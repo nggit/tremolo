@@ -57,8 +57,6 @@ class HTTPRequest(Request):
 
                     yield buf[i + 2:i + 2 + chunk_size]
                     del buf[:chunk_size + i + 4]
-
-            del buf[:]
         else:
             async for data in super().read():
                 yield data

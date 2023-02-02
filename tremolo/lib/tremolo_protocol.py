@@ -243,4 +243,6 @@ class TremoloProtocol(asyncio.Protocol):
 
         self._transport = None
         self._queue = {0: None, 1: None}
+        self._request = None
+        self._response = None
         self._data = None
