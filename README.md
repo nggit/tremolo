@@ -43,7 +43,7 @@ Well, `latin-1` on the right side is not required. The default is `utf-8`.
 You can save it as `hello.py` and just run it with `python3 hello.py`.
 
 ## Misc
-Tremolo utilizes `SO_REUSEPORT` to load balance worker processes.
+Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
 
 ```python
 app.run('0.0.0.0', 8000, worker_num=2)
@@ -57,6 +57,15 @@ app.add_listener(8002)
 
 app.run('0.0.0.0', 8000)
 ```
+
+You can even get higher concurrency with [uvloop](https://magic.io/blog/uvloop-blazing-fast-python-networking/):
+
+```python
+import asyncio
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+```
+
 ## Installing
 Tremolo is still in the early stages of development. But you can try installing it if you like.
 
