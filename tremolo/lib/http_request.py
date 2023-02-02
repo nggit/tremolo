@@ -43,21 +43,39 @@ class HTTPRequest(Request):
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
             buf = bytearray()
             agen = super().read()
+            tobe_read = 0
 
             while buf != b'0\r\n\r\n':
                 try:
                     buf.extend(await agen.__anext__())
                 except StopAsyncIteration:
-                    if buf == b'':
-                        raise
+                    pass
+
+                if buf == b'':
+                    raise StopAsyncIteration
+
+                if tobe_read > 0:
+                    data = buf[:tobe_read]
+
+                    yield data
+                    del buf[:tobe_read]
+
+                    tobe_read -= len(data)
+                    continue
 
                 i = buf.find(b'\r\n')
 
                 if i > -1:
-                    chunk_size = int(buf[:i], 16)
+                    chunk_size = int(buf[:i].split(b';')[0], 16)
+                    data = buf[i + 2:i + 2 + chunk_size]
+                    tobe_read = chunk_size - len(data)
 
-                    yield buf[i + 2:i + 2 + chunk_size]
-                    del buf[:chunk_size + i + 4]
+                    yield data
+
+                    if tobe_read > 0:
+                        del buf[:i + 2 + chunk_size]
+                    else:
+                        del buf[:chunk_size + i + 4]
         else:
             async for data in super().read():
                 yield data
