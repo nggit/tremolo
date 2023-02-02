@@ -48,7 +48,8 @@ class HTTPRequest(Request):
                 try:
                     buf.extend(await agen.__anext__())
                 except StopAsyncIteration:
-                    pass
+                    if buf == b'':
+                        raise
 
                 i = buf.find(b'\r\n')
 
