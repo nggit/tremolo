@@ -50,15 +50,7 @@ class Tremolo(TremoloProtocol):
             def wrapped(**kwargs):
                 return func(**kwargs)
 
-            options = {}
-
-            if func.__defaults__ is not None:
-                options = dict(zip(
-                    func.__code__.co_varnames[:len(func.__defaults__)],
-                    func.__defaults__
-                ))
-
-            self._add_handler(path, wrapped, options)
+            self._add_handler(path, wrapped, self._getoptions(func))
             return wrapped
 
         return decorator
@@ -71,13 +63,24 @@ class Tremolo(TremoloProtocol):
 
             for i, h in enumerate(self._route_handlers[0]):
                 if status == h[2]['status'][0]:
-                    self._route_handlers[0][i] = (None, wrapped, h[2])
+                    self._route_handlers[0][i] = (None, wrapped, dict(h[2], **self._getoptions(func)))
                     break
             return wrapped
 
         return decorator
 
-    def _add_handler(self, path=r'^/+(?:\?.*)?$', func=None, kwargs={}):
+    def _getoptions(self, func):
+        options = {}
+
+        if func.__defaults__ is not None:
+            options = dict(zip(
+                func.__code__.co_varnames[:len(func.__defaults__)],
+                func.__defaults__
+            ))
+
+        return options
+
+    def _add_handler(self, path='/', func=None, kwargs={}):
         if path.startswith('^') or path.endswith('$'):
             pattern = path.encode(encoding='latin-1')
             self._route_handlers['_unindexed'].append((pattern, func, kwargs))
