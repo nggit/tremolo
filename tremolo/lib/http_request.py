@@ -23,6 +23,9 @@ class HTTPRequest(Request):
         self._params = {}
         self._query = {}
 
+    async def read_started(self):
+        del self._body[:]
+
     async def read_timeout(self, timeout):
         if self._protocol.queue[1] is not None:
             self._protocol.queue[1].put_nowait(b'HTTP/%s 408 Request Timeout\r\nConnection: close\r\n\r\n' % self.version)
@@ -31,28 +34,31 @@ class HTTPRequest(Request):
             self._protocol.queue[1].put_nowait(None)
 
         del self._body[:]
+        await super().read_timeout(timeout)
 
-    async def body(self):
-        if self._body == bytearray():
-            async for data in self.read():
+    async def body(self, cache=True):
+        if self._body == b'' or cache is False:
+            async for data in self.read(cache=False):
                 self._body.extend(data)
 
         return self._body
 
-    async def read(self):
+    async def read(self, cache=True):
+        if cache and self._body != b'':
+            yield self._body
+            return
+
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
             buf = bytearray()
-            agen = super().read()
             tobe_read = 0
 
             while buf != b'0\r\n\r\n':
-                try:
-                    buf.extend(await agen.__anext__())
-                except StopAsyncIteration:
-                    pass
+                async for data in super().read():
+                    buf.extend(data)
+                    break
 
                 if buf == b'':
-                    raise StopAsyncIteration
+                    return
 
                 if tobe_read > 0:
                     data = buf[:tobe_read]

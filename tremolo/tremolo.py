@@ -126,7 +126,7 @@ class Tremolo(TremoloProtocol):
 
     async def body_received(self, request, response):
         if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
-            request.params['post'] = parse_qs(await request.body())
+            request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
 
     async def _handle_response(self, func, options={}):
         rate = options.get('rate', self.options['download_rate'])

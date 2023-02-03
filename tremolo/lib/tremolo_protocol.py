@@ -94,7 +94,7 @@ class TremoloProtocol(asyncio.Protocol):
         if transport is not None:
             self._body_size += data_size
 
-            if self._body_size >= self._request.content_length and queue is not None:
+            if self._request is not None and self._body_size >= self._request.content_length and queue is not None:
                 queue.put_nowait(None)
             elif self._body_size < self._options['client_max_body_size']:
                 transport.resume_reading()
