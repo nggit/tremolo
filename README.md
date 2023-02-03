@@ -42,6 +42,8 @@ Well, `latin-1` on the right side is not required. The default is `utf-8`.
 
 You can save it as `hello.py` and just run it with `python3 hello.py`.
 
+Your first *hello world* page with Tremolo will be at http://localhost:8000/hello.
+
 ## Misc
 Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
 
