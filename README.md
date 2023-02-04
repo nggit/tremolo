@@ -17,7 +17,11 @@ You can take advantage of this to serve files efficiently:
 @app.route('/my/url/movie.mp4')
 async def my_movie(content_type='video/mp4', **server):
     with open('/my/folder/movie.mp4', 'rb') as f:
-        yield f.read()
+        chunk = True
+
+        while chunk:
+            chunk = f.read(16 * 1024)
+            yield chunk
 ```
 
 And many different cases...
