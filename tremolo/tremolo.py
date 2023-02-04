@@ -298,7 +298,7 @@ class Tremolo(TremoloProtocol):
                 sock = socket.fromfd(fd, options['family'], socket.SOCK_STREAM)
                 sock.listen()
                 options['conn'].send(True)
-            except Exception as e:
+            except Exception:
                 options['conn'].send(False)
                 sock = options['conn'].recv()
                 sock.listen()

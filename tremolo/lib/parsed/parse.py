@@ -13,7 +13,7 @@ class ParseHeader:
         self._header = {}
         self._body = bytearray()
 
-        if data == b'' or not type(data) in (bytearray, bytes):
+        if data == b'' or not isinstance(data, (bytearray, bytes)):
             return self
 
         if isinstance(data, bytes):
