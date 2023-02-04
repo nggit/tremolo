@@ -9,7 +9,17 @@ class HTTPResponse(Response):
     def __init__(self, protocol, request):
         super().__init__(protocol)
 
-    async def set_cookie(self, name, value='', expires=0, path='/', domain=None, secure=False, httponly=False, samesite=None):
+        self._header = bytearray()
+        self._status = []
+
+    @property
+    def header(self):
+        return self._header
+
+    def append_header(self, value):
+        self._header.extend(value)
+
+    def set_cookie(self, name, value='', expires=0, path='/', domain=None, secure=False, httponly=False, samesite=None):
         if isinstance(name, str):
             name = name.encode(encoding='latin-1')
 
@@ -27,14 +37,25 @@ class HTTPResponse(Response):
             if k:
                 cookie.extend(v)
 
-        await self.write(cookie + b'\r\n', throttle=False)
-        del cookie[:]
+        self._header.extend(cookie + b'\r\n')
 
-    async def set_header(self, name, value=''):
+    def set_header(self, name, value=''):
         if isinstance(name, str):
             name = name.encode(encoding='latin-1')
 
         if isinstance(value, str):
             value = value.encode(encoding='latin-1')
 
-        await self.write(b'%s: %s\r\n' % (name, value), throttle=False)
+        self._header.extend(b'%s: %s\r\n' % (name, value))
+
+    def set_status(self, status=200, message=b'OK'):
+        if isinstance(message, str):
+            message = message.encode(encoding='latin-1')
+
+        self._status.append((status, message))
+
+    def get_status(self):
+        try:
+            return self._status.pop()
+        except IndexError:
+            return 200, b'OK'

@@ -134,10 +134,9 @@ class Tremolo(TremoloProtocol):
     async def _handle_response(self, func, options={}):
         rate = options.get('rate', self.options['download_rate'])
         buffer_size = options.get('buffer_size', self.options['buffer_size'])
-        status = options.get('status', (200, b'OK'))
 
-        if isinstance(status[1], str):
-            status = (status[0], status[1].encode(encoding='latin-1'))
+        if 'status' in options:
+            self._server['response'].set_status(options['status'])
 
         content_type = options.get('content_type', b'text/html')
 
@@ -149,31 +148,38 @@ class Tremolo(TremoloProtocol):
         if isinstance(self._server['name'], str):
             self._server['name'] = self._server['name'].encode(encoding='latin-1')
 
-        version = self._server['request'].version
-
-        if version != b'1.0':
-            version = b'1.1'
-
-        await self._server['response'].write(b'HTTP/%s %d %s\r\nDate: %s\r\nServer: %s\r\n' % (
-                                             version,
-                                             *status,
-                                             datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                             self._server['name']), throttle=False)
-
-        no_content = status[0] in (204, 304) or status[0] // 100 == 1
-        chunked = version == b'1.1' and self._server['request'].http_keepalive and no_content is False
-
-        if chunked:
-            await self._server['response'].write(b'Transfer-Encoding: chunked\r\n', throttle=False)
-            fmt = 2, b'%X\r\n%s\r\n'
-        else:
-            fmt = 1, b'%s'
+        self._server['response'].append_header(b'Date: %s\r\nServer: %s\r\n' % (
+                                               datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                               self._server['name']))
 
         agen = func(**self._server)
 
         try:
             data = await agen.__anext__()
+            is_agen = True
+        except AttributeError:
+            data = await agen
+            is_agen = False
 
+        version = self._server['request'].version
+
+        if version != b'1.0':
+            version = b'1.1'
+
+        status = self._server['response'].get_status()
+        no_content = status[0] in (204, 304) or status[0] // 100 == 1
+        chunked = version == b'1.1' and self._server['request'].http_keepalive and no_content is False
+
+        if chunked:
+            self._server['response'].append_header(b'Transfer-Encoding: chunked\r\n')
+            fmt = 2, b'%X\r\n%s\r\n'
+        else:
+            fmt = 1, b'%s'
+
+        await self._server['response'].write(b'HTTP/%s %d %s\r\n' % (version, *status), throttle=False)
+        await self._server['response'].write(self._server['response'].header, throttle=False)
+
+        if is_agen:
             if no_content:
                 await self._server['response'].write(b'Connection: close\r\n\r\n', throttle=False)
             else:
@@ -191,8 +197,7 @@ class Tremolo(TremoloProtocol):
                     except StopAsyncIteration:
                         await self._server['response'].write(fmt[1] % (0, b'')[-fmt[0]:], throttle=False)
                         break
-        except AttributeError:
-            data = await agen
+        else:
             encoding = ('utf-8',)
 
             if isinstance(data, tuple):
