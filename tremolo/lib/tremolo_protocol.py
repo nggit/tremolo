@@ -1,6 +1,7 @@
 # Copyright (c) 2023 nggit
 
 import asyncio
+import traceback
 
 from .parsed import ParseHeader
 from .http_request import HTTPRequest
@@ -57,10 +58,10 @@ class TremoloProtocol(asyncio.Protocol):
             self._tasks.append(self._loop.create_task(task))
 
     async def receive_timeout(self, timeout):
-        print('request timeout after {:d}s'.format(timeout))
+        self._options['logger'].info('request timeout after {:d}s'.format(timeout))
 
     async def keepalive_timeout(self, timeout):
-        print('keepalive timeout after {:d}s'.format(timeout))
+        self._options['logger'].info('keepalive timeout after {:d}s'.format(timeout))
 
     async def set_timeout(self, cancel_timeout, timeout=30, timeout_cb=None):
         _, pending = await asyncio.wait([cancel_timeout], timeout=timeout)
@@ -113,6 +114,25 @@ class TremoloProtocol(asyncio.Protocol):
     async def header_received(self, request, response):
         return
 
+    async def handle_exception(self, exc, request, response):
+        request.http_keepalive = False
+
+        if self.options['debug']:
+            data = b'<ul><li>%s</li></ul>' % '</li><li>'.join(
+                traceback.TracebackException.from_exception(exc).format()
+            ).encode(encoding='latin-1')
+        else:
+            data = b'Internal server error.'
+
+        await response.write(
+            b'HTTP/%s 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' % (
+            request.version, len(data), data))
+
+        await response.write(None)
+        self._options['logger'].error(': '.join(
+            (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
+        ), exc_info={True: exc, False: False}[self._options['debug']])
+
     async def _handle_request_header(self, data, sep):
         self._data = None
 
@@ -122,44 +142,47 @@ class TremoloProtocol(asyncio.Protocol):
             self._request = HTTPRequest(self, header)
             self._response = HTTPResponse(self, self._request)
 
-            if b'connection' in self._request.headers and self._request.headers[b'connection'].find(b'close') == -1:
-                self._request.http_keepalive = True
+            try:
+                if b'connection' in self._request.headers and self._request.headers[b'connection'].find(b'close') == -1:
+                    self._request.http_keepalive = True
 
-            if self._request.method in (b'POST', b'PUT', b'PATCH'):
-                if b'content-type' in self._request.headers:
-                    self._request.content_type = self._request.headers[b'content-type']
+                if self._request.method in (b'POST', b'PUT', b'PATCH'):
+                    if b'content-type' in self._request.headers:
+                        self._request.content_type = self._request.headers[b'content-type']
 
-                if b'content-length' in self._request.headers:
-                    self._request.content_length = int(self._request.headers[b'content-length'])
+                    if b'content-length' in self._request.headers:
+                        self._request.content_length = int(self._request.headers[b'content-length'])
 
-                if b'expect' in self._request.headers and self._request.headers[b'expect'] == b'100-continue':
-                    if self._request.content_length > self._options['client_max_body_size']:
+                    if b'expect' in self._request.headers and self._request.headers[b'expect'] == b'100-continue':
+                        if self._request.content_length > self._options['client_max_body_size']:
+                            if self._queue[1] is not None:
+                                self._queue[1].put_nowait(
+                                    b'HTTP/%s 417 Expectation Failed\r\nConnection: close\r\n\r\n' % self._request.version
+                                )
+                                self._request.http_keepalive = False
+                                self._queue[1].put_nowait(None)
+
+                            return
+                        elif self._queue[1] is not None:
+                            self._queue[1].put_nowait(b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version)
+                    elif self._request.content_length > self._options['client_max_body_size']:
                         if self._queue[1] is not None:
                             self._queue[1].put_nowait(
-                                b'HTTP/%s 417 Expectation Failed\r\nConnection: close\r\n\r\n' % self._request.version
+                                b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version
                             )
                             self._request.http_keepalive = False
                             self._queue[1].put_nowait(None)
 
                         return
-                    elif self._queue[1] is not None:
-                        self._queue[1].put_nowait(b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version)
-                elif self._request.content_length > self._options['client_max_body_size']:
-                    if self._queue[1] is not None:
-                        self._queue[1].put_nowait(
-                            b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version
-                        )
-                        self._request.http_keepalive = False
-                        self._queue[1].put_nowait(None)
 
-                    return
+                    await self._put_to_queue(
+                        data[sep + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
+                    )
+                    await self.body_received(self._request, self._response)
 
-                await self._put_to_queue(
-                    data[sep + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
-                )
-                await self.body_received(self._request, self._response)
-
-            await self.header_received(self._request, self._response)
+                await self.header_received(self._request, self._response)
+            except Exception as exc:
+                await self.handle_exception(exc, self._request, self._response)
         else:
             if self._queue[1] is not None:
                 self._queue[1].put_nowait(None)
@@ -178,10 +201,10 @@ class TremoloProtocol(asyncio.Protocol):
 
                 self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, sep)))
             elif sep > 8192:
-                print('request header too large')
+                self._options['logger'].info('request header too large')
                 self._transport.abort()
             elif not (sep == -1 and len(self._data) < 8192):
-                print('bad request')
+                self._options['logger'].info('bad request')
                 self._transport.abort()
 
             return
@@ -204,8 +227,12 @@ class TremoloProtocol(asyncio.Protocol):
                     if self._request is not None and self._request.http_keepalive and self._data is None:
                         for i, task in enumerate(self._tasks):
                             try:
-                                if task.exception():
-                                    task.print_stack()
+                                exc = task.exception()
+
+                                if exc:
+                                    self._options['logger'].error(': '.join(
+                                        (exc.__class__.__name__, str(exc))
+                                    ), exc_info={True: exc, False: False}[self._options['debug']])
 
                                 del self._tasks[i]
                             except InvalidStateError:
@@ -227,17 +254,21 @@ class TremoloProtocol(asyncio.Protocol):
                         return
 
                 self._transport.write(data)
-            except Exception:
+            except Exception as exc:
                 if self._transport is not None:
                     self._transport.abort()
 
-                return
+                raise exc
 
     def connection_lost(self, exc):
         for task in self._tasks:
             try:
-                if task.exception():
-                    task.print_stack()
+                exc = task.exception()
+
+                if exc:
+                    self._options['logger'].error(': '.join(
+                        (exc.__class__.__name__, str(exc))
+                    ), exc_info={True: exc, False: False}[self._options['debug']])
             except InvalidStateError:
                 task.cancel()
 

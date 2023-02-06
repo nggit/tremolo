@@ -2,6 +2,7 @@
 
 import asyncio
 import ipaddress
+import logging
 import multiprocessing as mp
 import os
 import re
@@ -136,7 +137,7 @@ class Tremolo(TremoloProtocol):
         buffer_size = options.get('buffer_size', self.options['buffer_size'])
 
         if 'status' in options:
-            self._server['response'].set_status(options['status'])
+            self._server['response'].set_status(*options['status'])
 
         content_type = options.get('content_type', b'text/html')
 
@@ -318,6 +319,8 @@ class Tremolo(TremoloProtocol):
 
         server = await self._loop.create_server(
             lambda : self.__class__(loop=self._loop,
+                                    logger=self._logger,
+                                    debug=options.get('debug', False),
                                     download_rate=options.get('download_rate', 1048576),
                                     upload_rate=options.get('upload_rate', 1048576),
                                     buffer_size=options.get('buffer_size', 16 * 1024),
@@ -349,6 +352,15 @@ class Tremolo(TremoloProtocol):
 
     def _worker(self, host, port, **kwargs):
         self._compile_handlers(kwargs['handlers'])
+
+        self._logger = logging.getLogger(mp.current_process().name)
+        self._logger.setLevel(getattr(logging, kwargs.get('log_level', 'DEBUG'), logging.DEBUG))
+
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+
+        handler.setFormatter(formatter)
+        self._logger.addHandler(handler)
 
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)

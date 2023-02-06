@@ -14,7 +14,7 @@ class Request:
         return
 
     async def read_timeout(self, timeout):
-        print('read timeout after {:d}s'.format(timeout))
+        self._protocol.options['logger'].info('read timeout after {:d}s'.format(timeout))
 
     async def read(self):
         await self.read_started()
