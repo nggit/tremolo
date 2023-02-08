@@ -19,16 +19,17 @@ from .lib.tremolo_protocol import TremoloProtocol
 
 class Tremolo(TremoloProtocol):
     def __init__(self, *args, **kwargs):
-        if '_handlers' in kwargs:
-            super().__init__(*args, **kwargs)
-
+        try:
             self._route_handlers = kwargs['_handlers']
+            self._middlewares = kwargs['_middlewares']
             self._server = {
-                'name': b'Tremolo',
-                'request' : None,
-                'response' : None
+                'logger': kwargs['logger'],
+                'request': None,
+                'response': None
             }
-        else:
+
+            super().__init__(*args, **kwargs)
+        except KeyError:
             self._listeners = []
 
             self._route_handlers = {
@@ -40,6 +41,13 @@ class Tremolo(TremoloProtocol):
                     (b'^/+(?:\\?.*)?$', self._index, {})
                 ],
                 '_unindexed': []
+            }
+
+            self._middlewares = {
+                'data': [
+                    (self._on_write, {})
+                ],
+                'request': []
             }
 
     def add_listener(self, port, host=None, **options):
@@ -69,6 +77,29 @@ class Tremolo(TremoloProtocol):
             return wrapped
 
         return decorator
+
+    def middleware(self, name):
+        def decorator(func):
+            @wraps(func)
+            def wrapped(**kwargs):
+                return func(**kwargs)
+
+            self._middlewares[name].append((wrapped, self._getoptions(func)))
+            return wrapped
+
+        return decorator
+
+    def on_data(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('data')(args[0])
+
+        return self.middleware('data')
+
+    def on_request(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('request')(args[0])
+
+        return self.middleware('request')
 
     def _getoptions(self, func):
         options = {}
@@ -126,34 +157,71 @@ class Tremolo(TremoloProtocol):
         yield b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; font-family: sans-serif; }</style></head><body>'
         yield b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr /><address>%s</address></body></html>' % (
             server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
-            server['name'])
+            server['options']['server_name'])
+
+    async def _on_write(self, **server):
+        return
 
     async def body_received(self, request, response):
         if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
             request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
 
-    async def _handle_response(self, func, options={}):
-        rate = options.get('rate', self.options['download_rate'])
-        buffer_size = options.get('buffer_size', self.options['buffer_size'])
+    def _set_base_header(self, options={}):
+        if self._server['response'].header != b'':
+            return
+
+        options['server_name'] = options.get('server_name', self.options['server_name'])
+
+        if isinstance(options['server_name'], str):
+            options['server_name'] = options['server_name'].encode(encoding='latin-1')
+
+        self._server['response'].append_header(b'Date: %s\r\nServer: %s\r\n' % (
+                                               datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                               options['server_name']))
+
+    async def _handle_middleware(self, func, options={}):
+        self._set_base_header(options)
+
+        data = await func(**{'options': options, **self._server})
+
+        if data is None:
+            return options
 
         if 'status' in options:
             self._server['response'].set_status(*options['status'])
 
-        content_type = options.get('content_type', b'text/html')
+        options['content_type'] = options.get('content_type', b'text/html; charset=utf-8')
 
-        if isinstance(content_type, str):
-            content_type = content_type.encode(encoding='latin-1')
+        if isinstance(options['content_type'], str):
+            options['content_type'] = options['content_type'].encode(encoding='latin-1')
 
-        self._server['name'] = options.get('server_name', self.options['server_name'])
+        self._server['response'].set_header(b'Content-Type', options['content_type'])
 
-        if isinstance(self._server['name'], str):
-            self._server['name'] = self._server['name'].encode(encoding='latin-1')
+        encoding = ('utf-8',)
 
-        self._server['response'].append_header(b'Date: %s\r\nServer: %s\r\n' % (
-                                               datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                               self._server['name']))
+        if isinstance(data, tuple):
+            data, *encoding = (*data, 'utf-8')
 
-        agen = func(**self._server)
+        if isinstance(data, str):
+            data = data.encode(encoding=encoding[0])
+
+        await self._server['response'].end(data)
+
+    async def _handle_response(self, func, options={}):
+        options['rate'] = options.get('rate', self.options['download_rate'])
+        options['buffer_size'] = options.get('buffer_size', self.options['buffer_size'])
+
+        if 'status' in options:
+            self._server['response'].set_status(*options['status'])
+
+        options['content_type'] = options.get('content_type', b'text/html; charset=utf-8')
+
+        if isinstance(options['content_type'], str):
+            options['content_type'] = options['content_type'].encode(encoding='latin-1')
+
+        self._set_base_header(options)
+
+        agen = func(**{'options': options, **self._server})
 
         try:
             data = await agen.__anext__()
@@ -169,7 +237,7 @@ class Tremolo(TremoloProtocol):
 
         status = self._server['response'].get_status()
         no_content = status[0] in (204, 304) or status[0] // 100 == 1
-        chunked = version == b'1.1' and self._server['request'].http_keepalive and no_content is False
+        chunked = options.get('chunked', version == b'1.1' and self._server['request'].http_keepalive and no_content is False)
 
         if chunked:
             self._server['response'].append_header(b'Transfer-Encoding: chunked\r\n')
@@ -177,26 +245,33 @@ class Tremolo(TremoloProtocol):
         else:
             fmt = 1, b'%s'
 
-        await self._server['response'].write(b'HTTP/%s %d %s\r\n' % (version, *status), throttle=False)
-        await self._server['response'].write(self._server['response'].header, throttle=False)
+        self._server['response'].set_write_callback(
+            lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
+        )
+        await self._server['response'].write(b'HTTP/%s %d %s\r\n' % (version, *status), name='header', throttle=False)
+        await self._server['response'].write(self._server['response'].header, name='header', throttle=False)
 
         if is_agen:
             if no_content:
-                await self._server['response'].write(b'Connection: close\r\n\r\n', throttle=False)
+                await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
                 await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
-                                                     content_type, throttle=False)
+                                                     options['content_type'], name='header', throttle=False)
 
             if not (self._server['request'].method == b'HEAD' or no_content):
-                await self._server['response'].write(fmt[1] % (len(data), data)[-fmt[0]:], rate=rate, buffer_size=buffer_size)
+                await self._server['response'].write(
+                    fmt[1] % (len(data), data)[-fmt[0]:], name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                )
 
                 while True:
                     try:
                         data = await agen.__anext__()
 
-                        await self._server['response'].write(fmt[1] % (len(data), data)[-fmt[0]:], rate=rate, buffer_size=buffer_size)
+                        await self._server['response'].write(
+                            fmt[1] % (len(data), data)[-fmt[0]:], name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                        )
                     except StopAsyncIteration:
-                        await self._server['response'].write(fmt[1] % (0, b'')[-fmt[0]:], throttle=False)
+                        await self._server['response'].write(fmt[1] % (0, b'')[-fmt[0]:], name='body', throttle=False)
                         break
         else:
             encoding = ('utf-8',)
@@ -208,26 +283,37 @@ class Tremolo(TremoloProtocol):
                 data = data.encode(encoding=encoding[0])
 
             if no_content or data == b'':
-                await self._server['response'].write(b'Connection: close\r\n\r\n', throttle=False)
+                await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
                 if chunked:
                     await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
-                                                         % content_type, throttle=False)
+                                                         % options['content_type'], name='header', throttle=False)
                 else:
-                    await self._server['response'].write(b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n'
-                                                         % (content_type, len(data), {True: b'keep-alive',
-                                                             False: b'close'}[self._server['request'].http_keepalive]), throttle=False)
+                    await self._server['response'].write(
+                        b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n'
+                        % (options['content_type'], len(data), {
+                            True: b'keep-alive',
+                            False: b'close'}[self._server['request'].http_keepalive]), name='header', throttle=False
+                    )
 
             if data != b'' and not (self._server['request'].method == b'HEAD' or no_content):
-                await self._server['response'].write((fmt[1] + fmt[1]) % (
-                                                     *(len(data), data)[-fmt[0]:],
-                                                     *(0, b'')[-fmt[0]:]), rate=rate, buffer_size=buffer_size)
+                await self._server['response'].write(
+                    (fmt[1] + fmt[1]) % (*(len(data), data)[-fmt[0]:],
+                                         *(0, b'')[-fmt[0]:]), name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                )
 
         await self._server['response'].write(None)
 
     async def header_received(self, request, response):
         self._server['request'] = request
         self._server['response'] = response
+        options = {}
+
+        for middleware in self._middlewares['request']:
+            options = await self._handle_middleware(middleware[0], {**middleware[1], **options})
+
+            if not isinstance(options, dict):
+                return
 
         if request.is_valid:
             if b'cookie' in request.headers:
@@ -262,7 +348,7 @@ class Tremolo(TremoloProtocol):
 
                         self._server['request'].params['url'] = matches
 
-                        await self._handle_response(func, kwargs)
+                        await self._handle_response(func, {**kwargs, **options})
                         return
             else:
                 for i, (pattern, func, kwargs) in enumerate(self._route_handlers['_unindexed']):
@@ -281,15 +367,15 @@ class Tremolo(TremoloProtocol):
 
                         self._server['request'].params['url'] = matches
 
-                        await self._handle_response(func, kwargs)
+                        await self._handle_response(func, {**kwargs, **options})
                         del self._route_handlers['_unindexed'][i]
                         return
 
             # not found
-            await self._handle_response(self._route_handlers[0][1][1], self._route_handlers[0][1][2])
+            await self._handle_response(self._route_handlers[0][1][1], {**self._route_handlers[0][1][2], **options})
         else:
             # bad request
-            await self._handle_response(self._route_handlers[0][0][1], self._route_handlers[0][0][2])
+            await self._handle_response(self._route_handlers[0][0][1], {**self._route_handlers[0][0][2], **options})
 
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
@@ -326,8 +412,11 @@ class Tremolo(TremoloProtocol):
                                     buffer_size=options.get('buffer_size', 16 * 1024),
                                     client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
                                     server_name=server_name,
-                                    _handlers=options['handlers']), sock=sock)
+                                    _handlers=options['handlers'],
+                                    _middlewares=options['middlewares']), sock=sock)
 
+        print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+        sys.stdout.flush()
         sys.stdout.buffer.write(b'%s (pid %d) is started at %s port %d' % (server_name, os.getpid(), host, port))
         print()
 
@@ -403,9 +492,13 @@ class Tremolo(TremoloProtocol):
                 parent_conn, child_conn = mp.Pipe()
                 args = (host, port)
 
-                p = mp.Process(target=self._worker,
-                               args=args,
-                               kwargs=dict(options, conn=child_conn, family=sock.family, handlers=deepcopy(self._route_handlers)))
+                p = mp.Process(
+                    target=self._worker, args=args, kwargs=dict(options,
+                                                                conn=child_conn,
+                                                                family=sock.family,
+                                                                handlers=deepcopy(self._route_handlers),
+                                                                middlewares=self._middlewares)
+                    )
 
                 p.start()
                 child_pid = parent_conn.recv()
@@ -427,9 +520,13 @@ class Tremolo(TremoloProtocol):
 
                     parent_conn.close()
                     parent_conn, child_conn = mp.Pipe()
-                    p = mp.Process(target=self._worker,
-                                   args=args,
-                                   kwargs=dict(options, conn=child_conn, family=sock.family, handlers=deepcopy(self._route_handlers)))
+                    p = mp.Process(
+                        target=self._worker, args=args, kwargs=dict(options,
+                                                                    conn=child_conn,
+                                                                    family=sock.family,
+                                                                    handlers=deepcopy(self._route_handlers),
+                                                                    middlewares=self._middlewares)
+                        )
 
                     p.start()
                     pid = parent_conn.recv()

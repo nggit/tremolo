@@ -10,7 +10,9 @@ class HTTPResponse(Response):
         super().__init__(protocol)
 
         self._header = bytearray()
+        self._request = request
         self._status = []
+        self._write_cb = self._on_write
 
     @property
     def header(self):
@@ -59,3 +61,29 @@ class HTTPResponse(Response):
             return self._status.pop()
         except IndexError:
             return 200, b'OK'
+
+    def set_write_callback(self, write_cb):
+        self._write_cb = write_cb
+
+    async def end(self, data=None):
+        if isinstance(data, (bytes, bytearray)):
+            content_length = len(data)
+        else:
+            data = b''
+            content_length = 0
+
+        await super().write(b'HTTP/%s %d %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
+            self._request.version,
+            *self.get_status(),
+            content_length,
+            self._header,
+            data))
+
+        await super().write(None)
+
+    async def write(self, data, name='data', **kwargs):
+        await self._write_cb(data=(name, data))
+        await super().write(data, **kwargs)
+
+    async def _on_write(self, **kwargs):
+        return
