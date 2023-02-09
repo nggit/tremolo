@@ -13,6 +13,7 @@ async def hello_world(**server):
 
 You can take advantage of this to serve big files efficiently:
 
+```python
 @app.route('/my/url/big.data')
 async def my_big_data(content_type='application/octet-stream', **server):
     with open('/my/folder/big.data', 'rb') as f:
@@ -21,6 +22,7 @@ async def my_big_data(content_type='application/octet-stream', **server):
         while chunk:
             chunk = f.read(server['options']['buffer_size'])
             yield chunk
+```
 
 And other use cases…
 
