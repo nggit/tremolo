@@ -143,7 +143,10 @@ class TremoloProtocol(asyncio.Protocol):
             self._response = HTTPResponse(self, self._request)
 
             try:
-                if b'connection' in self._request.headers and self._request.headers[b'connection'].find(b'close') == -1:
+                if b'connection' in self._request.headers:
+                    if self._request.headers[b'connection'].find(b'close') == -1:
+                        self._request.http_keepalive = True
+                elif self._request.version == b'1.1':
                     self._request.http_keepalive = True
 
                 if self._request.method in (b'POST', b'PUT', b'PATCH'):

@@ -190,12 +190,8 @@ class Tremolo(TremoloProtocol):
         if 'status' in options:
             self._server['response'].set_status(*options['status'])
 
-        options['content_type'] = options.get('content_type', b'text/html; charset=utf-8')
-
-        if isinstance(options['content_type'], str):
-            options['content_type'] = options['content_type'].encode(encoding='latin-1')
-
-        self._server['response'].set_header(b'Content-Type', options['content_type'])
+        if 'content_type' in options:
+            self._server['response'].set_content_type(options['content_type'])
 
         encoding = ('utf-8',)
 
@@ -214,10 +210,8 @@ class Tremolo(TremoloProtocol):
         if 'status' in options:
             self._server['response'].set_status(*options['status'])
 
-        options['content_type'] = options.get('content_type', b'text/html; charset=utf-8')
-
-        if isinstance(options['content_type'], str):
-            options['content_type'] = options['content_type'].encode(encoding='latin-1')
+        if 'content_type' in options:
+            self._server['response'].set_content_type(options['content_type'])
 
         self._set_base_header(options)
 
@@ -256,7 +250,7 @@ class Tremolo(TremoloProtocol):
                 await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
                 await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
-                                                     options['content_type'], name='header', throttle=False)
+                                                     self._server['response'].get_content_type(), name='header', throttle=False)
 
             if not (self._server['request'].method == b'HEAD' or no_content):
                 await self._server['response'].write(
@@ -287,11 +281,11 @@ class Tremolo(TremoloProtocol):
             else:
                 if chunked:
                     await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
-                                                         % options['content_type'], name='header', throttle=False)
+                                                         % self._server['response'].get_content_type(), name='header', throttle=False)
                 else:
                     await self._server['response'].write(
                         b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n'
-                        % (options['content_type'], len(data), {
+                        % (self._server['response'].get_content_type(), len(data), {
                             True: b'keep-alive',
                             False: b'close'}[self._server['request'].http_keepalive]), name='header', throttle=False
                     )

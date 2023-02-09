@@ -12,6 +12,7 @@ class HTTPResponse(Response):
         self._header = bytearray()
         self._request = request
         self._status = []
+        self._content_type = []
         self._write_cb = self._on_write
 
     @property
@@ -62,6 +63,18 @@ class HTTPResponse(Response):
         except IndexError:
             return 200, b'OK'
 
+    def set_content_type(self, content_type=b'text/html; charset=utf-8'):
+        if isinstance(content_type, str):
+            content_type = content_type.encode(encoding='latin-1')
+
+        self._content_type.append(content_type)
+
+    def get_content_type(self):
+        try:
+            return self._content_type.pop()
+        except IndexError:
+            return b'text/html; charset=utf-8'
+
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
@@ -72,9 +85,10 @@ class HTTPResponse(Response):
             data = b''
             content_length = 0
 
-        await super().write(b'HTTP/%s %d %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
+        await super().write(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
             self._request.version,
             *self.get_status(),
+            self.get_content_type(),
             content_length,
             self._header,
             data))
