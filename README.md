@@ -1,6 +1,6 @@
 # Tremolo
 
-Tremolo is a stream-oriented asynchronous web server/framework written in pure Python. Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
+Tremolo is a stream-oriented, asynchronous web server/framework written in pure Python. Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
 
 Being built with a stream in mind, Tremolo tends to use `yield` instead of `return` in route handlers.
 
@@ -11,20 +11,18 @@ async def hello_world(**server):
     yield b'world!'
 ```
 
-You can take advantage of this to serve files efficiently:
+You can take advantage of this to serve big files efficiently:
 
-```python
-@app.route('/my/url/movie.mp4')
-async def my_movie(content_type='video/mp4', **server):
-    with open('/my/folder/movie.mp4', 'rb') as f:
+@app.route('/my/url/big.data')
+async def my_big_data(content_type='application/octet-stream', **server):
+    with open('/my/folder/big.data', 'rb') as f:
         chunk = True
 
         while chunk:
-            chunk = f.read(16 * 1024)
+            chunk = f.read(server['options']['buffer_size'])
             yield chunk
-```
 
-And many different cases...
+And other use cases…
 
 ## Example
 Here is a complete *hello world* example in case you missed the usual `return`.

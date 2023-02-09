@@ -56,36 +56,36 @@ class Tremolo(TremoloProtocol):
     def route(self, path):
         def decorator(func):
             @wraps(func)
-            def wrapped(**kwargs):
+            def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._add_handler(path, wrapped, self._getoptions(func))
-            return wrapped
+            self._add_handler(path, wrapper, self._getoptions(func))
+            return wrapper
 
         return decorator
 
     def errorhandler(self, status):
         def decorator(func):
             @wraps(func)
-            def wrapped(**kwargs):
+            def wrapper(**kwargs):
                 return func(**kwargs)
 
             for i, h in enumerate(self._route_handlers[0]):
                 if status == h[2]['status'][0]:
-                    self._route_handlers[0][i] = (None, wrapped, dict(h[2], **self._getoptions(func)))
+                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self._getoptions(func)))
                     break
-            return wrapped
+            return wrapper
 
         return decorator
 
     def middleware(self, name):
         def decorator(func):
             @wraps(func)
-            def wrapped(**kwargs):
+            def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._middlewares[name].append((wrapped, self._getoptions(func)))
-            return wrapped
+            self._middlewares[name].append((wrapper, self._getoptions(func)))
+            return wrapper
 
         return decorator
 
@@ -249,6 +249,9 @@ class Tremolo(TremoloProtocol):
             if no_content:
                 await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
+                if not chunked:
+                    self._server['request'].http_keepalive = False
+
                 await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
                                                      self._server['response'].get_content_type(), name='header', throttle=False)
 
@@ -311,9 +314,14 @@ class Tremolo(TremoloProtocol):
 
         if request.is_valid:
             if b'cookie' in request.headers:
-                self._server['request'].cookies = parse_qs(
-                    request.headers[b'cookie'].replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
-                )
+                if isinstance(request.headers[b'cookie'], list):
+                    self._server['request'].cookies = parse_qs(
+                        b'; '.join(request.headers[b'cookie']).replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+                    )
+                else:
+                    self._server['request'].cookies = parse_qs(
+                        request.headers[b'cookie'].replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+                    )
 
             qs_pos = request.path.find(b'?')
 
