@@ -39,7 +39,7 @@ async def hello_world(**server):
     return 'Hello world!', 'latin-1'
 
 if __name__ == '__main__':
-    app.run('0.0.0.0', 8000)
+    app.run('0.0.0.0', 8000, debug=True)
 ```
 
 Well, `latin-1` on the right side is not required. The default is `utf-8`.
