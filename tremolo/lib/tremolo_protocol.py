@@ -95,18 +95,18 @@ class TremoloProtocol(asyncio.Protocol):
         if transport is not None:
             self._body_size += data_size
 
-            if self._request is not None and self._body_size >= self._request.content_length and queue is not None:
+            if (self._request is not None and self._request.content_length > -1 and self._body_size >= self._request.content_length
+                    and queue is not None):
                 queue.put_nowait(None)
             elif self._body_size < self._options['client_max_body_size']:
                 transport.resume_reading()
             else:
-                transport.write(b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version)
+                if self._request is not None:
+                    transport.write(b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version)
 
-                if self._queue[1] is not None:
-                    if self._request is not None:
+                    if self._queue[1] is not None:
                         self._request.http_keepalive = False
-
-                    self._queue[1].put_nowait(None)
+                        self._queue[1].put_nowait(None)
 
     async def body_received(self, request, response):
         return
@@ -167,6 +167,7 @@ class TremoloProtocol(asyncio.Protocol):
 
                             return
                         elif self._queue[1] is not None:
+                            self._request.http_continue = True
                             self._queue[1].put_nowait(b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version)
                     elif self._request.content_length > self._options['client_max_body_size']:
                         if self._queue[1] is not None:
@@ -241,7 +242,9 @@ class TremoloProtocol(asyncio.Protocol):
                             except InvalidStateError:
                                 pass
 
-                        self._data = bytearray()
+                        if not self._request.http_continue:
+                            self._data = bytearray()
+
                         self._body_size = 0
                         self._cancel_timeouts['keepalive'] = self._loop.create_future()
 

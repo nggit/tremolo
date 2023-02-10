@@ -19,6 +19,7 @@ class HTTPRequest(Request):
         self._content_type = b'application/octet-stream'
         self._body = bytearray()
         self._cookies = {}
+        self._http_continue = False
         self._http_keepalive = False
         self._params = {}
         self._query = {}
@@ -50,12 +51,17 @@ class HTTPRequest(Request):
 
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
             buf = bytearray()
+            agen = super().read()
             tobe_read = 0
 
             while buf != b'0\r\n\r\n':
-                async for data in super().read():
+                try:
+                    data = await agen.__anext__()
+
                     buf.extend(data)
-                    break
+                except StopAsyncIteration:
+                    if not buf.endswith(b'0\r\n\r\n'):
+                        break
 
                 if buf == b'':
                     return
@@ -67,6 +73,10 @@ class HTTPRequest(Request):
                     del buf[:tobe_read]
 
                     tobe_read -= len(data)
+
+                    if tobe_read <= 0:
+                        del buf[:2]
+
                     continue
 
                 i = buf.find(b'\r\n')
@@ -109,6 +119,14 @@ class HTTPRequest(Request):
     @cookies.setter
     def cookies(self, value):
         self._cookies = value
+
+    @property
+    def http_continue(self):
+        return self._http_continue
+
+    @http_continue.setter
+    def http_continue(self, value):
+        self._http_continue = value
 
     @property
     def http_keepalive(self):
