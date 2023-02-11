@@ -45,7 +45,7 @@ class Tremolo(TremoloProtocol):
 
             self._middlewares = {
                 'data': [
-                    (self._on_write, {})
+                    (None, {})
                 ],
                 'request': []
             }
@@ -159,9 +159,6 @@ class Tremolo(TremoloProtocol):
             server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
             server['options']['server_name'])
 
-    async def _on_write(self, **server):
-        return
-
     async def body_received(self, request, response):
         if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
             request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
@@ -239,9 +236,11 @@ class Tremolo(TremoloProtocol):
         else:
             fmt = 1, b'%s'
 
-        self._server['response'].set_write_callback(
-            lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
-        )
+        if self._middlewares['data'][-1][0] is not None:
+            self._server['response'].set_write_callback(
+                lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
+            )
+
         await self._server['response'].write(b'HTTP/%s %d %s\r\n' % (version, *status), name='header', throttle=False)
         await self._server['response'].write(self._server['response'].header, name='header', throttle=False)
 

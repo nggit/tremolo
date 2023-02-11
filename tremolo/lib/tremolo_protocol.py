@@ -51,7 +51,7 @@ class TremoloProtocol(asyncio.Protocol):
 
         self._data = bytearray()
         self._body_size = 0
-        self._cancel_timeouts = dict(receive=self._loop.create_future())
+        self._cancel_timeouts = {'receive': self._loop.create_future()}
 
         for task in (self._transfer_data(), self.set_timeout(self._cancel_timeouts['receive'],
                                                              timeout_cb=self.receive_timeout)):
