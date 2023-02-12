@@ -4,7 +4,7 @@ class Response:
     def __init__(self, protocol):
         self._protocol = protocol
 
-    async def write(self, data, throttle=True, rate=1048576, buffer_size=16 * 1024):
+    async def send(self, data, throttle=True, rate=1048576, buffer_size=16 * 1024):
         if data is None:
             if self._protocol.queue[1] is not None:
                 self._protocol.queue[1].put_nowait(None)

@@ -24,10 +24,10 @@ class HTTPRequest(Request):
         self._params = {}
         self._query = {}
 
-    async def read_started(self):
+    async def recv_started(self):
         del self._body[:]
 
-    async def read_timeout(self, timeout):
+    async def recv_timeout(self, timeout):
         if self._protocol.queue[1] is not None:
             self._protocol.queue[1].put_nowait(b'HTTP/%s 408 Request Timeout\r\nConnection: close\r\n\r\n' % self.version)
 
@@ -35,7 +35,7 @@ class HTTPRequest(Request):
             self._protocol.queue[1].put_nowait(None)
 
         del self._body[:]
-        await super().read_timeout(timeout)
+        await super().recv_timeout(timeout)
 
     async def body(self, cache=True):
         if self._body == b'' or cache is False:
@@ -51,7 +51,7 @@ class HTTPRequest(Request):
 
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
             buf = bytearray()
-            agen = super().read()
+            agen = self.recv()
             tobe_read = 0
 
             while buf != b'0\r\n\r\n':
@@ -93,7 +93,7 @@ class HTTPRequest(Request):
                     else:
                         del buf[:chunk_size + i + 4]
         else:
-            async for data in super().read():
+            async for data in self.recv():
                 yield data
 
     @property

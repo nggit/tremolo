@@ -85,7 +85,7 @@ class HTTPResponse(Response):
             data = b''
             content_length = 0
 
-        await super().write(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
+        await self.send(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
             self._request.version,
             *self.get_status(),
             self.get_content_type(),
@@ -93,11 +93,11 @@ class HTTPResponse(Response):
             self._header,
             data))
 
-        await super().write(None)
+        await self.send(None)
 
     async def write(self, data, name='data', **kwargs):
         await self._write_cb(data=(name, data))
-        await super().write(data, **kwargs)
+        await self.send(data, **kwargs)
 
     async def _on_write(self, **kwargs):
         return
