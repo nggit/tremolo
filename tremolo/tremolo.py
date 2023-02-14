@@ -229,13 +229,12 @@ class Tremolo(TremoloProtocol):
 
         status = self._server['response'].get_status()
         no_content = status[0] in (204, 304) or status[0] // 100 == 1
-        chunked = options.get('chunked', version == b'1.1' and self._server['request'].http_keepalive and no_content is False)
+        self._server['response'].http_chunked = options.get(
+            'chunked', version == b'1.1' and self._server['request'].http_keepalive and no_content is False
+        )
 
-        if chunked:
+        if self._server['response'].http_chunked:
             self._server['response'].append_header(b'Transfer-Encoding: chunked\r\n')
-            fmt = 2, b'%X\r\n%s\r\n'
-        else:
-            fmt = 1, b'%s'
 
         if self._middlewares['data'][-1][0] is not None:
             self._server['response'].set_write_callback(
@@ -249,7 +248,7 @@ class Tremolo(TremoloProtocol):
             if no_content:
                 await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
-                if not chunked:
+                if not self._server['response'].http_chunked:
                     self._server['request'].http_keepalive = False
 
                 await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
@@ -257,7 +256,7 @@ class Tremolo(TremoloProtocol):
 
             if not (self._server['request'].method == b'HEAD' or no_content):
                 await self._server['response'].write(
-                    fmt[1] % (len(data), data)[-fmt[0]:], name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                    data, name='body', rate=options['rate'], buffer_size=options['buffer_size']
                 )
 
                 while True:
@@ -265,10 +264,10 @@ class Tremolo(TremoloProtocol):
                         data = await agen.__anext__()
 
                         await self._server['response'].write(
-                            fmt[1] % (len(data), data)[-fmt[0]:], name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                            data, name='body', rate=options['rate'], buffer_size=options['buffer_size']
                         )
                     except StopAsyncIteration:
-                        await self._server['response'].write(fmt[1] % (0, b'')[-fmt[0]:], name='body', throttle=False)
+                        await self._server['response'].write(b'', name='body', throttle=False)
                         break
         else:
             encoding = ('utf-8',)
@@ -282,7 +281,7 @@ class Tremolo(TremoloProtocol):
             if no_content or data == b'':
                 await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
             else:
-                if chunked:
+                if self._server['response'].http_chunked:
                     await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
                                                          % self._server['response'].get_content_type(), name='header', throttle=False)
                 else:
@@ -294,10 +293,8 @@ class Tremolo(TremoloProtocol):
                     )
 
             if data != b'' and not (self._server['request'].method == b'HEAD' or no_content):
-                await self._server['response'].write(
-                    (fmt[1] + fmt[1]) % (*(len(data), data)[-fmt[0]:],
-                                         *(0, b'')[-fmt[0]:]), name='body', rate=options['rate'], buffer_size=options['buffer_size']
-                )
+                await self._server['response'].write(data, name='body', rate=options['rate'], buffer_size=options['buffer_size'])
+                await self._server['response'].write(b'', name='body', throttle=False)
 
         await self._server['response'].write(None)
 

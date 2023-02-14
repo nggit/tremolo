@@ -15,6 +15,8 @@ class HTTPResponse(Response):
         self._content_type = []
         self._write_cb = self._on_write
 
+        self._http_chunked = False
+
     @property
     def header(self):
         return self._header
@@ -97,7 +99,19 @@ class HTTPResponse(Response):
 
     async def write(self, data, name='data', **kwargs):
         await self._write_cb(data=(name, data))
-        await self.send(data, **kwargs)
+
+        if name == 'body' and self._http_chunked:
+            await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
+        else:
+            await self.send(data, **kwargs)
 
     async def _on_write(self, **kwargs):
         return
+
+    @property
+    def http_chunked(self):
+        return self._http_chunked
+
+    @http_chunked.setter
+    def http_chunked(self, value):
+        self._http_chunked = value
