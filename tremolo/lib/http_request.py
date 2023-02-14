@@ -7,7 +7,7 @@ class HTTPRequest(Request):
         super().__init__(protocol)
 
         self._protocol = protocol
-        self._header = header
+
         self.is_valid = header.is_valid_request
         self.headers = header.getheaders()
         self.host = header.gethost()

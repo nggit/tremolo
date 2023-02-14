@@ -3,7 +3,6 @@
 import asyncio
 import traceback
 
-from .parsed import ParseHeader
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 
@@ -16,7 +15,7 @@ class TremoloProtocol(asyncio.Protocol):
     def __init__(self, *args, **kwargs):
         self._options = kwargs
         self._transport = None
-        self._queue = {0: None, 1: None}
+        self._queue = (None, None)
 
         if 'loop' in kwargs:
             self._loop = kwargs['loop']
@@ -41,10 +40,9 @@ class TremoloProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self._transport = transport
-        self._queue = {
-            0: asyncio.Queue(),
-            1: asyncio.Queue()
-        }
+        self._conn = self._options['_pool'].get()
+        self._queue = self._conn['queue']
+        self._header = self._conn['header']
         self._request = None
         self._response = None
         self._tasks = []
@@ -136,10 +134,8 @@ class TremoloProtocol(asyncio.Protocol):
     async def _handle_request_header(self, data, sep):
         self._data = None
 
-        header = ParseHeader(data, excludes=[b'proxy'])
-
-        if header.is_request:
-            self._request = HTTPRequest(self, header)
+        if self._header.parse(data, excludes=[b'proxy']).is_request:
+            self._request = HTTPRequest(self, self._header)
             self._response = HTTPResponse(self, self._request)
 
             try:
@@ -278,8 +274,18 @@ class TremoloProtocol(asyncio.Protocol):
             except InvalidStateError:
                 task.cancel()
 
+        for i in (0, 1):
+            while not self._queue[i].empty():
+                self._queue[i].get_nowait()
+                self._queue[i].task_done()
+
+        self._options['_pool'].put({
+            'queue': self._queue,
+            'header': self._header
+        })
+
         self._transport = None
-        self._queue = {0: None, 1: None}
+        self._queue = (None, None)
         self._request = None
         self._response = None
         self._data = None

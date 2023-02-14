@@ -15,6 +15,7 @@ from datetime import datetime
 from functools import wraps
 from urllib.parse import parse_qs
 
+from .lib.connection_pool import ConnectionPool
 from .lib.tremolo_protocol import TremoloProtocol
 
 class Tremolo(TremoloProtocol):
@@ -404,6 +405,8 @@ class Tremolo(TremoloProtocol):
         if isinstance(host, str):
             host = host.encode(encoding='latin-1')
 
+        pool = ConnectionPool(1024, self._logger)
+
         server = await self._loop.create_server(
             lambda : self.__class__(loop=self._loop,
                                     logger=self._logger,
@@ -413,6 +416,7 @@ class Tremolo(TremoloProtocol):
                                     buffer_size=options.get('buffer_size', 16 * 1024),
                                     client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
                                     server_name=server_name,
+                                    _pool=pool,
                                     _handlers=options['handlers'],
                                     _middlewares=options['middlewares']), sock=sock)
 
