@@ -29,7 +29,9 @@ class HTTPRequest(Request):
 
     async def recv_timeout(self, timeout):
         if self._protocol.queue[1] is not None:
-            self._protocol.queue[1].put_nowait(b'HTTP/%s 408 Request Timeout\r\nConnection: close\r\n\r\n' % self.version)
+            self._protocol.queue[1].put_nowait(
+                b'HTTP/%s 408 Request Timeout\r\nConnection: close\r\n\r\n' % self.version
+            )
 
             self._http_keepalive = False
             self._protocol.queue[1].put_nowait(None)
@@ -61,7 +63,7 @@ class HTTPRequest(Request):
                     buf.extend(data)
                 except StopAsyncIteration:
                     if not buf.endswith(b'0\r\n\r\n'):
-                        break
+                        return
 
                 if buf == b'':
                     return
@@ -82,7 +84,21 @@ class HTTPRequest(Request):
                 i = buf.find(b'\r\n')
 
                 if i > -1:
-                    chunk_size = int(buf[:i].split(b';')[0], 16)
+                    try:
+                        chunk_size = int(buf[:i].split(b';')[0], 16)
+                    except ValueError:
+                        if self._protocol.queue[1] is not None:
+                            self._protocol.queue[1].put_nowait(
+                                b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
+                            )
+
+                            self._http_keepalive = False
+                            self._protocol.queue[1].put_nowait(None)
+
+                        del buf[:], self._body[:]
+                        self._protocol.options['logger'].error('bad chunked encoding')
+                        return
+
                     data = buf[i + 2:i + 2 + chunk_size]
                     tobe_read = chunk_size - len(data)
 
