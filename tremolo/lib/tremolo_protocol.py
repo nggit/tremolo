@@ -45,6 +45,7 @@ class TremoloProtocol(asyncio.Protocol):
         self._header = self._conn['header']
         self._request = None
         self._response = None
+        self._write_event = asyncio.Event()
         self._tasks = []
 
         self._data = bytearray()
@@ -217,6 +218,9 @@ class TremoloProtocol(asyncio.Protocol):
     def eof_received(self):
         self._queue[0].put_nowait(None)
 
+    def resume_writing(self):
+        self._write_event.set()
+
     async def _transfer_data(self):
         while True:
             data = await self._queue[1].get()
@@ -254,6 +258,16 @@ class TremoloProtocol(asyncio.Protocol):
 
                         self._transport.close()
                         return
+
+                write_buffer_size = self._transport.get_write_buffer_size()
+                low, high = self._transport.get_write_buffer_limits()
+
+                if write_buffer_size > high:
+                    self._options['logger'].info(
+                        '{:d} exceeds the current watermark limits (high={:d}, low={:d})'.format(write_buffer_size, high, low)
+                    )
+                    self._write_event.clear()
+                    await self._write_event.wait()
 
                 self._transport.write(data)
             except Exception as exc:

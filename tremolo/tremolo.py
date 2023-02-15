@@ -228,7 +228,7 @@ class Tremolo(TremoloProtocol):
             version = b'1.1'
 
         status = self._server['response'].get_status()
-        no_content = status[0] in (204, 304) or status[0] // 100 == 1
+        no_content = status[0] in (204, 304) or 100 <= status[0] < 200
         self._server['response'].http_chunked = options.get(
             'chunked', version == b'1.1' and self._server['request'].http_keepalive and no_content is False
         )
@@ -255,6 +255,7 @@ class Tremolo(TremoloProtocol):
                                                      self._server['response'].get_content_type(), name='header', throttle=False)
 
             if not (self._server['request'].method == b'HEAD' or no_content):
+                self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
                 await self._server['response'].write(
                     data, name='body', rate=options['rate'], buffer_size=options['buffer_size']
                 )
@@ -293,6 +294,7 @@ class Tremolo(TremoloProtocol):
                     )
 
             if data != b'' and not (self._server['request'].method == b'HEAD' or no_content):
+                self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
                 await self._server['response'].write(data, name='body', rate=options['rate'], buffer_size=options['buffer_size'])
                 await self._server['response'].write(b'', name='body', throttle=False)
 
