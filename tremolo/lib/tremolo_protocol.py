@@ -114,6 +114,13 @@ class TremoloProtocol(asyncio.Protocol):
         return
 
     async def handle_exception(self, exc, request, response):
+        if request is None or response is None:
+            return
+
+        self._options['logger'].error(': '.join(
+            (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
+        ), exc_info={True: exc, False: False}[self._options['debug']])
+
         request.http_keepalive = False
 
         if self.options['debug']:
@@ -128,11 +135,8 @@ class TremoloProtocol(asyncio.Protocol):
             request.version, len(data), data))
 
         await response.write(None)
-        self._options['logger'].error(': '.join(
-            (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
-        ), exc_info={True: exc, False: False}[self._options['debug']])
 
-    async def _handle_request_header(self, data, sep):
+    async def _handle_request_header(self, data, body_start):
         self._data = None
 
         if self._header.parse(data, excludes=[b'proxy']).is_request:
@@ -177,7 +181,7 @@ class TremoloProtocol(asyncio.Protocol):
                         return
 
                     await self._put_to_queue(
-                        data[sep + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
+                        data[body_start:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                     )
                     await self.body_received(self._request, self._response)
 
@@ -188,23 +192,25 @@ class TremoloProtocol(asyncio.Protocol):
             if self._queue[1] is not None:
                 self._queue[1].put_nowait(None)
 
+            self._options['logger'].info('bad request: not a request')
+
     def data_received(self, data):
         if self._data is not None:
             self._data.extend(data)
-            sep = self._data.find(b'\r\n\r\n')
+            header_size = self._data.find(b'\r\n\r\n')
 
-            if sep > -1 and sep < 8192:
+            if header_size > -1 and header_size < 8192:
                 self._transport.pause_reading()
 
                 for i in self._cancel_timeouts:
                     if self._cancel_timeouts[i].done() is False:
                         self._cancel_timeouts[i].set_result(None)
 
-                self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, sep)))
-            elif sep > 8192:
+                self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size + 4)))
+            elif header_size > 8192:
                 self._options['logger'].info('request header too large')
                 self._transport.abort()
-            elif not (sep == -1 and len(self._data) < 8192):
+            elif not (header_size == -1 and len(self._data) < 8192):
                 self._options['logger'].info('bad request')
                 self._transport.abort()
 

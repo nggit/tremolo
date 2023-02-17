@@ -517,6 +517,8 @@ class Tremolo(TremoloProtocol):
 
                 processes.append((parent_conn, p, args, options))
 
+            sock.close()
+
         while True:
             for i, (parent_conn, p, args, options) in enumerate(processes):
                 if not p.is_alive():
@@ -554,7 +556,6 @@ class Tremolo(TremoloProtocol):
                     time.sleep(1)
                 except KeyboardInterrupt:
                     for parent_conn, p, *_ in processes:
-                        sock.close()
                         parent_conn.close()
                         p.terminate()
 
