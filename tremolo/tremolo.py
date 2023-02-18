@@ -41,7 +41,7 @@ class Tremolo(TremoloProtocol):
                 1: [
                     (b'^/+(?:\\?.*)?$', self._index, {})
                 ],
-                '_unindexed': []
+                -1: []
             }
 
             self._middlewares = {
@@ -116,7 +116,7 @@ class Tremolo(TremoloProtocol):
     def _add_handler(self, path='/', func=None, kwargs={}):
         if path.startswith('^') or path.endswith('$'):
             pattern = path.encode(encoding='latin-1')
-            self._route_handlers['_unindexed'].append((pattern, func, kwargs))
+            self._route_handlers[-1].append((pattern, func, kwargs))
         else:
             qs_pos = path.find('?')
             
@@ -126,25 +126,25 @@ class Tremolo(TremoloProtocol):
             p = path.strip('/')
 
             if p == '':
-                sc = 1
+                ri = 1
                 pattern = self._route_handlers[1][0][0]
-                self._route_handlers[sc] = [(pattern, func, kwargs)]
+                self._route_handlers[ri] = [(pattern, func, kwargs)]
             else:
-                sc = p.count('/') + 2
+                ri = '{:d}#{:s}'.format(p.count('/') + 2, p[:(p + '/').find('/')]).encode(encoding='latin-1')
                 pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(p).encode(encoding='latin-1')
 
-                if sc in self._route_handlers:
-                    self._route_handlers[sc].append((pattern, func, kwargs))
+                if ri in self._route_handlers:
+                    self._route_handlers[ri].append((pattern, func, kwargs))
                 else:
-                    self._route_handlers[sc] = [(pattern, func, kwargs)]
+                    self._route_handlers[ri] = [(pattern, func, kwargs)]
 
     def _compile_handlers(self, handlers={}):
-        for sc in handlers:
-            for i, h in enumerate(handlers[sc]):
+        for ri in handlers:
+            for i, h in enumerate(handlers[ri]):
                 pattern, *handler = h
 
                 if isinstance(pattern, bytes):
-                    handlers[sc][i] = (re.compile(pattern), *handler)
+                    handlers[ri][i] = (re.compile(pattern), *handler)
 
     async def _index(self, **server):
         return b'Under construction.'
@@ -333,12 +333,12 @@ class Tremolo(TremoloProtocol):
             p = path.strip(b'/')
 
             if p == b'':
-                sc = 1
+                ri = 1
             else:
-                sc = p.count(b'/') + 2
+                ri = b'%d#%s' % (p.count(b'/') + 2, p[:(p + b'/').find(b'/')])
 
-            if sc in self._route_handlers:
-                for (pattern, func, kwargs) in self._route_handlers[sc]:
+            if ri in self._route_handlers:
+                for (pattern, func, kwargs) in self._route_handlers[ri]:
                     m = pattern.search(request.path)
 
                     if m:
@@ -352,14 +352,14 @@ class Tremolo(TremoloProtocol):
                         await self._handle_response(func, {**kwargs, **options})
                         return
             else:
-                for i, (pattern, func, kwargs) in enumerate(self._route_handlers['_unindexed']):
+                for i, (pattern, func, kwargs) in enumerate(self._route_handlers[-1]):
                     m = pattern.search(request.path)
 
                     if m:
-                        if sc in self._route_handlers:
-                            self._route_handlers[sc].append((pattern, func, kwargs))
+                        if ri in self._route_handlers:
+                            self._route_handlers[ri].append((pattern, func, kwargs))
                         else:
-                            self._route_handlers[sc] = [(pattern, func, kwargs)]
+                            self._route_handlers[ri] = [(pattern, func, kwargs)]
 
                         matches = m.groupdict()
 
@@ -369,7 +369,7 @@ class Tremolo(TremoloProtocol):
                         self._server['request'].params['url'] = matches
 
                         await self._handle_response(func, {**kwargs, **options})
-                        del self._route_handlers['_unindexed'][i]
+                        del self._route_handlers[-1][i]
                         return
 
             # not found
@@ -439,7 +439,7 @@ class Tremolo(TremoloProtocol):
                         break
 
                 process_num = options['conn'].recv()
-            except (BrokenPipeError, EOFError):
+            except (BrokenPipeError, ConnectionResetError, EOFError):
                 server.close()
                 break
 
