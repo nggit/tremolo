@@ -54,7 +54,7 @@ class HTTPRequest(Request):
             yield self._body
             return
 
-        if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
+        if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].lower().find(b'chunked') > -1:
             buf = bytearray()
             agen = self.recv()
             paused = False

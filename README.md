@@ -76,7 +76,7 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 Tremolo is still in the early stages of development. But you can try installing it if you like.
 
 ```
-python3 -m pip install tremolo
+python3 -m pip install --upgrade tremolo
 ```
 
 ## License
