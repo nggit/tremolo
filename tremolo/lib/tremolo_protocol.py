@@ -100,12 +100,11 @@ class TremoloProtocol(asyncio.Protocol):
             elif self._body_size < self._options['client_max_body_size']:
                 transport.resume_reading()
             else:
-                if self._request is not None:
-                    transport.write(b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version)
-
                 if self._queue[1] is not None:
                     self._request.http_keepalive = False
                     self._queue[1].put_nowait(None)
+
+                self._options['logger'].info('payload too large')
 
     async def body_received(self, request, response):
         return
@@ -145,7 +144,7 @@ class TremoloProtocol(asyncio.Protocol):
 
             try:
                 if b'connection' in self._request.headers:
-                    if self._request.headers[b'connection'].find(b'close') == -1:
+                    if self._request.headers[b'connection'].lower().find(b'close') == -1:
                         self._request.http_keepalive = True
                 elif self._request.version == b'1.1':
                     self._request.http_keepalive = True
@@ -157,7 +156,7 @@ class TremoloProtocol(asyncio.Protocol):
                     if b'content-length' in self._request.headers:
                         self._request.content_length = int(self._request.headers[b'content-length'])
 
-                    if b'expect' in self._request.headers and self._request.headers[b'expect'] == b'100-continue':
+                    if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
                         if self._request.content_length > self._options['client_max_body_size']:
                             if self._queue[1] is not None:
                                 self._queue[1].put_nowait(
@@ -228,11 +227,11 @@ class TremoloProtocol(asyncio.Protocol):
         self._write_event.set()
 
     async def _transfer_data(self):
-        while True:
-            data = await self._queue[1].get()
-            self._queue[1].task_done()
-
+        while self._queue[1] is not None:
             try:
+                data = await self._queue[1].get()
+                self._queue[1].task_done()
+
                 if data is None:
                     if self._request is not None and self._request.http_keepalive and self._data is None:
                         for i, task in enumerate(self._tasks):

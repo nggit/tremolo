@@ -19,7 +19,7 @@ class Request:
     async def recv(self):
         await self.recv_started()
 
-        while True:
+        while self._protocol.queue[0] is not None:
             cancel_recv_timeout = self._loop.create_future()
             self._loop.create_task(self._protocol.set_timeout(cancel_recv_timeout,
                                                           timeout_cb=self.recv_timeout))

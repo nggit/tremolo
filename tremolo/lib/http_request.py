@@ -11,9 +11,12 @@ class HTTPRequest(Request):
         self.is_valid = header.is_valid_request
         self.headers = header.getheaders()
         self.host = header.gethost()
-        self.method = header.getmethod()
+        self.method = header.getmethod().upper()
         self.path = header.getpath()
         self.version = header.getversion()
+
+        if self.version != b'1.0':
+            self.version = b'1.1'
 
         self._content_length = -1
         self._content_type = b'application/octet-stream'
@@ -54,19 +57,21 @@ class HTTPRequest(Request):
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].find(b'chunked') > -1:
             buf = bytearray()
             agen = self.recv()
+            paused = False
             tobe_read = 0
 
             while buf != b'0\r\n\r\n':
-                try:
-                    data = await agen.__anext__()
+                if not paused:
+                    try:
+                        data = await agen.__anext__()
 
-                    buf.extend(data)
-                except StopAsyncIteration:
-                    if not buf.endswith(b'0\r\n\r\n'):
+                        buf.extend(data)
+                    except StopAsyncIteration:
+                        if not buf.endswith(b'0\r\n\r\n'):
+                            return
+
+                    if buf == b'':
                         return
-
-                if buf == b'':
-                    return
 
                 if tobe_read > 0:
                     data = buf[:tobe_read]
@@ -84,30 +89,38 @@ class HTTPRequest(Request):
                 i = buf.find(b'\r\n')
 
                 if i > -1:
-                    try:
-                        chunk_size = int(buf[:i].split(b';')[0], 16)
-                    except ValueError:
-                        if self._protocol.queue[1] is not None:
-                            self._protocol.queue[1].put_nowait(
-                                b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
-                            )
+                    paused = True
+                else:
+                    paused = False
 
-                            self._http_keepalive = False
-                            self._protocol.queue[1].put_nowait(None)
+                    continue
 
-                        del buf[:], self._body[:]
-                        self._protocol.options['logger'].error('bad chunked encoding')
-                        return
+                try:
+                    chunk_size = int(buf[:i].split(b';')[0], 16)
+                except ValueError:
+                    if self._protocol.queue[1] is not None:
+                        self._protocol.queue[1].put_nowait(
+                            b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
+                        )
 
-                    data = buf[i + 2:i + 2 + chunk_size]
-                    tobe_read = chunk_size - len(data)
+                        self._http_keepalive = False
+                        self._protocol.queue[1].put_nowait(None)
 
-                    yield data
+                    del buf[:], self._body[:]
+                    self._protocol.options['logger'].error('bad chunked encoding')
+                    return
 
-                    if tobe_read > 0:
-                        del buf[:i + 2 + chunk_size]
-                    else:
-                        del buf[:chunk_size + i + 4]
+                data = buf[i + 2:i + 2 + chunk_size]
+                tobe_read = chunk_size - len(data)
+
+                yield data
+
+                if tobe_read > 0:
+                    paused = False
+
+                    del buf[:i + 2 + chunk_size]
+                else:
+                    del buf[:chunk_size + i + 4]
         else:
             async for data in self.recv():
                 yield data
