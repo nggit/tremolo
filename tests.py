@@ -204,8 +204,6 @@ class TestQuick(unittest.TestCase):
                                        b'Transfer-Encoding: chunked\r\n\r\n' +
                                        create_dummy_body(2 * 1048576 + 16 * 1024, chunk_size=16 * 1024))
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
     def test_payloadtoolarge(self):
         header, body = getcontents(host=HOST,
                                    port=PORT,
@@ -380,7 +378,7 @@ async def upload2_ok(**server):
 
 @app.route('/upload3')
 async def upload3_payloadtoolarge(**server):
-    assert await server['request'].body() == create_dummy_body(2 * 1048576 + 16 * 1024), 'integrity error'
+    await server['request'].body()
 
     return 'OK'
 

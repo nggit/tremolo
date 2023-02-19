@@ -151,7 +151,7 @@ class TremoloProtocol(asyncio.Protocol):
 
                 if self._request.method in (b'POST', b'PUT', b'PATCH'):
                     if b'content-type' in self._request.headers:
-                        self._request.content_type = self._request.headers[b'content-type']
+                        self._request.content_type = self._request.headers[b'content-type'].lower()
 
                     if b'content-length' in self._request.headers:
                         self._request.content_length = int(self._request.headers[b'content-length'])
