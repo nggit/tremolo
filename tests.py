@@ -125,7 +125,7 @@ class TestQuick(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
         self.assertFalse(chunked_detected(header))
-        self.assertTrue(header.find(b'\r\nFoo: bar') > -1 and header.find(b'Set-Cookie: sess=www') > -1)
+        self.assertTrue(header.find(b'\r\nX-Foo: bar') > -1 and header.find(b'Set-Cookie: sess=www') > -1)
 
     def test_get_ok_11(self):
         header, body = getcontents(host=HOST,
@@ -330,7 +330,7 @@ async def my_request_middleware(**server):
         return b'Request method %s is not supported!' % request.method
 
     # test response object
-    response.set_header('Foo', 'bar')
+    response.set_header('X-Foo', 'bar')
     response.set_cookie('sess', 'www')
 
 @app.route(r'^/page/(?P<page_id>\d+)')
