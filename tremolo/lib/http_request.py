@@ -43,7 +43,7 @@ class HTTPRequest(Request):
         await super().recv_timeout(timeout)
 
     async def body(self, cache=True):
-        if self._body == b'' or cache is False:
+        if self._body == b'' or not cache:
             async for data in self.read(cache=False):
                 self._body.extend(data)
 

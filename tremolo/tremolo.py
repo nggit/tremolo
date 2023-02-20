@@ -230,7 +230,7 @@ class Tremolo(TremoloProtocol):
         status = self._server['response'].get_status()
         no_content = status[0] in (204, 304) or 100 <= status[0] < 200
         self._server['response'].http_chunked = options.get(
-            'chunked', version == b'1.1' and self._server['request'].http_keepalive and no_content is False
+            'chunked', version == b'1.1' and self._server['request'].http_keepalive and not no_content
         )
 
         if self._server['response'].http_chunked:

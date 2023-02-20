@@ -73,7 +73,7 @@ class TremoloProtocol(asyncio.Protocol):
                 if callable(timeout_cb):
                     await timeout_cb(timeout)
 
-                if self._transport is not None and self._transport.is_closing() is False:
+                if self._transport is not None and not self._transport.is_closing():
                     self._transport.abort()
 
     async def _put_to_queue(self, data, queue=None, transport=None, rate=1048576, buffer_size=16 * 1024):
@@ -202,7 +202,7 @@ class TremoloProtocol(asyncio.Protocol):
                 self._transport.pause_reading()
 
                 for i in self._cancel_timeouts:
-                    if self._cancel_timeouts[i].done() is False:
+                    if not self._cancel_timeouts[i].done():
                         self._cancel_timeouts[i].set_result(None)
 
                 self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size + 4)))
