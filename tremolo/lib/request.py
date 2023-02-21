@@ -1,7 +1,5 @@
 # Copyright (c) 2023 nggit
 
-import asyncio
-
 class Request:
     def __init__(self, protocol):
         self._protocol = protocol

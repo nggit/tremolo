@@ -432,7 +432,7 @@ class Tremolo(TremoloProtocol):
                 # ping parent process
                 options['conn'].send(None)
 
-                for i in range(2 * process_num):
+                for _ in range(2 * process_num):
                     await asyncio.sleep(1)
 
                     if options['conn'].poll():
