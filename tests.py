@@ -133,7 +133,7 @@ class TestQuick(unittest.TestCase):
                                    method='GET',
                                    path='/page/101?a=111&a=xyz&b=222',
                                    version='1.1',
-                                   headers=['Cookie: a=123', 'Cookie: a=xxx'])
+                                   headers=['Cookie: a=123', 'Cookie: a=xxx, yyy'])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
 
@@ -340,10 +340,14 @@ async def my_page(**server):
 
     assert page_id is not None, 'empty page_id'
 
-    if page_id == 101:
-        assert request.cookies['a'] == ['123', 'xxx']
+    if page_id == b'101':
+        assert request.headers.get(b'cookie') == [b'a=123', b'a=xxx, yyy']
+        assert request.headers.getlist(b'cookie') == [b'a=123', b'a=xxx', b'yyy']
+        assert request.cookies['a'] == ['123', 'xxx, yyy']
 
-    elif page_id == 102:
+    elif page_id == b'102':
+        assert request.headers.get(b'cookie') == None
+        assert request.headers.getlist(b'cookie') == []
         assert request.params['post']['username'] == ['myuser']
         assert request.params['post']['password'] == ['mypass']
 

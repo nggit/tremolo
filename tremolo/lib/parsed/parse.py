@@ -1,5 +1,19 @@
 # Copyright (c) 2023 nggit
 
+class Headers(dict):
+    def getlist(self, name):
+        values = self.get(name, [])
+
+        if isinstance(values, list):
+            result = []
+
+            for v in values:
+                result.extend(v.replace(b', ', b',').split(b','))
+
+            return result
+
+        return values.replace(b', ', b',').split(b',')
+
 class ParseHeader:
     def __init__(self, data=bytearray(), **kwargs):
         self.parse(data, **kwargs)
@@ -9,7 +23,7 @@ class ParseHeader:
         self.is_response = False
         self.is_valid_request = False
         self.is_valid_response = False
-        self._headers = {}
+        self._headers = Headers()
         self._header = {}
         self._body = bytearray()
 
