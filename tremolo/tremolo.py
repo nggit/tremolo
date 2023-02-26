@@ -24,6 +24,7 @@ class Tremolo(TremoloProtocol):
             self._route_handlers = kwargs['_handlers']
             self._middlewares = kwargs['_middlewares']
             self._server = {
+                'loop': kwargs['loop'],
                 'logger': kwargs['logger'],
                 'request': None,
                 'response': None
@@ -463,7 +464,7 @@ class Tremolo(TremoloProtocol):
         finally:
             self._loop.close()
 
-    def run(self, host, port=0, reuse_port = True, worker_num=1, **kwargs):
+    def run(self, host, port=0, reuse_port=True, worker_num=1, **kwargs):
         default_host = host
         self.add_listener(port, host=host, **kwargs)
 
