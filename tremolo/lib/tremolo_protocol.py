@@ -249,8 +249,8 @@ class TremoloProtocol(asyncio.Protocol):
 
                         if not self._request.http_continue:
                             self._data = bytearray()
+                            self._body_size = 0
 
-                        self._body_size = 0
                         self._cancel_timeouts['keepalive'] = self._loop.create_future()
 
                         self._tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
