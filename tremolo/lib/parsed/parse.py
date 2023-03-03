@@ -18,7 +18,7 @@ class ParseHeader:
     def __init__(self, data=bytearray(), **kwargs):
         self.parse(data, **kwargs)
 
-    def parse(self, data=bytearray(), excludes=[]):
+    def parse(self, data=bytearray(), header_size=None, excludes=[]):
         self.is_request = False
         self.is_response = False
         self.is_valid_request = False
@@ -33,13 +33,14 @@ class ParseHeader:
         if isinstance(data, bytes):
             data = bytearray(data)
 
-        end = data.find(b'\r\n\r\n')
+        if header_size is None:
+            header_size = data.find(b'\r\n\r\n')
 
-        if end == -1:
+        if header_size == -1:
             return self
 
-        self._body = data[end:]
-        data = data[:end]
+        self._body = data[header_size:]
+        data = data[:header_size]
 
         if data == b'':
             return self
@@ -122,6 +123,8 @@ class ParseHeader:
             if value in self._header:
                 del self._header[value]
 
+        return self
+
     def append(self, append={}):
         if append == {} or not isinstance(append, dict):
             return self
@@ -133,6 +136,8 @@ class ParseHeader:
                 self._header[name_lc].append(name + b': ' + append[name])
             else:
                 self._header[name_lc] = [name + b': ' + append[name]]
+
+        return self
 
     def getheaders(self):
         return self._headers

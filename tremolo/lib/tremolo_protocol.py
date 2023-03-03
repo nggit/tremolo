@@ -76,10 +76,10 @@ class TremoloProtocol(asyncio.Protocol):
                 if self._transport is not None and not self._transport.is_closing():
                     self._transport.abort()
 
-    async def _put_to_queue(self, data, queue=None, transport=None, rate=1048576, buffer_size=16 * 1024):
+    async def put_to_queue(self, data, queue=None, transport=None, rate=1048576, buffer_size=16 * 1024):
         data_size = len(data)
 
-        if (data_size >= 2 * buffer_size):
+        if data_size >= 2 * buffer_size:
             mv = memoryview(data)
 
             while mv and queue is not None:
@@ -106,7 +106,7 @@ class TremoloProtocol(asyncio.Protocol):
 
                 self._options['logger'].info('payload too large')
 
-    async def body_received(self, request, response):
+    async def body_received(self, body_size, request, response):
         return
 
     async def header_received(self, request, response):
@@ -135,10 +135,10 @@ class TremoloProtocol(asyncio.Protocol):
 
         await response.write(None)
 
-    async def _handle_request_header(self, data, body_start):
+    async def _handle_request_header(self, data, header_size):
         self._data = None
 
-        if self._header.parse(data, excludes=[b'proxy']).is_request:
+        if self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
             self._request = HTTPRequest(self, self._header)
             self._response = HTTPResponse(self, self._request)
 
@@ -166,7 +166,8 @@ class TremoloProtocol(asyncio.Protocol):
                                 self._queue[1].put_nowait(None)
 
                             return
-                        elif self._queue[1] is not None:
+
+                        if self._queue[1] is not None:
                             self._request.http_continue = True
                             self._queue[1].put_nowait(b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version)
                     elif self._request.content_length > self._options['client_max_body_size']:
@@ -179,10 +180,10 @@ class TremoloProtocol(asyncio.Protocol):
 
                         return
 
-                    await self._put_to_queue(
-                        data[body_start:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
+                    await self.put_to_queue(
+                        data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                     )
-                    await self.body_received(self._request, self._response)
+                    await self.body_received(self._body_size, self._request, self._response)
 
                 await self.header_received(self._request, self._response)
             except Exception as exc:
@@ -198,14 +199,14 @@ class TremoloProtocol(asyncio.Protocol):
             self._data.extend(data)
             header_size = self._data.find(b'\r\n\r\n')
 
-            if header_size > -1 and header_size < 8192:
+            if -1 < header_size < 8192:
                 self._transport.pause_reading()
 
                 for i in self._cancel_timeouts:
                     if not self._cancel_timeouts[i].done():
                         self._cancel_timeouts[i].set_result(None)
 
-                self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size + 4)))
+                self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
             elif header_size > 8192:
                 self._options['logger'].info('request header too large')
                 self._transport.abort()
@@ -217,7 +218,7 @@ class TremoloProtocol(asyncio.Protocol):
 
         self._transport.pause_reading()
         self._loop.create_task(
-            self._put_to_queue(data, queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate'])
+            self.put_to_queue(data, queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate'])
         )
 
     def eof_received(self):
@@ -257,12 +258,12 @@ class TremoloProtocol(asyncio.Protocol):
                                                                                    timeout_cb=self.keepalive_timeout)))
                         self._transport.resume_reading()
                         continue
-                    else:
-                        if self._transport.can_write_eof():
-                            self._transport.write_eof()
 
-                        self._transport.close()
-                        return
+                    if self._transport.can_write_eof():
+                        self._transport.write_eof()
+
+                    self._transport.close()
+                    return
 
                 write_buffer_size = self._transport.get_write_buffer_size()
                 low, high = self._transport.get_write_buffer_limits()

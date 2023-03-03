@@ -120,7 +120,7 @@ class Tremolo(TremoloProtocol):
             self._route_handlers[-1].append((pattern, func, kwargs))
         else:
             qs_pos = path.find('?')
-            
+
             if qs_pos > -1:
                 path = path[:qs_pos]
 
@@ -161,8 +161,8 @@ class Tremolo(TremoloProtocol):
             server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
             server['options']['server_name'])
 
-    async def body_received(self, request, response):
-        if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
+    async def body_received(self, body_size, request, response):
+        if body_size <= 8 * 1048576 and request.content_type.find(b'application/x-www-form-urlencoded') > -1:
             request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
 
     def _set_base_header(self, options={}):
