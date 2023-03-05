@@ -5,18 +5,15 @@ class Request:
         self._protocol = protocol
         self._loop = self._protocol.loop
 
-    async def recv_finished(self):
-        return
+        self._body_size = 0
 
-    async def recv_started(self):
-        return
+    def clear_body(self):
+        self._body_size = 0
 
     async def recv_timeout(self, timeout):
         self._protocol.options['logger'].info('recv timeout after {:d}s'.format(timeout))
 
     async def recv(self):
-        await self.recv_started()
-
         while self._protocol.queue[0] is not None:
             cancel_recv_timeout = self._loop.create_future()
             self._loop.create_task(self._protocol.set_timeout(cancel_recv_timeout,
@@ -27,7 +24,14 @@ class Request:
             cancel_recv_timeout.set_result(None)
 
             if data is None:
-                await self.recv_finished()
                 break
 
             yield data
+
+    @property
+    def body_size(self):
+        return self._body_size
+
+    @body_size.setter
+    def body_size(self, value):
+        self._body_size = value

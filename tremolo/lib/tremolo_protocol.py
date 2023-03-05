@@ -49,7 +49,6 @@ class TremoloProtocol(asyncio.Protocol):
         self._tasks = []
 
         self._data = bytearray()
-        self._body_size = 0
         self._cancel_timeouts = {'receive': self._loop.create_future()}
 
         for task in (self._transfer_data(), self.set_timeout(self._cancel_timeouts['receive'],
@@ -91,13 +90,12 @@ class TremoloProtocol(asyncio.Protocol):
             queue.put_nowait(data)
             await asyncio.sleep(1 / (rate / max(queue.qsize(), 1) / data_size))
 
-        if transport is not None:
-            self._body_size += data_size
+        if transport is not None and self._request is not None:
+            self._request.body_size += data_size
 
-            if (self._request is not None and self._request.content_length > -1 and self._body_size >= self._request.content_length
-                    and queue is not None):
+            if self._request.content_length > -1 and self._request.body_size >= self._request.content_length and queue is not None:
                 queue.put_nowait(None)
-            elif self._body_size < self._options['client_max_body_size']:
+            elif self._request.body_size < self._options['client_max_body_size']:
                 transport.resume_reading()
             else:
                 if self._queue[1] is not None:
@@ -106,7 +104,7 @@ class TremoloProtocol(asyncio.Protocol):
 
                 self._options['logger'].info('payload too large')
 
-    async def body_received(self, body_size, request, response):
+    async def body_received(self, request, response):
         return
 
     async def header_received(self, request, response):
@@ -183,7 +181,7 @@ class TremoloProtocol(asyncio.Protocol):
                     await self.put_to_queue(
                         data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                     )
-                    await self.body_received(self._body_size, self._request, self._response)
+                    await self.body_received(self._request, self._response)
 
                 await self.header_received(self._request, self._response)
             except Exception as exc:
@@ -234,30 +232,33 @@ class TremoloProtocol(asyncio.Protocol):
                 self._queue[1].task_done()
 
                 if data is None:
-                    if self._request is not None and self._request.http_keepalive and self._data is None:
-                        for i, task in enumerate(self._tasks):
-                            try:
-                                exc = task.exception()
+                    if self._request is not None:
+                        if self._request.http_keepalive and self._data is None:
+                            for i, task in enumerate(self._tasks):
+                                try:
+                                    exc = task.exception()
 
-                                if exc:
-                                    self._options['logger'].error(': '.join(
-                                        (exc.__class__.__name__, str(exc))
-                                    ), exc_info={True: exc, False: False}[self._options['debug']])
+                                    if exc:
+                                        self._options['logger'].error(': '.join(
+                                            (exc.__class__.__name__, str(exc))
+                                        ), exc_info={True: exc, False: False}[self._options['debug']])
 
-                                del self._tasks[i]
-                            except InvalidStateError:
-                                pass
+                                    del self._tasks[i]
+                                except InvalidStateError:
+                                    pass
 
-                        if not self._request.http_continue:
-                            self._data = bytearray()
-                            self._body_size = 0
+                            if not self._request.http_continue:
+                                self._data = bytearray()
+                                self._request.clear_body()
 
-                        self._cancel_timeouts['keepalive'] = self._loop.create_future()
+                            self._cancel_timeouts['keepalive'] = self._loop.create_future()
 
-                        self._tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
-                                                                                   timeout_cb=self.keepalive_timeout)))
-                        self._transport.resume_reading()
-                        continue
+                            self._tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
+                                                                                       timeout_cb=self.keepalive_timeout)))
+                            self._transport.resume_reading()
+                            continue
+
+                        self._request.clear_body()
 
                     if self._transport.can_write_eof():
                         self._transport.write_eof()

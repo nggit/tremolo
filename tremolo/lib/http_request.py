@@ -27,8 +27,12 @@ class HTTPRequest(Request):
         self._params = {}
         self._query = {}
 
-    async def recv_started(self):
+    def append_body(self, value):
+        self._body.extend(value)
+
+    def clear_body(self):
         del self._body[:]
+        super().clear_body()
 
     async def recv_timeout(self, timeout):
         if self._protocol.queue[1] is not None:
@@ -39,13 +43,12 @@ class HTTPRequest(Request):
             self._http_keepalive = False
             self._protocol.queue[1].put_nowait(None)
 
-        del self._body[:]
         await super().recv_timeout(timeout)
 
     async def body(self, cache=True):
         if self._body == b'' or not cache:
             async for data in self.read(cache=False):
-                self._body.extend(data)
+                self.append_body(data)
 
         return self._body
 
@@ -106,7 +109,7 @@ class HTTPRequest(Request):
                         self._http_keepalive = False
                         self._protocol.queue[1].put_nowait(None)
 
-                    del buf[:], self._body[:]
+                    del buf[:]
                     self._protocol.options['logger'].error('bad chunked encoding')
                     return
 
