@@ -24,6 +24,7 @@ class HTTPRequest(Request):
         self._cookies = {}
         self._http_continue = False
         self._http_keepalive = False
+        self._http_upgrade = False
         self._params = {}
         self._query = {}
 
@@ -167,6 +168,15 @@ class HTTPRequest(Request):
     @http_keepalive.setter
     def http_keepalive(self, value):
         self._http_keepalive = value
+
+    @property
+    def http_upgrade(self):
+        return self._http_upgrade
+
+    @http_upgrade.setter
+    def http_upgrade(self, value):
+        self.clear_body()
+        self._http_upgrade = value
 
     @property
     def params(self):

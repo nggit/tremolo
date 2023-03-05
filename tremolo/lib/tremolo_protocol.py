@@ -91,6 +91,10 @@ class TremoloProtocol(asyncio.Protocol):
             await asyncio.sleep(1 / (rate / max(queue.qsize(), 1) / data_size))
 
         if transport is not None and self._request is not None:
+            if self._request.http_upgrade:
+                transport.resume_reading()
+                return
+
             self._request.body_size += data_size
 
             if self._request.content_length > -1 and self._request.body_size >= self._request.content_length and queue is not None:
