@@ -45,21 +45,23 @@ class TremoloProtocol(asyncio.Protocol):
         self._header = self._conn['header']
         self._request = None
         self._response = None
-        self._write_event = asyncio.Event()
         self._tasks = []
 
         self._data = bytearray()
         self._cancel_timeouts = {'receive': self._loop.create_future()}
 
-        for task in (self._transfer_data(), self.set_timeout(self._cancel_timeouts['receive'],
-                                                             timeout_cb=self.receive_timeout)):
+        for task in (self._send_data(), self.set_timeout(self._cancel_timeouts['receive'],
+                                                         timeout_cb=self.receive_timeout)):
             self._tasks.append(self._loop.create_task(task))
 
     async def receive_timeout(self, timeout):
-        self._options['logger'].info('request timeout after {:d}s'.format(timeout))
+        self._options['logger'].info('request timeout after {:g}s'.format(timeout))
 
     async def keepalive_timeout(self, timeout):
-        self._options['logger'].info('keepalive timeout after {:d}s'.format(timeout))
+        self._options['logger'].info('keepalive timeout after {:g}s'.format(timeout))
+
+    async def send_timeout(self, timeout):
+        self._options['logger'].info('send timeout after {:g}s'.format(timeout))
 
     async def set_timeout(self, cancel_timeout, timeout=30, timeout_cb=None):
         _, pending = await asyncio.wait([cancel_timeout], timeout=timeout)
@@ -205,7 +207,7 @@ class TremoloProtocol(asyncio.Protocol):
                 self._transport.pause_reading()
 
                 for i in self._cancel_timeouts:
-                    if not self._cancel_timeouts[i].done():
+                    if i != 'send' and not self._cancel_timeouts[i].done():
                         self._cancel_timeouts[i].set_result(None)
 
                 self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
@@ -227,9 +229,9 @@ class TremoloProtocol(asyncio.Protocol):
         self._queue[0].put_nowait(None)
 
     def resume_writing(self):
-        self._write_event.set()
+        self._cancel_timeouts['send'].set_result(None)
 
-    async def _transfer_data(self):
+    async def _send_data(self):
         while self._queue[1] is not None:
             try:
                 data = await self._queue[1].get()
@@ -277,8 +279,9 @@ class TremoloProtocol(asyncio.Protocol):
                     self._options['logger'].info(
                         '{:d} exceeds the current watermark limits (high={:d}, low={:d})'.format(write_buffer_size, high, low)
                     )
-                    self._write_event.clear()
-                    await self._write_event.wait()
+                    self._cancel_timeouts['send'] = self._loop.create_future()
+
+                    await self.set_timeout(self._cancel_timeouts['send'], timeout_cb=self.send_timeout)
 
                 self._transport.write(data)
             except Exception as exc:

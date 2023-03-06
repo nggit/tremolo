@@ -66,7 +66,7 @@ app.add_listener(8002)
 app.run('0.0.0.0', 8000)
 ```
 
-You can even get higher concurrency with [uvloop](https://magic.io/blog/uvloop-blazing-fast-python-networking/):
+You can even get higher concurrency with [PyPy](https://www.pypy.org/) or [uvloop](https://magic.io/blog/uvloop-blazing-fast-python-networking/):
 
 ```python
 import asyncio
