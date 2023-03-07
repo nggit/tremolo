@@ -80,22 +80,30 @@ class HTTPResponse(Response):
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
-    async def end(self, data=None):
+    async def end(self, data=None, **kwargs):
+        status = self.get_status()
+
         if isinstance(data, (bytes, bytearray)):
             content_length = len(data)
+
+            if content_length > 0 and (
+                        self._request.method == b'HEAD' or status[0] in (204, 304) or 100 <= status[0] < 200
+                    ):
+                data = b''
         else:
             data = b''
             content_length = 0
 
-        await self.send(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n%s\r\n%s' % (
+        await self.send(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n%s\r\n%s' % (
             self._request.version,
-            *self.get_status(),
+            *status,
             self.get_content_type(),
             content_length,
+            {True: b'keep-alive', False: b'close'}[self._request.http_keepalive],
             self._header,
-            data))
+            data), **kwargs)
 
-        await self.send(None)
+        self.close()
 
     async def write(self, data, name='data', **kwargs):
         await self._write_cb(data=(name, data))

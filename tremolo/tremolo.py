@@ -228,17 +228,17 @@ class Tremolo(TremoloProtocol):
             is_agen = True
         except AttributeError:
             data = await agen
+
+            if data is None:
+                self._server['response'].close()
+                return
+
             is_agen = False
-
-        version = self._server['request'].version
-
-        if version != b'1.0':
-            version = b'1.1'
 
         status = self._server['response'].get_status()
         no_content = status[0] in (204, 304) or 100 <= status[0] < 200
         self._server['response'].http_chunked = options.get(
-            'chunked', version == b'1.1' and self._server['request'].http_keepalive and not no_content
+            'chunked', self._server['request'].version == b'1.1' and self._server['request'].http_keepalive and not no_content
         )
 
         if self._server['response'].http_chunked:
@@ -249,7 +249,9 @@ class Tremolo(TremoloProtocol):
                 lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
             )
 
-        await self._server['response'].write(b'HTTP/%s %d %s\r\n' % (version, *status), name='header', throttle=False)
+        await self._server['response'].write(
+            b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status), name='header', throttle=False
+        )
         await self._server['response'].write(self._server['response'].header, name='header', throttle=False)
 
         if is_agen:
@@ -306,7 +308,7 @@ class Tremolo(TremoloProtocol):
                 await self._server['response'].write(data, name='body', rate=options['rate'], buffer_size=options['buffer_size'])
                 await self._server['response'].write(b'', name='body', throttle=False)
 
-        await self._server['response'].write(None)
+        self._server['response'].close()
 
     async def header_received(self, request, response):
         self._server['request'] = request
