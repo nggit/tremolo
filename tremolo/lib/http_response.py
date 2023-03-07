@@ -80,6 +80,10 @@ class HTTPResponse(Response):
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
+    def close(self):
+        self._request.http_keepalive = False
+        super().close()
+
     async def end(self, data=None, **kwargs):
         status = self.get_status()
 
@@ -103,7 +107,7 @@ class HTTPResponse(Response):
             self._header,
             data), **kwargs)
 
-        self.close()
+        await self.send(None)
 
     async def write(self, data, name='data', **kwargs):
         await self._write_cb(data=(name, data))

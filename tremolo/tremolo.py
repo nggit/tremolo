@@ -308,7 +308,7 @@ class Tremolo(TremoloProtocol):
                 await self._server['response'].write(data, name='body', rate=options['rate'], buffer_size=options['buffer_size'])
                 await self._server['response'].write(b'', name='body', throttle=False)
 
-        self._server['response'].close()
+        await self._server['response'].send(None)
 
     async def header_received(self, request, response):
         self._server['request'] = request

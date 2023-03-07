@@ -15,7 +15,7 @@ setup(
     name='tremolo',
     packages=['tremolo'],
     package_data={'': ['lib/*', 'lib/parsed/*']},
-    version='0.0.50',
+    version='0.0.51',
     license='MIT',
     author='nggit',
     author_email='contact@anggit.com',
