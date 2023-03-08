@@ -173,7 +173,7 @@ class Tremolo(TremoloProtocol):
                 request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
 
     def _set_base_header(self, options={}):
-        if self._server['response'].header != b'':
+        if self._server['response'].header[1] != b'':
             return
 
         options['server_name'] = options.get('server_name', self.options['server_name'])
@@ -249,25 +249,22 @@ class Tremolo(TremoloProtocol):
                 lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
             )
 
-        await self._server['response'].write(
-            b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status), name='header', throttle=False
-        )
-        await self._server['response'].write(self._server['response'].header, name='header', throttle=False)
+        self._server['response'].header = b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status)
 
         if is_agen:
             if no_content:
-                await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
+                self._server['response'].append_header(b'Connection: close\r\n\r\n')
             else:
                 if not self._server['response'].http_chunked:
                     self._server['request'].http_keepalive = False
 
-                await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
-                                                     self._server['response'].get_content_type(), name='header', throttle=False)
+                self._server['response'].append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
+                                                       self._server['response'].get_content_type())
 
             if not (self._server['request'].method == b'HEAD' or no_content):
                 self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
                 await self._server['response'].write(
-                    data, name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                    data, rate=options['rate'], buffer_size=options['buffer_size']
                 )
 
                 while True:
@@ -275,10 +272,10 @@ class Tremolo(TremoloProtocol):
                         data = await agen.__anext__()
 
                         await self._server['response'].write(
-                            data, name='body', rate=options['rate'], buffer_size=options['buffer_size']
+                            data, rate=options['rate'], buffer_size=options['buffer_size']
                         )
                     except StopAsyncIteration:
-                        await self._server['response'].write(b'', name='body', throttle=False)
+                        await self._server['response'].write(b'', throttle=False)
                         break
         else:
             encoding = ('utf-8',)
@@ -290,23 +287,23 @@ class Tremolo(TremoloProtocol):
                 data = data.encode(encoding=encoding[0])
 
             if no_content or data == b'':
-                await self._server['response'].write(b'Connection: close\r\n\r\n', name='header', throttle=False)
+                self._server['response'].append_header(b'Connection: close\r\n\r\n')
             else:
                 if self._server['response'].http_chunked:
-                    await self._server['response'].write(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
-                                                         % self._server['response'].get_content_type(), name='header', throttle=False)
+                    self._server['response'].append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
+                                                           % self._server['response'].get_content_type())
                 else:
-                    await self._server['response'].write(
-                        b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n'
-                        % (self._server['response'].get_content_type(), len(data), {
+                    self._server['response'].append_header(
+                        b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n' % (
+                        self._server['response'].get_content_type(), len(data), {
                             True: b'keep-alive',
-                            False: b'close'}[self._server['request'].http_keepalive]), name='header', throttle=False
+                            False: b'close'}[self._server['request'].http_keepalive])
                     )
 
             if data != b'' and not (self._server['request'].method == b'HEAD' or no_content):
                 self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
-                await self._server['response'].write(data, name='body', rate=options['rate'], buffer_size=options['buffer_size'])
-                await self._server['response'].write(b'', name='body', throttle=False)
+                await self._server['response'].write(data, rate=options['rate'], buffer_size=options['buffer_size'])
+                await self._server['response'].write(b'', throttle=False)
 
         await self._server['response'].send(None)
 

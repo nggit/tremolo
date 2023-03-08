@@ -9,7 +9,7 @@ class HTTPResponse(Response):
     def __init__(self, protocol, request):
         super().__init__(protocol)
 
-        self._header = bytearray()
+        self._header = [b'', bytearray()]
         self._request = request
         self._status = []
         self._content_type = []
@@ -21,8 +21,12 @@ class HTTPResponse(Response):
     def header(self):
         return self._header
 
+    @header.setter
+    def header(self, value):
+        self._header[0] = value
+
     def append_header(self, value):
-        self._header.extend(value)
+        self._header[1].extend(value)
 
     def set_cookie(self, name, value='', expires=0, path='/', domain=None, secure=False, httponly=False, samesite=None):
         if isinstance(name, str):
@@ -42,7 +46,7 @@ class HTTPResponse(Response):
             if k:
                 cookie.extend(v)
 
-        self._header.extend(cookie + b'\r\n')
+        self._header[1].extend(cookie + b'\r\n')
 
     def set_header(self, name, value=''):
         if isinstance(name, str):
@@ -51,7 +55,7 @@ class HTTPResponse(Response):
         if isinstance(value, str):
             value = value.encode(encoding='latin-1')
 
-        self._header.extend(b'%s: %s\r\n' % (name, value))
+        self._header[1].extend(b'%s: %s\r\n' % (name, value))
 
     def set_status(self, status=200, message=b'OK'):
         if isinstance(message, str):
@@ -84,35 +88,41 @@ class HTTPResponse(Response):
         self._request.http_keepalive = False
         super().close()
 
-    async def end(self, data=None, **kwargs):
-        status = self.get_status()
-
-        if isinstance(data, (bytes, bytearray)):
+    async def end(self, data=b'', **kwargs):
+        if self._header is None:
+            await self.write(data, throttle=False)
+        else:
+            status = self.get_status()
             content_length = len(data)
 
             if content_length > 0 and (
                         self._request.method == b'HEAD' or status[0] in (204, 304) or 100 <= status[0] < 200
                     ):
                 data = b''
-        else:
-            data = b''
-            content_length = 0
 
-        await self.send(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n%s\r\n%s' % (
-            self._request.version,
-            *status,
-            self.get_content_type(),
-            content_length,
-            {True: b'keep-alive', False: b'close'}[self._request.http_keepalive],
-            self._header,
-            data), **kwargs)
+            await self.send(b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n%s\r\n%s' % (
+                self._request.version,
+                *status,
+                self.get_content_type(),
+                content_length,
+                {True: b'keep-alive', False: b'close'}[self._request.http_keepalive],
+                self._header[1],
+                data), **kwargs)
 
         await self.send(None)
 
-    async def write(self, data, name='data', **kwargs):
-        await self._write_cb(data=(name, data))
+    async def write(self, data, **kwargs):
+        if self._header is not None:
+            header = b''.join(self._header)
 
-        if name == 'body' and self._http_chunked and not self._request.http_upgrade:
+            await self._write_cb(data=('header', header))
+            await self.send(header, throttle=False)
+
+            self._header = None
+
+        await self._write_cb(data=('body', data))
+
+        if self._http_chunked and not self._request.http_upgrade:
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
             await self.send(data, **kwargs)
