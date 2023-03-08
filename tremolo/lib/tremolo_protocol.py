@@ -203,7 +203,7 @@ class TremoloProtocol(asyncio.Protocol):
             self._data.extend(data)
             header_size = self._data.find(b'\r\n\r\n')
 
-            if -1 < header_size < 8192:
+            if -1 < header_size <= 8192:
                 self._transport.pause_reading()
 
                 for i in self._cancel_timeouts:
@@ -214,7 +214,7 @@ class TremoloProtocol(asyncio.Protocol):
             elif header_size > 8192:
                 self._options['logger'].info('request header too large')
                 self._transport.abort()
-            elif not (header_size == -1 and len(self._data) < 8192):
+            elif not (header_size == -1 and len(self._data) <= 8192):
                 self._options['logger'].info('bad request')
                 self._transport.abort()
 

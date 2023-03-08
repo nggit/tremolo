@@ -112,7 +112,7 @@ class HTTPResponse(Response):
     async def write(self, data, name='data', **kwargs):
         await self._write_cb(data=(name, data))
 
-        if name == 'body' and self._http_chunked:
+        if name == 'body' and self._http_chunked and not self._request.http_upgrade:
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
             await self.send(data, **kwargs)
