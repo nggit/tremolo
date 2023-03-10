@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+__all__ = ('Tremolo',)
+
 import asyncio
 import ipaddress
 import logging
@@ -32,145 +34,11 @@ class Tremolo(TremoloProtocol):
 
             super().__init__(*args, **kwargs)
         except KeyError:
-            self._listeners = []
+            server = Server()
 
-            self._route_handlers = {
-                0: [
-                    (None, self._err_badrequest, dict(status=(400, b'Bad Request'))),
-                    (None, self._err_notfound, dict(status=(404, b'Not Found')))
-                ],
-                1: [
-                    (b'^/+(?:\\?.*)?$', self._index, {})
-                ],
-                -1: []
-            }
-
-            self._middlewares = {
-                'data': [
-                    (None, {})
-                ],
-                'request': []
-            }
-
-    def add_listener(self, port, host=None, **options):
-        self._listeners.append((host, port, options))
-
-    def route(self, path):
-        def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            self._add_handler(path, wrapper, self._getoptions(func))
-            return wrapper
-
-        return decorator
-
-    def errorhandler(self, status):
-        def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            for i, h in enumerate(self._route_handlers[0]):
-                if status == h[2]['status'][0]:
-                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self._getoptions(func)))
-                    break
-            return wrapper
-
-        return decorator
-
-    def middleware(self, name):
-        def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            self._middlewares[name].append((wrapper, self._getoptions(func)))
-            return wrapper
-
-        return decorator
-
-    def on_data(self, *args):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('data')(args[0])
-
-        return self.middleware('data')
-
-    def on_request(self, *args):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('request')(args[0])
-
-        return self.middleware('request')
-
-    def _getoptions(self, func):
-        options = {}
-
-        if func.__defaults__ is not None:
-            options = dict(zip(
-                func.__code__.co_varnames[:len(func.__defaults__)],
-                func.__defaults__
-            ))
-
-        return options
-
-    def _add_handler(self, path='/', func=None, kwargs={}):
-        if path.startswith('^') or path.endswith('$'):
-            pattern = path.encode(encoding='latin-1')
-            self._route_handlers[-1].append((pattern, func, kwargs))
-        else:
-            qs_pos = path.find('?')
-
-            if qs_pos > -1:
-                path = path[:qs_pos]
-
-            p = path.strip('/')
-
-            if p == '':
-                ri = 1
-                pattern = self._route_handlers[1][0][0]
-                self._route_handlers[ri] = [(pattern, func, kwargs)]
-            else:
-                ri = '{:d}#{:s}'.format(p.count('/') + 2, p[:(p + '/').find('/')]).encode(encoding='latin-1')
-                pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(p).encode(encoding='latin-1')
-
-                if ri in self._route_handlers:
-                    self._route_handlers[ri].append((pattern, func, kwargs))
-                else:
-                    self._route_handlers[ri] = [(pattern, func, kwargs)]
-
-    def _compile_handlers(self, handlers={}):
-        for ri in handlers:
-            for i, h in enumerate(handlers[ri]):
-                pattern, *handler = h
-
-                if isinstance(pattern, bytes):
-                    handlers[ri][i] = (re.compile(pattern), *handler)
-
-    async def _index(self, **server):
-        return b'Under construction.'
-
-    async def _err_badrequest(self, **server):
-        return b'Bad request.'
-
-    async def _err_notfound(self, **server):
-        yield b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />'
-        yield b'<title>404 Not Found</title>'
-        yield b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; font-family: sans-serif; }</style></head><body>'
-        yield b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr /><address>%s</address></body></html>' % (
-            server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
-            server['options']['server_name'])
-
-    async def body_received(self, request, response):
-        if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
-            async for data in request.read():
-                request.append_body(data)
-
-                if request.body_size > 8 * 1048576:
-                    break
-
-            if request.body_size <= 8 * 1048576:
-                request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
+            for attr in dir(server):
+                if not attr.startswith('__'):
+                    setattr(self, attr, getattr(server, attr))
 
     def _set_base_header(self, options={}):
         if self._server['response'].header[1] != b'':
@@ -307,6 +175,17 @@ class Tremolo(TremoloProtocol):
 
         await self._server['response'].send(None)
 
+    async def body_received(self, request, response):
+        if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
+            async for data in request.read():
+                request.append_body(data)
+
+                if request.body_size > 8 * 1048576:
+                    break
+
+            if request.body_size <= 8 * 1048576:
+                request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
+
     async def header_received(self, request, response):
         self._server['request'] = request
         self._server['response'] = response
@@ -385,6 +264,137 @@ class Tremolo(TremoloProtocol):
             # bad request
             await self._handle_response(self._route_handlers[0][0][1], {**self._route_handlers[0][0][2], **options})
 
+class Server():
+    def __init__(self):
+        self._listeners = []
+
+        self._route_handlers = {
+            0: [
+                (None, self._err_badrequest, dict(status=(400, b'Bad Request'))),
+                (None, self._err_notfound, dict(status=(404, b'Not Found')))
+            ],
+            1: [
+                (b'^/+(?:\\?.*)?$', self._index, {})
+            ],
+            -1: []
+        }
+
+        self._middlewares = {
+            'data': [
+                (None, {})
+            ],
+            'request': []
+        }
+
+    def add_listener(self, port, host=None, **options):
+        self._listeners.append((host, port, options))
+
+    def route(self, path):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(**kwargs):
+                return func(**kwargs)
+
+            self._add_handler(path, wrapper, self._getoptions(func))
+            return wrapper
+
+        return decorator
+
+    def errorhandler(self, status):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(**kwargs):
+                return func(**kwargs)
+
+            for i, h in enumerate(self._route_handlers[0]):
+                if status == h[2]['status'][0]:
+                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self._getoptions(func)))
+                    break
+            return wrapper
+
+        return decorator
+
+    def middleware(self, name):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(**kwargs):
+                return func(**kwargs)
+
+            self._middlewares[name].append((wrapper, self._getoptions(func)))
+            return wrapper
+
+        return decorator
+
+    def on_data(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('data')(args[0])
+
+        return self.middleware('data')
+
+    def on_request(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('request')(args[0])
+
+        return self.middleware('request')
+
+    def _getoptions(self, func):
+        options = {}
+
+        if func.__defaults__ is not None:
+            options = dict(zip(
+                func.__code__.co_varnames[:len(func.__defaults__)],
+                func.__defaults__
+            ))
+
+        return options
+
+    def _add_handler(self, path='/', func=None, kwargs={}):
+        if path.startswith('^') or path.endswith('$'):
+            pattern = path.encode(encoding='latin-1')
+            self._route_handlers[-1].append((pattern, func, kwargs))
+        else:
+            qs_pos = path.find('?')
+
+            if qs_pos > -1:
+                path = path[:qs_pos]
+
+            p = path.strip('/')
+
+            if p == '':
+                ri = 1
+                pattern = self._route_handlers[1][0][0]
+                self._route_handlers[ri] = [(pattern, func, kwargs)]
+            else:
+                ri = '{:d}#{:s}'.format(p.count('/') + 2, p[:(p + '/').find('/')]).encode(encoding='latin-1')
+                pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(p).encode(encoding='latin-1')
+
+                if ri in self._route_handlers:
+                    self._route_handlers[ri].append((pattern, func, kwargs))
+                else:
+                    self._route_handlers[ri] = [(pattern, func, kwargs)]
+
+    def _compile_handlers(self, handlers={}):
+        for ri in handlers:
+            for i, h in enumerate(handlers[ri]):
+                pattern, *handler = h
+
+                if isinstance(pattern, bytes):
+                    handlers[ri][i] = (re.compile(pattern), *handler)
+
+    async def _index(self, **server):
+        return b'Under construction.'
+
+    async def _err_badrequest(self, **server):
+        return b'Bad request.'
+
+    async def _err_notfound(self, **server):
+        yield b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />'
+        yield b'<title>404 Not Found</title>'
+        yield b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; font-family: sans-serif; }</style></head><body>'
+        yield b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr /><address>%s</address></body></html>' % (
+            server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
+            server['options']['server_name'])
+
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
 
@@ -414,17 +424,17 @@ class Tremolo(TremoloProtocol):
         pool = ConnectionPool(1024, self._logger)
 
         server = await self._loop.create_server(
-            lambda : self.__class__(loop=self._loop,
-                                    logger=self._logger,
-                                    debug=options.get('debug', False),
-                                    download_rate=options.get('download_rate', 1048576),
-                                    upload_rate=options.get('upload_rate', 1048576),
-                                    buffer_size=options.get('buffer_size', 16 * 1024),
-                                    client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
-                                    server_name=server_name,
-                                    _pool=pool,
-                                    _handlers=options['handlers'],
-                                    _middlewares=options['middlewares']), sock=sock)
+            lambda : Tremolo(loop=self._loop,
+                             logger=self._logger,
+                             debug=options.get('debug', False),
+                             download_rate=options.get('download_rate', 1048576),
+                             upload_rate=options.get('upload_rate', 1048576),
+                             buffer_size=options.get('buffer_size', 16 * 1024),
+                             client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
+                             server_name=server_name,
+                             _pool=pool,
+                             _handlers=options['handlers'],
+                             _middlewares=options['middlewares']), sock=sock)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()

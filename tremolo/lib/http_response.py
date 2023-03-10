@@ -109,6 +109,8 @@ class HTTPResponse(Response):
                 self._header[1],
                 data), **kwargs)
 
+            self._header = None
+
         await self.send(None)
 
     async def write(self, data, **kwargs):
