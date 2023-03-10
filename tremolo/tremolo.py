@@ -41,7 +41,7 @@ class Tremolo(TremoloProtocol):
                     setattr(self, attr, getattr(server, attr))
 
     def _set_base_header(self, options={}):
-        if self._server['response'].header[1] != b'':
+        if self._server['response'].header is None or self._server['response'].header[1] != b'':
             return
 
         options['server_name'] = options.get('server_name', self.options['server_name'])
@@ -264,7 +264,7 @@ class Tremolo(TremoloProtocol):
             # bad request
             await self._handle_response(self._route_handlers[0][0][1], {**self._route_handlers[0][0][2], **options})
 
-class Server():
+class Server:
     def __init__(self):
         self._listeners = []
 
