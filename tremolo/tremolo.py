@@ -480,6 +480,23 @@ class Server:
         finally:
             self._loop.close()
 
+    def _create_sock(self, host, port, reuse_port):
+        try:
+            sock = socket.socket({4: socket.AF_INET,
+                                  6: socket.AF_INET6
+                                  }[ipaddress.ip_address(host).version], socket.SOCK_STREAM)
+        except ValueError:
+            sock = socket.socket(type=socket.SOCK_STREAM)
+
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        sock.setsockopt(socket.SOL_SOCKET, {True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
+                                            False: socket.SO_REUSEADDR
+                                            }[reuse_port], 1)
+        sock.bind((host, port))
+        sock.set_inheritable(True)
+
+        return sock
+
     def run(self, host, port=0, reuse_port=True, worker_num=1, **kwargs):
         default_host = host
         self.add_listener(port, host=host, **kwargs)
@@ -490,33 +507,22 @@ class Server:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
         processes = []
+        socks = {}
 
         for host, port, options in self._listeners:
             if host is None:
                 host = default_host
 
-            try:
-                sock = socket.socket({4: socket.AF_INET,
-                                      6: socket.AF_INET6
-                                      }[ipaddress.ip_address(host).version], socket.SOCK_STREAM)
-            except ValueError:
-                sock = socket.socket(type=socket.SOCK_STREAM)
-
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            sock.setsockopt(socket.SOL_SOCKET, {True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
-                                                False: socket.SO_REUSEADDR
-                                                }[options.get('reuse_port', reuse_port)], 1)
-            sock.bind((host, port))
-            sock.set_inheritable(True)
+            args = (host, port)
+            socks[args] = self._create_sock(host, port, options.get('reuse_port', reuse_port))
 
             for _ in range(options.get('worker_num', worker_num)):
                 parent_conn, child_conn = mp.Pipe()
-                args = (host, port)
 
                 p = mp.Process(
                     target=self._worker, args=args, kwargs=dict(options,
                                                                 conn=child_conn,
-                                                                family=sock.family,
+                                                                family=socks[args].family,
                                                                 handlers=deepcopy(self._route_handlers),
                                                                 middlewares=self._middlewares)
                     )
@@ -524,57 +530,60 @@ class Server:
                 p.start()
                 child_pid = parent_conn.recv()
 
-                if hasattr(sock, 'share'):
-                    parent_conn.send(sock.share(child_pid))
+                if hasattr(socks[args], 'share'):
+                    parent_conn.send(socks[args].share(child_pid))
                 else:
-                    parent_conn.send(sock.fileno())
+                    parent_conn.send(socks[args].fileno())
 
                     if parent_conn.recv() is False:
-                        parent_conn.send(sock)
+                        parent_conn.send(socks[args])
 
                 processes.append((parent_conn, p, args, options))
 
-            sock.close()
-
         while True:
-            for i, (parent_conn, p, args, options) in enumerate(processes):
-                if not p.is_alive():
-                    print('A worker process died. Restarting...')
+            try:
+                for i, (parent_conn, p, args, options) in enumerate(processes):
+                    if not p.is_alive():
+                        print('A worker process died. Restarting...')
 
-                    parent_conn.close()
-                    parent_conn, child_conn = mp.Pipe()
-                    p = mp.Process(
-                        target=self._worker, args=args, kwargs=dict(options,
-                                                                    conn=child_conn,
-                                                                    family=sock.family,
-                                                                    handlers=deepcopy(self._route_handlers),
-                                                                    middlewares=self._middlewares)
-                        )
-
-                    p.start()
-                    pid = parent_conn.recv()
-
-                    if hasattr(sock, 'share'):
-                        parent_conn.send(sock.share(pid))
-                    else:
-                        parent_conn.send(sock.fileno())
-
-                        if parent_conn.recv() is False:
-                            parent_conn.send(sock)
-
-                    processes[i] = (parent_conn, p, args, options)
-
-                # response ping from child
-                while parent_conn.poll():
-                    parent_conn.recv()
-                    parent_conn.send(len(processes))
-
-                try:
-                    time.sleep(1)
-                except KeyboardInterrupt:
-                    for parent_conn, p, *_ in processes:
                         parent_conn.close()
-                        p.terminate()
+                        parent_conn, child_conn = mp.Pipe()
+                        p = mp.Process(
+                            target=self._worker, args=args, kwargs=dict(options,
+                                                                        conn=child_conn,
+                                                                        family=socks[args].family,
+                                                                        handlers=deepcopy(self._route_handlers),
+                                                                        middlewares=self._middlewares)
+                            )
 
-                        print('pid {:d} terminated'.format(p.pid))
-                    return
+                        p.start()
+                        pid = parent_conn.recv()
+
+                        if hasattr(socks[args], 'share'):
+                            parent_conn.send(socks[args].share(pid))
+                        else:
+                            parent_conn.send(socks[args].fileno())
+
+                            if parent_conn.recv() is False:
+                                parent_conn.send(socks[args])
+
+                        processes[i] = (parent_conn, p, args, options)
+
+                    # response ping from child
+                    while parent_conn.poll():
+                        parent_conn.recv()
+                        parent_conn.send(len(processes))
+
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                break
+
+        for parent_conn, p, *_ in processes:
+            parent_conn.close()
+            p.terminate()
+
+            print('pid {:d} terminated'.format(p.pid))
+
+        for sock in socks.values():
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
