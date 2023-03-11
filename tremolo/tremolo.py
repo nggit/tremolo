@@ -36,9 +36,9 @@ class Tremolo(TremoloProtocol):
         except KeyError:
             server = Server()
 
-            for attr in dir(server):
-                if not attr.startswith('__'):
-                    setattr(self, attr, getattr(server, attr))
+            for attr_name in dir(server):
+                if not attr_name.startswith('__'):
+                    setattr(self, attr_name, getattr(server, attr_name))
 
     def _set_base_header(self, options={}):
         if self._server['response'].header is None or self._server['response'].header[1] != b'':
@@ -295,7 +295,7 @@ class Server:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._add_handler(path, wrapper, self._getoptions(func))
+            self._add_handler(path, wrapper, self.getoptions(func))
             return wrapper
 
         return decorator
@@ -308,7 +308,7 @@ class Server:
 
             for i, h in enumerate(self._route_handlers[0]):
                 if status == h[2]['status'][0]:
-                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self._getoptions(func)))
+                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self.getoptions(func)))
                     break
             return wrapper
 
@@ -320,7 +320,7 @@ class Server:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._middlewares[name].append((wrapper, self._getoptions(func)))
+            self._middlewares[name].append((wrapper, self.getoptions(func)))
             return wrapper
 
         return decorator
@@ -337,7 +337,7 @@ class Server:
 
         return self.middleware('request')
 
-    def _getoptions(self, func):
+    def getoptions(self, func):
         options = {}
 
         if func.__defaults__ is not None:
@@ -405,7 +405,7 @@ class Server:
             fd = options['conn'].recv()
 
             try:
-                sock = socket.fromfd(fd, options['family'], socket.SOCK_STREAM)
+                sock = socket.fromfd(fd, options['sa_family'], socket.SOCK_STREAM)
                 sock.listen()
                 options['conn'].send(True)
             except Exception:
@@ -522,7 +522,7 @@ class Server:
                 p = mp.Process(
                     target=self._worker, args=args, kwargs=dict(options,
                                                                 conn=child_conn,
-                                                                family=socks[args].family,
+                                                                sa_family=socks[args].family,
                                                                 handlers=deepcopy(self._route_handlers),
                                                                 middlewares=self._middlewares)
                     )
@@ -551,7 +551,7 @@ class Server:
                         p = mp.Process(
                             target=self._worker, args=args, kwargs=dict(options,
                                                                         conn=child_conn,
-                                                                        family=socks[args].family,
+                                                                        sa_family=socks[args].family,
                                                                         handlers=deepcopy(self._route_handlers),
                                                                         middlewares=self._middlewares)
                             )
