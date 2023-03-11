@@ -11,6 +11,10 @@ class HTTPRequest(Request):
         self.is_valid = header.is_valid_request
         self.headers = header.getheaders()
         self.host = header.gethost()
+
+        if isinstance(self.host, list):
+            self.host = self.host[0]
+
         self.method = header.getmethod().upper()
         self.path = header.getpath()
         self.version = header.getversion()
