@@ -126,7 +126,8 @@ class Tremolo(TremoloProtocol):
 
         if data is None:
             return options
-        elif not isinstance(data, (bytes, bytearray, str)):
+
+        if not isinstance(data, (bytes, bytearray, str)):
             return
 
         if 'status' in options:
