@@ -1,8 +1,8 @@
 # Copyright (c) 2023 nggit
 
 class Response:
-    def __init__(self, protocol):
-        self._protocol = protocol
+    def __init__(self, request):
+        self._protocol = request.protocol
 
     def close(self):
         if self._protocol.queue[1] is not None:

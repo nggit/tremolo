@@ -12,23 +12,33 @@ except ImportError:
     from asyncio.base_futures import InvalidStateError
 
 class TremoloProtocol(asyncio.Protocol):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, context, **kwargs):
+        self._context = context
         self._options = kwargs
-        self._transport = None
-        self._queue = (None, None)
 
         if 'loop' in kwargs:
             self._loop = kwargs['loop']
         else:
             self._loop = asyncio.get_event_loop()
 
+        self._transport = None
+        self._queue = (None, None)
+
     @property
-    def loop(self):
-        return self._loop
+    def context(self):
+        return self._context
+
+    @property
+    def tasks(self):
+        return self._context.tasks
 
     @property
     def options(self):
         return self._options
+
+    @property
+    def loop(self):
+        return self._loop
 
     @property
     def transport(self):
@@ -45,14 +55,13 @@ class TremoloProtocol(asyncio.Protocol):
         self._header = self._conn['header']
         self._request = None
         self._response = None
-        self._tasks = []
 
         self._data = bytearray()
         self._cancel_timeouts = {'receive': self._loop.create_future()}
 
         for task in (self._send_data(), self.set_timeout(self._cancel_timeouts['receive'],
                                                          timeout_cb=self.receive_timeout)):
-            self._tasks.append(self._loop.create_task(task))
+            self.tasks.append(self._loop.create_task(task))
 
     async def receive_timeout(self, timeout):
         self._options['logger'].info('request timeout after {:g}s'.format(timeout))
@@ -110,9 +119,6 @@ class TremoloProtocol(asyncio.Protocol):
 
                 self._options['logger'].info('payload too large')
 
-    async def body_received(self, request, response):
-        return
-
     async def header_received(self, request, response):
         return
 
@@ -144,7 +150,7 @@ class TremoloProtocol(asyncio.Protocol):
 
         if self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
             self._request = HTTPRequest(self, self._header)
-            self._response = HTTPResponse(self, self._request)
+            self._response = HTTPResponse(self._request)
 
             try:
                 if b'connection' in self._request.headers:
@@ -187,7 +193,6 @@ class TremoloProtocol(asyncio.Protocol):
                     await self.put_to_queue(
                         data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                     )
-                    await self.body_received(self._request, self._response)
 
                 await self.header_received(self._request, self._response)
             except Exception as exc:
@@ -210,7 +215,7 @@ class TremoloProtocol(asyncio.Protocol):
                     if i != 'send' and not self._cancel_timeouts[i].done():
                         self._cancel_timeouts[i].set_result(None)
 
-                self._tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
+                self.tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
             elif header_size > 8192:
                 self._options['logger'].info('request header too large')
                 self._transport.abort()
@@ -240,7 +245,7 @@ class TremoloProtocol(asyncio.Protocol):
                 if data is None:
                     if self._request is not None:
                         if self._request.http_keepalive and self._data is None:
-                            for i, task in enumerate(self._tasks):
+                            for i, task in enumerate(self.tasks):
                                 try:
                                     exc = task.exception()
 
@@ -249,7 +254,7 @@ class TremoloProtocol(asyncio.Protocol):
                                             (exc.__class__.__name__, str(exc))
                                         ), exc_info={True: exc, False: False}[self._options['debug']])
 
-                                    del self._tasks[i]
+                                    del self.tasks[i]
                                 except InvalidStateError:
                                     pass
 
@@ -259,7 +264,7 @@ class TremoloProtocol(asyncio.Protocol):
 
                             self._cancel_timeouts['keepalive'] = self._loop.create_future()
 
-                            self._tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
+                            self.tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
                                                                                        timeout_cb=self.keepalive_timeout)))
                             self._transport.resume_reading()
                             continue
@@ -291,7 +296,7 @@ class TremoloProtocol(asyncio.Protocol):
                 raise exc
 
     def connection_lost(self, exc):
-        for task in self._tasks:
+        for task in self.tasks:
             try:
                 exc = task.exception()
 

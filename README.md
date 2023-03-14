@@ -16,7 +16,7 @@ You can take advantage of this to serve big files efficiently:
 ```python
 @app.route('/my/url/big.data')
 async def my_big_data(content_type='application/octet-stream', **server):
-    buffer_size = server['options']['buffer_size']
+    buffer_size = server['context'].options['buffer_size']
 
     with open('/my/folder/big.data', 'rb') as f:
         chunk = True
@@ -60,8 +60,8 @@ app.run('0.0.0.0', 8000, worker_num=2)
 Tremolo can also listen to multiple ports in case you are using an external load balancer like Nginx / HAProxy.
 
 ```python
-app.add_listener(8001)
-app.add_listener(8002)
+app.listen(8001)
+app.listen(8002)
 
 app.run('0.0.0.0', 8000)
 ```

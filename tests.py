@@ -348,6 +348,7 @@ async def my_page(**server):
     elif page_id == b'102':
         assert request.headers.get(b'cookie') == None
         assert request.headers.getlist(b'cookie') == []
+        await request.form
         assert request.params['post']['username'] == ['myuser']
         assert request.params['post']['password'] == ['mypass']
 
@@ -387,8 +388,8 @@ async def upload3_payloadtoolarge(**server):
     return 'OK'
 
 # test multiple ports
-app.add_listener(28001)
-app.add_listener(28002)
+app.listen(28001)
+app.listen(28002)
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')

@@ -20,25 +20,90 @@ from urllib.parse import parse_qs
 from .lib.connection_pool import ConnectionPool
 from .lib.tremolo_protocol import TremoloProtocol
 
+class ServerContext:
+    def __init__(self):
+        self.__dict__ = {
+            'options': {},
+            'tasks': [],
+            'data': {}
+        }
+
+    def __repr__(self):
+        return self.__dict__.__repr__()
+
+    @property
+    def options(self):
+        return self.__dict__['options']
+
+    @property
+    def tasks(self):
+        return self.__dict__['tasks']
+
+    @property
+    def data(self):
+        return self.__dict__['data']
+
+    def set(self, name, value):
+        self.__dict__[name] = value
+
 class Tremolo(TremoloProtocol):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, **kwargs):
         try:
             self._route_handlers = kwargs['_handlers']
             self._middlewares = kwargs['_middlewares']
             self._server = {
                 'loop': kwargs['loop'],
                 'logger': kwargs['logger'],
+                'context': ServerContext(),
                 'request': None,
                 'response': None
             }
 
-            super().__init__(*args, **kwargs)
+            super().__init__(self._server['context'], **kwargs)
         except KeyError:
             server = Server()
 
             for attr_name in dir(server):
                 if not attr_name.startswith('__'):
                     setattr(self, attr_name, getattr(server, attr_name))
+
+    async def _connection_made(self, func):
+        await func(**self._server)
+
+        if self._server['context']._on_connect is not None:
+            self._server['context']._on_connect.set_result(None)
+
+    async def _connection_lost(self, func, exc):
+        try:
+            await func(**self._server)
+        except Exception:
+            pass
+
+        super().connection_lost(exc)
+
+    def connection_made(self, transport):
+        super().connection_made(transport)
+
+        func = self._middlewares['connect'][-1][0]
+        self._server['context'].set('options', self._middlewares['connect'][-1][1])
+
+        if func is None:
+            self._server['context']._on_connect = None
+        else:
+            self._server['context']._on_connect = self._server['loop'].create_future()
+
+            self._server['context'].tasks.append(
+                self._server['loop'].create_task(self._connection_made(func))
+            )
+
+    def connection_lost(self, exc):
+        func = self._middlewares['close'][-1][0]
+
+        if func is None:
+            super().connection_lost(exc)
+            return
+
+        self._server['loop'].create_task(self._connection_lost(func, exc))
 
     def _set_base_header(self, options={}):
         if self._server['response'].header is None or self._server['response'].header[1] != b'':
@@ -56,10 +121,13 @@ class Tremolo(TremoloProtocol):
     async def _handle_middleware(self, func, options={}):
         self._set_base_header(options)
 
-        data = await func(**{'options': options, **self._server})
+        self._server['context'].set('options', options)
+        data = await func(**self._server)
 
         if data is None:
             return options
+        elif not isinstance(data, (bytes, bytearray, str)):
+            return
 
         if 'status' in options:
             self._server['response'].set_status(*options['status'])
@@ -89,7 +157,8 @@ class Tremolo(TremoloProtocol):
 
         self._set_base_header(options)
 
-        agen = func(**{'options': options, **self._server})
+        self._server['context'].set('options', options)
+        agen = func(**self._server)
 
         try:
             data = await agen.__anext__()
@@ -112,9 +181,9 @@ class Tremolo(TremoloProtocol):
         if self._server['response'].http_chunked:
             self._server['response'].append_header(b'Transfer-Encoding: chunked\r\n')
 
-        if self._middlewares['data'][-1][0] is not None:
+        if self._middlewares['send'][-1][0] is not None:
             self._server['response'].set_write_callback(
-                lambda **kwargs : self._handle_middleware(self._middlewares['data'][-1][0], {**self._middlewares['data'][-1][1], **kwargs})
+                lambda : self._handle_middleware(self._middlewares['send'][-1][0], self._middlewares['send'][-1][1])
             )
 
         self._server['response'].header = b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status)
@@ -175,21 +244,15 @@ class Tremolo(TremoloProtocol):
 
         await self._server['response'].send(None)
 
-    async def body_received(self, request, response):
-        if request.content_type.find(b'application/x-www-form-urlencoded') > -1:
-            async for data in request.read():
-                request.append_body(data)
-
-                if request.body_size > 8 * 1048576:
-                    break
-
-            if request.body_size <= 8 * 1048576:
-                request.params['post'] = parse_qs((await request.body()).decode(encoding='latin-1'))
-
     async def header_received(self, request, response):
         self._server['request'] = request
         self._server['response'] = response
-        options = {}
+
+        if self._server['context']._on_connect is not None:
+            await self._server['context']._on_connect
+            self._server['context']._on_connect = None
+
+        options = self._server['context'].options
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(middleware[0], {**middleware[1], **options})
@@ -198,16 +261,6 @@ class Tremolo(TremoloProtocol):
                 return
 
         if request.is_valid:
-            if b'cookie' in request.headers:
-                if isinstance(request.headers[b'cookie'], list):
-                    self._server['request'].cookies = parse_qs(
-                        b'; '.join(request.headers[b'cookie']).replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
-                    )
-                else:
-                    self._server['request'].cookies = parse_qs(
-                        request.headers[b'cookie'].replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
-                    )
-
             qs_pos = request.path.find(b'?')
 
             if qs_pos > -1:
@@ -266,7 +319,7 @@ class Tremolo(TremoloProtocol):
 
 class Server:
     def __init__(self):
-        self._listeners = []
+        self._ports = []
 
         self._route_handlers = {
             0: [
@@ -280,14 +333,20 @@ class Server:
         }
 
         self._middlewares = {
-            'data': [
+            'connect': [
+                (None, {})
+            ],
+            'send': [
+                (None, {})
+            ],
+            'close': [
                 (None, {})
             ],
             'request': []
         }
 
-    def add_listener(self, port, host=None, **options):
-        self._listeners.append((host, port, options))
+    def listen(self, port, host=None, **options):
+        self._ports.append((host, port, options))
 
     def route(self, path):
         def decorator(func):
@@ -325,11 +384,23 @@ class Server:
 
         return decorator
 
-    def on_data(self, *args):
+    def on_connect(self, *args):
         if len(args) == 1 and callable(args[0]):
-            return self.middleware('data')(args[0])
+            return self.middleware('connect')(args[0])
 
-        return self.middleware('data')
+        return self.middleware('connect')
+
+    def on_send(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('send')(args[0])
+
+        return self.middleware('send')
+
+    def on_close(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('close')(args[0])
+
+        return self.middleware('close')
 
     def on_request(self, *args):
         if len(args) == 1 and callable(args[0]):
@@ -393,7 +464,7 @@ class Server:
         yield b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; font-family: sans-serif; }</style></head><body>'
         yield b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr /><address>%s</address></body></html>' % (
             server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
-            server['options']['server_name'])
+            server['context'].options['server_name'])
 
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
@@ -499,7 +570,7 @@ class Server:
 
     def run(self, host, port=0, reuse_port=True, worker_num=1, **kwargs):
         default_host = host
-        self.add_listener(port, host=host, **kwargs)
+        self.listen(port, host=host, **kwargs)
 
         try:
             worker_num = min(worker_num, len(os.sched_getaffinity(0)))
@@ -509,7 +580,7 @@ class Server:
         processes = []
         socks = {}
 
-        for host, port, options in self._listeners:
+        for host, port, options in self._ports:
             if host is None:
                 host = default_host
 

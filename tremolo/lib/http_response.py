@@ -6,14 +6,14 @@ from urllib.parse import quote
 from .response import Response
 
 class HTTPResponse(Response):
-    def __init__(self, protocol, request):
-        super().__init__(protocol)
+    def __init__(self, request):
+        super().__init__(request)
 
         self._header = [b'', bytearray()]
         self._request = request
         self._status = []
         self._content_type = []
-        self._write_cb = self._on_write
+        self._write_cb = None
 
         self._http_chunked = False
 
@@ -117,20 +117,22 @@ class HTTPResponse(Response):
         if self._header is not None:
             header = b''.join(self._header)
 
-            await self._write_cb(data=('header', header))
+            if self._write_cb is not None:
+                self._request.context.set('data', ('header', header))
+                await self._write_cb()
+
             await self.send(header, throttle=False)
 
             self._header = None
 
-        await self._write_cb(data=('body', data))
+        if self._write_cb is not None:
+            self._request.context.set('data', ('body', data))
+            await self._write_cb()
 
         if self._http_chunked and not self._request.http_upgrade:
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
             await self.send(data, **kwargs)
-
-    async def _on_write(self, **kwargs):
-        return
 
     @property
     def http_chunked(self):
