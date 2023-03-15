@@ -202,22 +202,25 @@ class Tremolo(TremoloProtocol):
                 self._server['response'].append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
                                                        self._server['response'].get_content_type())
 
-            if not (self._server['request'].method == b'HEAD' or no_content):
-                self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
-                await self._server['response'].write(
-                    data, rate=options['rate'], buffer_size=options['buffer_size']
-                )
+            if self._server['request'].method == b'HEAD' or no_content:
+                await self._server['response'].write(None)
+                return
 
-                while True:
-                    try:
-                        data = await agen.__anext__()
+            self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
+            await self._server['response'].write(
+                data, rate=options['rate'], buffer_size=options['buffer_size']
+            )
 
-                        await self._server['response'].write(
-                            data, rate=options['rate'], buffer_size=options['buffer_size']
-                        )
-                    except StopAsyncIteration:
-                        await self._server['response'].write(b'', throttle=False)
-                        break
+            while True:
+                try:
+                    data = await agen.__anext__()
+
+                    await self._server['response'].write(
+                        data, rate=options['rate'], buffer_size=options['buffer_size']
+                    )
+                except StopAsyncIteration:
+                    await self._server['response'].write(b'', throttle=False)
+                    break
         else:
             encoding = ('utf-8',)
 
@@ -241,10 +244,13 @@ class Tremolo(TremoloProtocol):
                             False: b'close'}[self._server['request'].http_keepalive])
                     )
 
-            if data != b'' and not (self._server['request'].method == b'HEAD' or no_content):
-                self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
-                await self._server['response'].write(data, rate=options['rate'], buffer_size=options['buffer_size'])
-                await self._server['response'].write(b'', throttle=False)
+            if data == b'' or self._server['request'].method == b'HEAD' or no_content:
+                await self._server['response'].write(None)
+                return
+
+            self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
+            await self._server['response'].write(data, rate=options['rate'], buffer_size=options['buffer_size'])
+            await self._server['response'].write(b'', throttle=False)
 
         await self._server['response'].send(None)
 

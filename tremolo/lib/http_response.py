@@ -113,8 +113,37 @@ class HTTPResponse(Response):
 
         await self.send(None)
 
-    async def write(self, data, **kwargs):
+    async def write(self, data, buffer_size=16 * 1024, **kwargs):
+        kwargs['buffer_size'] = buffer_size
+
         if self._header is not None:
+            if self._header[0] == b'':
+                status = self.get_status()
+                no_content = status[0] in (204, 304) or 100 <= status[0] < 200
+                self._http_chunked = kwargs.get(
+                    'chunked', self._request.version == b'1.1' and self._request.http_keepalive and not no_content
+                )
+
+                if self._http_chunked:
+                    self.append_header(b'Transfer-Encoding: chunked\r\n')
+
+                self._header[0] = b'HTTP/%s %d %s\r\n' % (self._request.version, *status)
+
+                if no_content:
+                    self.append_header(b'Connection: close\r\n\r\n')
+                else:
+                    if not self._http_chunked:
+                        self._request.http_keepalive = False
+
+                    self.append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
+                                       self.get_content_type())
+
+                if self._request.method == b'HEAD' or no_content:
+                    self._request.http_keepalive = False
+                    data = None
+                else:
+                    self._request.transport.set_write_buffer_limits(high=buffer_size * 4, low=buffer_size // 2)
+
             header = b''.join(self._header)
 
             if self._write_cb is not None:
@@ -129,7 +158,7 @@ class HTTPResponse(Response):
             self._request.context.set('data', ('body', data))
             await self._write_cb()
 
-        if self._http_chunked and not self._request.http_upgrade:
+        if self._http_chunked and not self._request.http_upgrade and data is not None:
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
             await self.send(data, **kwargs)
