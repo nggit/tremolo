@@ -14,6 +14,10 @@ class Request:
     def context(self):
         return self._protocol.context
 
+    @property
+    def transport(self):
+        return self._protocol.transport
+
     def clear_body(self):
         self._body_size = 0
 

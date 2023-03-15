@@ -348,7 +348,7 @@ async def my_page(**server):
     elif page_id == b'102':
         assert request.headers.get(b'cookie') == None
         assert request.headers.getlist(b'cookie') == []
-        await request.form
+        await request.form()
         assert request.params['post']['username'] == ['myuser']
         assert request.params['post']['password'] == ['mypass']
 

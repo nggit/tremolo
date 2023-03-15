@@ -54,6 +54,7 @@ class Tremolo(TremoloProtocol):
             self._server = {
                 'loop': kwargs['loop'],
                 'logger': kwargs['logger'],
+                'socket': kwargs['sock'],
                 'context': ServerContext(),
                 'request': None,
                 'response': None
@@ -119,9 +120,10 @@ class Tremolo(TremoloProtocol):
                                                options['server_name']))
 
     async def _handle_middleware(self, func, options={}):
-        self._set_base_header(options)
+        if self._server['response'].header is not None:
+            self._set_base_header(options)
+            self._server['context'].set('options', options)
 
-        self._server['context'].set('options', options)
         data = await func(**self._server)
 
         if data is None:
@@ -184,7 +186,8 @@ class Tremolo(TremoloProtocol):
 
         if self._middlewares['send'][-1][0] is not None:
             self._server['response'].set_write_callback(
-                lambda : self._handle_middleware(self._middlewares['send'][-1][0], self._middlewares['send'][-1][1])
+                lambda : self._handle_middleware(
+                    self._middlewares['send'][-1][0], {**self._middlewares['send'][-1][1], **options})
             )
 
         self._server['response'].header = b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status)
@@ -498,6 +501,7 @@ class Server:
         server = await self._loop.create_server(
             lambda : Tremolo(loop=self._loop,
                              logger=self._logger,
+                             sock=sock,
                              debug=options.get('debug', False),
                              download_rate=options.get('download_rate', 1048576),
                              upload_rate=options.get('upload_rate', 1048576),

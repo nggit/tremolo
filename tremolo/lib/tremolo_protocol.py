@@ -13,12 +13,14 @@ except ImportError:
 
 class TremoloProtocol(asyncio.Protocol):
     def __init__(self, context, **kwargs):
+        assert context.tasks == []
+
         self._context = context
         self._options = kwargs
 
-        if 'loop' in kwargs:
+        try:
             self._loop = kwargs['loop']
-        else:
+        except KeyError:
             self._loop = asyncio.get_event_loop()
 
         self._transport = None
@@ -57,13 +59,13 @@ class TremoloProtocol(asyncio.Protocol):
         self._response = None
 
         self._data = bytearray()
-        self._cancel_timeouts = {'receive': self._loop.create_future()}
+        self._cancel_timeouts = {'request': self._loop.create_future()}
 
-        for task in (self._send_data(), self.set_timeout(self._cancel_timeouts['receive'],
-                                                         timeout_cb=self.receive_timeout)):
+        for task in (self._send_data(), self.set_timeout(self._cancel_timeouts['request'],
+                                                         timeout_cb=self.request_timeout)):
             self.tasks.append(self._loop.create_task(task))
 
-    async def receive_timeout(self, timeout):
+    async def request_timeout(self, timeout):
         self._options['logger'].info('request timeout after {:g}s'.format(timeout))
 
     async def keepalive_timeout(self, timeout):

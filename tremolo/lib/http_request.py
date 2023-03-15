@@ -58,7 +58,9 @@ class HTTPRequest(Request):
     async def read(self, cache=True):
         if cache and self._body != b'':
             yield self._body
-            return
+
+            if not self.body_size < self._content_length:
+                return
 
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].lower().find(b'chunked') > -1:
             buf = bytearray()
@@ -195,8 +197,7 @@ class HTTPRequest(Request):
 
             return self._params['cookies']
 
-    @property
-    async def form(self):
+    async def form(self, limit=8 * 1048576):
         try:
             return self._params['post']
         except KeyError:
@@ -206,10 +207,10 @@ class HTTPRequest(Request):
                 async for data in self.read():
                     self.append_body(data)
 
-                    if self.body_size > 8 * 1048576:
+                    if self.body_size > limit:
                         break
 
-                if 2 < self.body_size <= 8 * 1048576:
+                if 2 < self.body_size <= limit:
                     self._params['post'] = parse_qs(self._body.decode(encoding='latin-1'))
 
             return self._params['post']
