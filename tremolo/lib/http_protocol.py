@@ -11,7 +11,7 @@ try:
 except ImportError:
     from asyncio.base_futures import InvalidStateError
 
-class TremoloProtocol(asyncio.Protocol):
+class HTTPProtocol(asyncio.Protocol):
     def __init__(self, context, **kwargs):
         assert context.tasks == []
 
@@ -267,7 +267,7 @@ class TremoloProtocol(asyncio.Protocol):
                             self._cancel_timeouts['keepalive'] = self._loop.create_future()
 
                             self.tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
-                                                                                       timeout_cb=self.keepalive_timeout)))
+                                                                                      timeout_cb=self.keepalive_timeout)))
                             self._transport.resume_reading()
                             continue
 
