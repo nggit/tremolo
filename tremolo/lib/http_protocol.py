@@ -25,6 +25,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._transport = None
         self._queue = (None, None)
+        self._header = None
 
     @property
     def context(self):
@@ -49,6 +50,10 @@ class HTTPProtocol(asyncio.Protocol):
     @property
     def queue(self):
         return self._queue
+
+    @property
+    def header(self):
+        return self._header
 
     def connection_made(self, transport):
         self._transport = transport
@@ -151,7 +156,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._data = None
 
         if self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
-            self._request = HTTPRequest(self, self._header)
+            self._request = HTTPRequest(self)
             self._response = HTTPResponse(self._request)
 
             try:

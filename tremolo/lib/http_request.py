@@ -1,23 +1,23 @@
 # Copyright (c) 2023 nggit
 
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, parse_qsl
 
 from .request import Request
 
 class HTTPRequest(Request):
-    def __init__(self, protocol, header):
+    def __init__(self, protocol):
         super().__init__(protocol)
 
-        self.is_valid = header.is_valid_request
-        self.headers = header.getheaders()
-        self.host = header.gethost()
+        self.is_valid = protocol.header.is_valid_request
+        self.headers = protocol.header.getheaders()
+        self.host = protocol.header.gethost()
 
         if isinstance(self.host, list):
             self.host = self.host[0]
 
-        self.method = header.getmethod().upper()
-        self.path = header.getpath()
-        self.version = header.getversion()
+        self.method = protocol.header.getmethod().upper()
+        self.path = protocol.header.getpath()
+        self.version = protocol.header.getversion()
 
         if self.version != b'1.0':
             self.version = b'1.1'
@@ -71,15 +71,10 @@ class HTTPRequest(Request):
             while buf != b'0\r\n\r\n':
                 if not paused:
                     try:
-                        data = await agen.__anext__()
-
-                        buf.extend(data)
+                        buf.extend(await agen.__anext__())
                     except StopAsyncIteration:
                         if not buf.endswith(b'0\r\n\r\n'):
                             return
-
-                    if buf == b'':
-                        return
 
                 if tobe_read > 0:
                     data = buf[:tobe_read]
@@ -89,46 +84,44 @@ class HTTPRequest(Request):
 
                     tobe_read -= len(data)
 
-                    if tobe_read <= 0:
-                        del buf[:2]
+                    if tobe_read > 0:
+                        continue
 
-                    continue
-
-                i = buf.find(b'\r\n')
-
-                if i > -1:
                     paused = True
+                    del buf[:2]
                 else:
-                    paused = False
+                    i = buf.find(b'\r\n')
 
-                    continue
+                    if i == -1:
+                        paused = False
+                        continue
 
-                try:
-                    chunk_size = int(buf[:i].split(b';')[0], 16)
-                except ValueError:
-                    if self.protocol.queue[1] is not None:
-                        self.protocol.queue[1].put_nowait(
-                            b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
-                        )
+                    try:
+                        chunk_size = int(buf[:i].split(b';')[0], 16)
+                    except ValueError:
+                        if self.protocol.queue[1] is not None:
+                            self.protocol.queue[1].put_nowait(
+                                b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
+                            )
 
-                        self._http_keepalive = False
-                        self.protocol.queue[1].put_nowait(None)
+                            self._http_keepalive = False
+                            self.protocol.queue[1].put_nowait(None)
 
-                    del buf[:]
-                    self.protocol.options['logger'].error('bad chunked encoding')
-                    return
+                        del buf[:]
+                        self.protocol.options['logger'].error('bad chunked encoding')
+                        return
 
-                data = buf[i + 2:i + 2 + chunk_size]
-                tobe_read = chunk_size - len(data)
+                    data = buf[i + 2:i + 2 + chunk_size]
+                    tobe_read = chunk_size - len(data)
 
-                yield data
+                    yield data
 
-                if tobe_read > 0:
-                    paused = False
-
-                    del buf[:i + 2 + chunk_size]
-                else:
-                    del buf[:chunk_size + i + 4]
+                    if tobe_read > 0:
+                        paused = False
+                        del buf[:i + 2 + chunk_size]
+                    else:
+                        paused = True
+                        del buf[:chunk_size + i + 4]
         else:
             async for data in self.recv():
                 yield data
@@ -214,6 +207,89 @@ class HTTPRequest(Request):
                     self._params['post'] = parse_qs(self._body.decode(encoding='latin-1'))
 
             return self._params['post']
+
+    async def files(self):
+        ct = parse_qs(
+            self._content_type.replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+        )
+
+        try:
+            boundary = ct['boundary'][-1].encode(encoding='latin-1')
+        except KeyError:
+            if self.protocol.queue[1] is not None:
+                self.protocol.queue[1].put_nowait(
+                    b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
+                )
+
+                self._http_keepalive = False
+                self.protocol.queue[1].put_nowait(None)
+
+            self.protocol.options['logger'].error('missing boundary')
+            return
+
+        header = bytearray()
+        body = bytearray()
+
+        header_size = 0
+        body_size = 0
+        content_length = 0
+
+        agen = self.read()
+        paused = False
+
+        while header != b'--%s--\r\n' % boundary:
+            data = b''
+
+            if not paused:
+                try:
+                    data = await agen.__anext__()
+                except StopAsyncIteration:
+                    if header_size == -1 or body_size == -1:
+                        return
+
+            if isinstance(header, bytearray):
+                header.extend(data)
+                header_size = header.find(b'\r\n\r\n')
+
+                if header_size == -1:
+                    paused = False
+                else:
+                    body = header[header_size + 4:]
+                    info = {}
+
+                    if header_size <= 8192 and header.startswith(b'--%s\r\n' % boundary):
+                        header = self.protocol.header.parse(header, header_size=header_size).getheaders()
+
+                        if b'content-disposition' in header:
+                            for k, v in parse_qsl(header[b'content-disposition']
+                                    .replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')):
+                                info[k] = v.strip('"')
+
+                        if b'content-length' in header:
+                            content_length = int(header[b'content-length'])
+                            info['length'] = content_length
+
+                        if b'content-type' in header:
+                            info['type'] = header[b'content-type'].decode(encoding='latin-1')
+                    else:
+                        header = {}
+
+                continue
+
+            body.extend(data)
+            body_size = body.find(b'\r\n--%s' % boundary, content_length)
+
+            if body_size == -1:
+                paused = False
+                continue
+
+            yield info, body[:body_size]
+
+            header = body[body_size + 2:]
+            content_length = 0
+            paused = True
+
+            del body[:]
 
     @property
     def query(self):
