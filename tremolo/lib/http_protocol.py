@@ -6,11 +6,6 @@ import traceback
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 
-try:
-    from asyncio import InvalidStateError
-except ImportError:
-    from asyncio.base_futures import InvalidStateError
-
 class HTTPProtocol(asyncio.Protocol):
     def __init__(self, context, **kwargs):
         assert context.tasks == []
@@ -64,9 +59,9 @@ class HTTPProtocol(asyncio.Protocol):
         self._response = None
 
         self._data = bytearray()
-        self._cancel_timeouts = {'request': self._loop.create_future()}
+        self._timeout_waiters = {'request': self._loop.create_future()}
 
-        for task in (self._send_data(), self.set_timeout(self._cancel_timeouts['request'],
+        for task in (self._send_data(), self.set_timeout(self._timeout_waiters['request'],
                                                          timeout_cb=self.request_timeout)):
             self.tasks.append(self._loop.create_task(task))
 
@@ -79,19 +74,20 @@ class HTTPProtocol(asyncio.Protocol):
     async def send_timeout(self, timeout):
         self._options['logger'].info('send timeout after {:g}s'.format(timeout))
 
-    async def set_timeout(self, cancel_timeout, timeout=30, timeout_cb=None):
-        _, pending = await asyncio.wait([cancel_timeout], timeout=timeout)
+    async def set_timeout(self, waiter, timeout=30, timeout_cb=None):
+        timer = self._loop.call_at(self._loop.time() + timeout, waiter.cancel)
 
-        if pending:
-            for task in pending:
-                task.cancel()
-
+        try:
+            return await waiter
+        except asyncio.CancelledError:
             if self._transport is not None:
                 if callable(timeout_cb):
                     await timeout_cb(timeout)
 
                 if self._transport is not None and not self._transport.is_closing():
                     self._transport.abort()
+        finally:
+            timer.cancel()
 
     async def put_to_queue(self, data, queue=None, transport=None, rate=1048576, buffer_size=16 * 1024):
         data_size = len(data)
@@ -218,9 +214,9 @@ class HTTPProtocol(asyncio.Protocol):
             if -1 < header_size <= 8192:
                 self._transport.pause_reading()
 
-                for i in self._cancel_timeouts:
-                    if i != 'send' and not self._cancel_timeouts[i].done():
-                        self._cancel_timeouts[i].set_result(None)
+                for i in self._timeout_waiters:
+                    if i != 'send' and not self._timeout_waiters[i].done():
+                        self._timeout_waiters[i].set_result(None)
 
                 self.tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
             elif header_size > 8192:
@@ -241,7 +237,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._queue[0].put_nowait(None)
 
     def resume_writing(self):
-        self._cancel_timeouts['send'].set_result(None)
+        self._timeout_waiters['send'].set_result(None)
 
     async def _send_data(self):
         while self._queue[1] is not None:
@@ -262,16 +258,16 @@ class HTTPProtocol(asyncio.Protocol):
                                         ), exc_info={True: exc, False: False}[self._options['debug']])
 
                                     del self.tasks[i]
-                                except InvalidStateError:
+                                except asyncio.InvalidStateError:
                                     pass
 
                             if not self._request.http_continue:
                                 self._data = bytearray()
                                 self._request.clear_body()
 
-                            self._cancel_timeouts['keepalive'] = self._loop.create_future()
+                            self._timeout_waiters['keepalive'] = self._loop.create_future()
 
-                            self.tasks.append(self._loop.create_task(self.set_timeout(self._cancel_timeouts['keepalive'],
+                            self.tasks.append(self._loop.create_task(self.set_timeout(self._timeout_waiters['keepalive'],
                                                                                       timeout_cb=self.keepalive_timeout)))
                             self._transport.resume_reading()
                             continue
@@ -291,9 +287,9 @@ class HTTPProtocol(asyncio.Protocol):
                     self._options['logger'].info(
                         '{:d} exceeds the current watermark limits (high={:d}, low={:d})'.format(write_buffer_size, high, low)
                     )
-                    self._cancel_timeouts['send'] = self._loop.create_future()
+                    self._timeout_waiters['send'] = self._loop.create_future()
 
-                    await self.set_timeout(self._cancel_timeouts['send'], timeout_cb=self.send_timeout)
+                    await self.set_timeout(self._timeout_waiters['send'], timeout_cb=self.send_timeout)
 
                 self._transport.write(data)
             except Exception as exc:
@@ -311,7 +307,7 @@ class HTTPProtocol(asyncio.Protocol):
                     self._options['logger'].error(': '.join(
                         (exc.__class__.__name__, str(exc))
                     ), exc_info={True: exc, False: False}[self._options['debug']])
-            except InvalidStateError:
+            except asyncio.InvalidStateError:
                 task.cancel()
 
         for i in (0, 1):

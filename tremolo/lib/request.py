@@ -26,13 +26,13 @@ class Request:
 
     async def recv(self):
         while self._protocol.queue[0] is not None:
-            cancel_recv_timeout = self._protocol.loop.create_future()
-            self._protocol.loop.create_task(self._protocol.set_timeout(cancel_recv_timeout,
+            recv_waiter = self._protocol.loop.create_future()
+            self._protocol.loop.create_task(self._protocol.set_timeout(recv_waiter,
                                                                        timeout_cb=self.recv_timeout))
 
             data = await self._protocol.queue[0].get()
             self._protocol.queue[0].task_done()
-            cancel_recv_timeout.set_result(None)
+            recv_waiter.set_result(None)
 
             if data is None:
                 break
