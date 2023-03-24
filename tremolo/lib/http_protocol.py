@@ -310,10 +310,10 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 task.cancel()
 
-        for i in (0, 1):
-            while not self._queue[i].empty():
-                self._queue[i].get_nowait()
-                self._queue[i].task_done()
+        for queue in self._queue:
+            while not queue.empty():
+                queue.get_nowait()
+                queue.task_done()
 
         self._options['_pool'].put({
             'queue': self._queue,
