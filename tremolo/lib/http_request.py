@@ -62,6 +62,16 @@ class HTTPRequest(Request):
             if not self.body_size < self._content_length:
                 return
 
+        if self._content_length > self.protocol.options['client_max_body_size']:
+            if self.protocol.queue[1] is not None:
+                self.protocol.queue[1].put_nowait(
+                    b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self.version
+                )
+                self._http_keepalive = False
+                self.protocol.queue[1].put_nowait(None)
+
+            return
+
         if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].lower().find(b'chunked') > -1:
             buf = bytearray()
             agen = self.recv()

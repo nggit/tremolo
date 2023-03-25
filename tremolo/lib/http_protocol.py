@@ -170,28 +170,7 @@ class HTTPProtocol(asyncio.Protocol):
                         self._request.content_length = int(self._request.headers[b'content-length'])
 
                     if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
-                        if self._request.content_length > self._options['client_max_body_size']:
-                            if self._queue[1] is not None:
-                                self._queue[1].put_nowait(
-                                    b'HTTP/%s 417 Expectation Failed\r\nConnection: close\r\n\r\n' % self._request.version
-                                )
-                                self._request.http_keepalive = False
-                                self._queue[1].put_nowait(None)
-
-                            return
-
-                        if self._queue[1] is not None:
-                            self._request.http_continue = True
-                            self._queue[1].put_nowait(b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version)
-                    elif self._request.content_length > self._options['client_max_body_size']:
-                        if self._queue[1] is not None:
-                            self._queue[1].put_nowait(
-                                b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self._request.version
-                            )
-                            self._request.http_keepalive = False
-                            self._queue[1].put_nowait(None)
-
-                        return
+                        self._request.http_continue = True
 
                     await self.put_to_queue(
                         data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']

@@ -128,6 +128,18 @@ class HTTPServer(HTTPProtocol):
 
         await self._server['response'].end(data)
 
+    async def _handle_continue(self):
+        if self._server['request'].http_continue:
+            if self._server['request'].content_length > self.options['client_max_body_size']:
+                await self._server['response'].send(
+                    b'HTTP/%s 417 Expectation Failed\r\nConnection: close\r\n\r\n' % self._server['request'].version
+                )
+                self._server['response'].close()
+                return False
+
+            await self._server['response'].send(b'HTTP/%s 100 Continue\r\n\r\n' % self._server['request'].version)
+            return True
+
     async def _handle_response(self, func, options={}):
         options['rate'] = options.get('rate', self.options['download_rate'])
         options['buffer_size'] = options.get('buffer_size', self.options['buffer_size'])
@@ -271,6 +283,11 @@ class HTTPServer(HTTPProtocol):
                     m = pattern.search(request.path)
 
                     if m:
+                        http_continue = await self._handle_continue()
+
+                        if http_continue is False:
+                            return
+
                         matches = m.groupdict()
 
                         if not matches:
@@ -290,14 +307,18 @@ class HTTPServer(HTTPProtocol):
                         else:
                             self._route_handlers[ri] = [(pattern, func, kwargs)]
 
-                        matches = m.groupdict()
+                        http_continue = await self._handle_continue()
 
-                        if not matches:
-                            matches = m.groups()
+                        if http_continue is not False:
+                            matches = m.groupdict()
 
-                        self._server['request'].params['url'] = matches
+                            if not matches:
+                                matches = m.groups()
 
-                        await self._handle_response(func, {**kwargs, **options})
+                            self._server['request'].params['url'] = matches
+
+                            await self._handle_response(func, {**kwargs, **options})
+
                         del self._route_handlers[-1][i]
                         return
 
