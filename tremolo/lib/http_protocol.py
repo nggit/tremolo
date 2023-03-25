@@ -62,6 +62,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._timeout_waiters = {'request': self._loop.create_future()}
 
         for task in (self._send_data(), self.set_timeout(self._timeout_waiters['request'],
+                                                         timeout=self._options['request_timeout'],
                                                          timeout_cb=self.request_timeout)):
             self.tasks.append(self._loop.create_task(task))
 
@@ -142,11 +143,11 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             data = b'Internal server error.'
 
-        await response.write(
+        await response.send(
             b'HTTP/%s 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' % (
             request.version, len(data), data))
 
-        await response.write(None)
+        response.close()
 
     async def _handle_request_header(self, data, header_size):
         self._data = None
@@ -247,6 +248,7 @@ class HTTPProtocol(asyncio.Protocol):
                             self._timeout_waiters['keepalive'] = self._loop.create_future()
 
                             self.tasks.append(self._loop.create_task(self.set_timeout(self._timeout_waiters['keepalive'],
+                                                                                      timeout=self._options['keepalive_timeout'],
                                                                                       timeout_cb=self.keepalive_timeout)))
                             self._transport.resume_reading()
                             continue

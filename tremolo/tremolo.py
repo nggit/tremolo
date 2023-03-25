@@ -205,6 +205,8 @@ class Tremolo:
                                 upload_rate=options.get('upload_rate', 1048576),
                                 buffer_size=options.get('buffer_size', 16 * 1024),
                                 client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
+                                request_timeout=options.get('request_timeout', 30),
+                                keepalive_timeout=options.get('keepalive_timeout', 30),
                                 server_name=server_name,
                                 _pool=pool,
                                 _handlers=options['handlers'],
