@@ -18,43 +18,44 @@ class ParseHeader:
     def __init__(self, data=bytearray(), **kwargs):
         self.parse(data, **kwargs)
 
-    def parse(self, data=bytearray(), header_size=None, excludes=[]):
+    def parse(self, data, header_size=None, excludes=[]):
         self.is_request = False
         self.is_response = False
         self.is_valid_request = False
         self.is_valid_response = False
+
+        self._data = data
         self._headers = Headers()
         self._header = {}
-        self._body = bytearray()
+        self._header_size = header_size
 
         if data == b'' or not isinstance(data, (bytearray, bytes)):
             return self
 
         if isinstance(data, bytes):
-            data = bytearray(data)
+            self._data = bytearray(data)
 
         if header_size is None:
-            header_size = data.find(b'\r\n\r\n')
+            self._header_size = self._data.find(b'\r\n\r\n')
 
-        if header_size == -1:
+        if self._header_size == -1:
             return self
 
-        self._body = data[header_size:]
-        data = data[:header_size]
+        header = self._data[:self._header_size]
 
-        if data == b'':
+        if header == b'':
             return self
 
-        data.extend(b'\r\n')
+        header.extend(b'\r\n')
         start = 0
 
         while True:
-            end = data.find(b'\r\n', start)
+            end = header.find(b'\r\n', start)
 
             if end == -1:
                 break
 
-            line = data[start:end]
+            line = header[start:end]
             colon_pos = line.find(b':', 1)
 
             if colon_pos > 0:
@@ -78,7 +79,7 @@ class ParseHeader:
                         self._header[name_lc].append(name + b': ' + value)
                     else:
                         self._header[name_lc] = [name + b': ' + value]
-            else:
+            elif start == 0:
                 if line.startswith(b'HTTP/'):
                     self.is_response = True
 
@@ -106,6 +107,11 @@ class ParseHeader:
                             self._headers[b'_version'] = b''
 
                 self._header[0] = [line]
+            else:
+                self.is_valid_request = False
+                self.is_valid_response = False
+
+                break
 
             start = end + 2
 
@@ -161,4 +167,4 @@ class ParseHeader:
         return self._headers.get(b'_message')
 
     def save(self):
-        return bytearray(b'\r\n').join([bytearray(b'\r\n').join(v) for v in self._header.values()]) + self._body
+        return bytearray(b'\r\n').join([bytearray(b'\r\n').join(v) for v in self._header.values()]) + self._data[self._header_size:]
