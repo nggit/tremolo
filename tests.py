@@ -123,7 +123,7 @@ class TestQuick(unittest.TestCase):
     def test_get_ok_10(self):
         header, body = getcontents(host=HOST, port=PORT, method='GET', path='/', version='1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 503 Service Unavailable')
         self.assertFalse(chunked_detected(header))
         self.assertTrue(header.find(b'\r\nX-Foo: bar') > -1 and header.find(b'Set-Cookie: sess=www') > -1)
 
@@ -211,7 +211,7 @@ class TestQuick(unittest.TestCase):
                                        (b'Content-Length: %d\r\n\r\n\x00' %  (2 * 1048576 + 16 * 1024)))
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 413 Payload Too Large')
-        self.assertEqual(body, b'')
+        self.assertEqual(body, b'Payload Too Large')
 
     def test_continue(self):
         header, body = getcontents(host=HOST,
@@ -232,7 +232,7 @@ class TestQuick(unittest.TestCase):
                                        (b'Content-Length: %d\r\n\r\n\x00' %  (2 * 1048576 + 16 * 1024)))
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 417 Expectation Failed')
-        self.assertEqual(body, b'')
+        self.assertEqual(body, b'Expectation Failed')
 
     def test_get_notfound_10(self):
         header, body = getcontents(host=HOST, port=PORT, method='GET', path='/invalid', version='1.0')

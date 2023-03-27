@@ -5,6 +5,7 @@ __all__ = ('HTTPServer',)
 from datetime import datetime
 from urllib.parse import parse_qs
 
+from .exceptions import ExpectationFailed
 from .lib.http_protocol import HTTPProtocol
 
 class ServerContext:
@@ -131,14 +132,9 @@ class HTTPServer(HTTPProtocol):
     async def _handle_continue(self):
         if self._server['request'].http_continue:
             if self._server['request'].content_length > self.options['client_max_body_size']:
-                await self._server['response'].send(
-                    b'HTTP/%s 417 Expectation Failed\r\nConnection: close\r\n\r\n' % self._server['request'].version
-                )
-                self._server['response'].close()
-                return False
+                raise ExpectationFailed
 
             await self._server['response'].send(b'HTTP/%s 100 Continue\r\n\r\n' % self._server['request'].version)
-            return True
 
     async def _handle_response(self, func, options={}):
         options['rate'] = options.get('rate', self.options['download_rate'])
@@ -283,10 +279,7 @@ class HTTPServer(HTTPProtocol):
                     m = pattern.search(request.path)
 
                     if m:
-                        http_continue = await self._handle_continue()
-
-                        if http_continue is False:
-                            return
+                        await self._handle_continue()
 
                         matches = m.groupdict()
 
@@ -307,18 +300,16 @@ class HTTPServer(HTTPProtocol):
                         else:
                             self._route_handlers[ri] = [(pattern, func, kwargs)]
 
-                        http_continue = await self._handle_continue()
+                        await self._handle_continue()
 
-                        if http_continue is not False:
-                            matches = m.groupdict()
+                        matches = m.groupdict()
 
-                            if not matches:
-                                matches = m.groups()
+                        if not matches:
+                            matches = m.groups()
 
-                            self._server['request'].params['url'] = matches
+                        self._server['request'].params['url'] = matches
 
-                            await self._handle_response(func, {**kwargs, **options})
-
+                        await self._handle_response(func, {**kwargs, **options})
                         del self._route_handlers[-1][i]
                         return
 

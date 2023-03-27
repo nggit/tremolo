@@ -3,6 +3,7 @@
 import asyncio
 import traceback
 
+from .http_exception import HTTPException, BadRequest, InternalServerError
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 
@@ -134,18 +135,16 @@ class HTTPProtocol(asyncio.Protocol):
             (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
         ), exc_info={True: exc, False: False}[self._options['debug']])
 
-        request.http_keepalive = False
-
         if self.options['debug']:
             data = b'<ul><li>%s</li></ul>' % '</li><li>'.join(
                 traceback.TracebackException.from_exception(exc).format()
-            ).encode(encoding='latin-1')
+            ).encode(encoding='utf-8')
         else:
-            data = b'Internal server error.'
+            data = str(exc).encode(encoding='utf-8')
 
         await response.send(
-            b'HTTP/%s 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' % (
-            request.version, len(data), data))
+            b'HTTP/%s %d %s\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' % (
+            request.version, exc.code, exc.message.encode(encoding='utf-8'), len(data), data))
 
         response.close()
 
@@ -167,7 +166,13 @@ class HTTPProtocol(asyncio.Protocol):
                     if b'content-type' in self._request.headers:
                         self._request.content_type = self._request.headers[b'content-type'].lower()
 
+                    if b'transfer-encoding' in self._request.headers:
+                        self._request.transfer_encoding = self._request.headers[b'transfer-encoding'].lower()
+
                     if b'content-length' in self._request.headers:
+                        if self._request.transfer_encoding.find(b'chunked') > -1:
+                            raise BadRequest
+
                         self._request.content_length = int(self._request.headers[b'content-length'])
 
                     if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
@@ -179,6 +184,9 @@ class HTTPProtocol(asyncio.Protocol):
 
                 await self.header_received(self._request, self._response)
             except Exception as exc:
+                if not isinstance(exc, HTTPException):
+                    exc = InternalServerError(cause=exc)
+
                 await self.handle_exception(exc, self._request, self._response)
         else:
             if self._queue[1] is not None:

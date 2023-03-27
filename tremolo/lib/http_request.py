@@ -2,6 +2,7 @@
 
 from urllib.parse import parse_qs, parse_qsl
 
+from .http_exception import BadRequest, PayloadTooLarge, RequestTimeout
 from .request import Request
 
 class HTTPRequest(Request):
@@ -24,6 +25,7 @@ class HTTPRequest(Request):
 
         self._content_length = -1
         self._content_type = b'application/octet-stream'
+        self._transfer_encoding = b'none'
         self._body = bytearray()
         self._http_continue = False
         self._http_keepalive = False
@@ -38,15 +40,7 @@ class HTTPRequest(Request):
         super().clear_body()
 
     async def recv_timeout(self, timeout):
-        if self.protocol.queue[1] is not None:
-            self.protocol.queue[1].put_nowait(
-                b'HTTP/%s 408 Request Timeout\r\nConnection: close\r\n\r\n' % self.version
-            )
-
-            self._http_keepalive = False
-            self.protocol.queue[1].put_nowait(None)
-
-        await super().recv_timeout(timeout)
+        raise RequestTimeout
 
     async def body(self, cache=True):
         if self._body == b'' or not cache:
@@ -63,16 +57,9 @@ class HTTPRequest(Request):
                 return
 
         if self._content_length > self.protocol.options['client_max_body_size']:
-            if self.protocol.queue[1] is not None:
-                self.protocol.queue[1].put_nowait(
-                    b'HTTP/%s 413 Payload Too Large\r\nConnection: close\r\n\r\n' % self.version
-                )
-                self._http_keepalive = False
-                self.protocol.queue[1].put_nowait(None)
+            raise PayloadTooLarge
 
-            return
-
-        if b'transfer-encoding' in self.headers and self.headers[b'transfer-encoding'].lower().find(b'chunked') > -1:
+        if self._transfer_encoding.find(b'chunked') > -1:
             buf = bytearray()
             agen = self.recv()
             paused = False
@@ -109,17 +96,8 @@ class HTTPRequest(Request):
                     try:
                         chunk_size = int(buf[:i].split(b';')[0], 16)
                     except ValueError:
-                        if self.protocol.queue[1] is not None:
-                            self.protocol.queue[1].put_nowait(
-                                b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
-                            )
-
-                            self._http_keepalive = False
-                            self.protocol.queue[1].put_nowait(None)
-
                         del buf[:]
-                        self.protocol.options['logger'].error('bad chunked encoding')
-                        return
+                        raise BadRequest('bad chunked encoding')
 
                     data = buf[i + 2:i + 2 + chunk_size]
                     tobe_read = chunk_size - len(data)
@@ -151,6 +129,14 @@ class HTTPRequest(Request):
     @content_type.setter
     def content_type(self, value):
         self._content_type = value
+
+    @property
+    def transfer_encoding(self):
+        return self._transfer_encoding
+
+    @transfer_encoding.setter
+    def transfer_encoding(self, value):
+        self._transfer_encoding = value
 
     @property
     def http_continue(self):
@@ -226,16 +212,7 @@ class HTTPRequest(Request):
         try:
             boundary = ct['boundary'][-1].encode(encoding='latin-1')
         except KeyError:
-            if self.protocol.queue[1] is not None:
-                self.protocol.queue[1].put_nowait(
-                    b'HTTP/%s 400 Bad Request\r\nConnection: close\r\n\r\n' % self.version
-                )
-
-                self._http_keepalive = False
-                self.protocol.queue[1].put_nowait(None)
-
-            self.protocol.options['logger'].error('missing boundary')
-            return
+            raise BadRequest('missing boundary')
 
         header = bytearray()
         body = bytearray()

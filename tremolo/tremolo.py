@@ -17,6 +17,7 @@ from datetime import datetime
 from functools import wraps
 
 from .lib.connection_pool import ConnectionPool
+from .exceptions import BadRequest
 from .http_server import HTTPServer
 
 class Tremolo:
@@ -25,11 +26,11 @@ class Tremolo:
 
         self._route_handlers = {
             0: [
-                (None, self._err_badrequest, dict(status=(400, b'Bad Request'))),
+                (None, self._err_badrequest, {}),
                 (None, self._err_notfound, dict(status=(404, b'Not Found')))
             ],
             1: [
-                (b'^/+(?:\\?.*)?$', self._index, {})
+                (b'^/+(?:\\?.*)?$', self._index, dict(status=(503, b'Service Unavailable')))
             ],
             -1: []
         }
@@ -155,10 +156,10 @@ class Tremolo:
                     handlers[ri][i] = (re.compile(pattern), *handler)
 
     async def _index(self, **server):
-        return b'Under construction.'
+        return b'Service Unavailable'
 
     async def _err_badrequest(self, **server):
-        return b'Bad request.'
+        raise BadRequest
 
     async def _err_notfound(self, **server):
         yield b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />'
