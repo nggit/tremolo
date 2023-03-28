@@ -142,7 +142,7 @@ class HTTPResponse(Response):
                     self._request.http_keepalive = False
                     data = None
                 else:
-                    self._request.transport.set_write_buffer_limits(high=buffer_size * 4, low=buffer_size // 2)
+                    self._request.protocol.set_watermarks(high=buffer_size * 4, low=buffer_size // 2)
 
             header = b''.join(self._header)
 

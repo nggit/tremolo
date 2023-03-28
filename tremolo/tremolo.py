@@ -9,6 +9,7 @@ import multiprocessing as mp
 import os
 import re
 import socket
+import ssl
 import sys
 import time
 
@@ -171,21 +172,30 @@ class Tremolo:
 
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
+        backlog = options.get('backlog', 100)
 
         if hasattr(socket, 'fromshare'):
             sock = socket.fromshare(options['conn'].recv())
-            sock.listen()
+            sock.listen(backlog)
         else:
             fd = options['conn'].recv()
 
             try:
                 sock = socket.fromfd(fd, options['sa_family'], socket.SOCK_STREAM)
-                sock.listen()
+                sock.listen(backlog)
                 options['conn'].send(True)
             except Exception:
                 options['conn'].send(False)
                 sock = options['conn'].recv()
-                sock.listen()
+                sock.listen(backlog)
+
+        if 'ssl' in options and isinstance(options['ssl'], dict):
+            ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            ssl_context.load_cert_chain(certfile=options['ssl'].get('cert'),
+                                        keyfile=options['ssl'].get('key'),
+                                        password=options['ssl'].get('password'))
+        else:
+            ssl_context = None
 
         server_name = options.get('server_name', b'Tremolo')
 
@@ -211,11 +221,15 @@ class Tremolo:
                                 server_name=server_name,
                                 _pool=pool,
                                 _handlers=options['handlers'],
-                                _middlewares=options['middlewares']), sock=sock)
+                                _middlewares=options['middlewares']), sock=sock, ssl=ssl_context)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(b'%s (pid %d) is started at %s port %d' % (server_name, os.getpid(), host, port))
+
+        if ssl_context is not None:
+            sys.stdout.buffer.write(b' (https)')
+
         print()
 
         process_num = 1
@@ -274,9 +288,12 @@ class Tremolo:
 
         return sock
 
-    def run(self, host, port=0, reuse_port=True, worker_num=1, **kwargs):
-        default_host = host
-        self.listen(port, host=host, **kwargs)
+    def run(self, host=None, port=80, reuse_port=True, worker_num=1, **kwargs):
+        if host is None:
+            default_host = ''
+        else:
+            default_host = host
+            self.listen(port, host=host, **kwargs)
 
         try:
             worker_num = min(worker_num, len(os.sched_getaffinity(0)))

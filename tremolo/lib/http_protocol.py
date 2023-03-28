@@ -9,8 +9,6 @@ from .http_response import HTTPResponse
 
 class HTTPProtocol(asyncio.Protocol):
     def __init__(self, context, **kwargs):
-        assert context.tasks == []
-
         self._context = context
         self._options = kwargs
 
@@ -22,6 +20,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._transport = None
         self._queue = (None, None)
         self._header = None
+        self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
     def context(self):
@@ -227,6 +226,13 @@ class HTTPProtocol(asyncio.Protocol):
     def resume_writing(self):
         self._timeout_waiters['send'].set_result(None)
 
+    def set_watermarks(self, high=65536, low=8192):
+        if self._transport is not None:
+            self._watermarks['high'] = high
+            self._watermarks['low'] = low
+
+            self._transport.set_write_buffer_limits(high=high, low=low)
+
     async def _send_data(self):
         while self._queue[1] is not None:
             try:
@@ -270,11 +276,12 @@ class HTTPProtocol(asyncio.Protocol):
                     return
 
                 write_buffer_size = self._transport.get_write_buffer_size()
-                low, high = self._transport.get_write_buffer_limits()
 
-                if write_buffer_size > high:
+                if write_buffer_size > self._watermarks['high']:
                     self._options['logger'].info(
-                        '{:d} exceeds the current watermark limits (high={:d}, low={:d})'.format(write_buffer_size, high, low)
+                        '{:d} exceeds the current watermark limits (high={:d}, low={:d})'.format(write_buffer_size,
+                                                                                                 self._watermarks['high'],
+                                                                                                 self._watermarks['low'])
                     )
                     self._timeout_waiters['send'] = self._loop.create_future()
 

@@ -58,10 +58,8 @@ class HTTPServer(HTTPProtocol):
     async def _connection_lost(self, func, exc):
         try:
             await func(**self._server)
-        except Exception:
-            pass
-
-        super().connection_lost(exc)
+        finally:
+            super().connection_lost(exc)
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -194,7 +192,7 @@ class HTTPServer(HTTPProtocol):
                 await self._server['response'].write(None)
                 return
 
-            self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
+            self.set_watermarks(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
             await self._server['response'].write(
                 data, rate=options['rate'], buffer_size=options['buffer_size']
             )
@@ -236,7 +234,7 @@ class HTTPServer(HTTPProtocol):
                 await self._server['response'].write(None)
                 return
 
-            self.transport.set_write_buffer_limits(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
+            self.set_watermarks(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
             await self._server['response'].write(data, rate=options['rate'], buffer_size=options['buffer_size'])
             await self._server['response'].write(b'', throttle=False)
 
