@@ -221,7 +221,7 @@ class Tremolo:
                                 server_name=server_name,
                                 _pool=pool,
                                 _handlers=options['handlers'],
-                                _middlewares=options['middlewares']), sock=sock, ssl=ssl_context)
+                                _middlewares=options['middlewares']), sock=sock, backlog=backlog, ssl=ssl_context)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()

@@ -166,6 +166,9 @@ class HTTPProtocol(asyncio.Protocol):
                         self._request.content_type = self._request.headers[b'content-type'].lower()
 
                     if b'transfer-encoding' in self._request.headers:
+                        if self._request.version == b'1.0':
+                            raise BadRequest
+
                         self._request.transfer_encoding = self._request.headers[b'transfer-encoding'].lower()
 
                     if b'content-length' in self._request.headers:
@@ -173,6 +176,8 @@ class HTTPProtocol(asyncio.Protocol):
                             raise BadRequest
 
                         self._request.content_length = int(self._request.headers[b'content-length'])
+                    elif self._request.version == b'1.0':
+                        raise BadRequest
 
                     if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
                         self._request.http_continue = True
