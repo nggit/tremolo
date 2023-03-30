@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import multiprocessing as mp
+import sys
 import unittest
 
 HOST = 'localhost'
@@ -46,24 +47,26 @@ def getcontents(host='localhost',
             buf = sock.recv(4096)
             response_data.extend(buf)
 
-            header_end = response_data.find(b'\r\n\r\n')
-            response_header = response_data[:header_end]
+            header_size = response_data.find(b'\r\n\r\n')
+            response_header = response_data[:header_size]
 
-            if header_end > -1:
+            if header_size > -1:
                 if response_header.lower().startswith('http/{:s} 100 continue'.format(version).encode(encoding='latin-1')):
                     del response_data[:]
                     continue
 
                 if method.upper() == 'HEAD':
                     break
-                elif (response_header.lower().find(b'\r\ntransfer-encoding: chunked') == -1
-                            and response_data[header_end + 4:] != b''
+
+                if (response_header.lower().find(b'\r\ntransfer-encoding: chunked') == -1
+                            and response_data[header_size + 4:] != b''
                        ):
                     break
-                elif response_data.endswith(b'\r\n0\r\n\r\n'):
+
+                if response_data.endswith(b'\r\n0\r\n\r\n'):
                     break
 
-        return response_header, response_data[header_end + 4:]
+        return response_header, response_data[header_size + 4:]
 
 def chunked_detected(header):
     return header.lower().find(b'\r\ntransfer-encoding: chunked') > -1
@@ -312,9 +315,17 @@ class TestQuick(unittest.TestCase):
 
         self.assertEqual(data, (b'', b''))
 
+    def test_requesttimeout(self):
+        data = getcontents(
+            host=HOST, port=28001, raw=b'GET / HTTP/1.1\r\nHost: localhost:28001\r\n'
+        )
+
+        self.assertEqual(data, (b'', b''))
+
 #### SERVER ####
 
 from tremolo import Tremolo
+from tremolo.exceptions import BadRequest
 
 app = Tremolo()
 
@@ -323,7 +334,10 @@ async def my_request_middleware(**server):
     request = server['request']
     response = server['response']
 
-    if request.is_valid and request.method not in (b'GET', b'POST'):
+    if not request.is_valid:
+        raise BadRequest
+
+    if request.method not in (b'GET', b'POST'):
         response.set_status(405, 'Method Not Allowed')
         response.set_content_type('text/plain')
 
@@ -332,6 +346,20 @@ async def my_request_middleware(**server):
     # test response object
     response.set_header('X-Foo', 'bar')
     response.set_cookie('sess', 'www')
+
+@app.on_send
+async def my_send_middleware(**server):
+    response = server['response']
+    name, data = server['context'].data
+
+    if name == 'header':
+        # test append_header()
+        response.append_header(b'------------------')
+
+        assert data + b'------------------' == b''.join(response.header)
+
+        sys.stdout.buffer.write(b''.join(response.header))
+        print()
 
 @app.route(r'^/page/(?P<page_id>\d+)')
 async def my_page(**server):
@@ -388,7 +416,7 @@ async def upload3_payloadtoolarge(**server):
     return 'OK'
 
 # test multiple ports
-app.listen(28001)
+app.listen(28001, request_timeout=2)
 app.listen(28002)
 
 if __name__ == '__main__':
