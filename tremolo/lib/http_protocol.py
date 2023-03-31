@@ -3,6 +3,8 @@
 import asyncio
 import traceback
 
+from datetime import datetime
+
 from .http_exception import HTTPException, BadRequest, InternalServerError
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
@@ -134,16 +136,30 @@ class HTTPProtocol(asyncio.Protocol):
             (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
         ), exc_info={True: exc, False: False}[self._options['debug']])
 
+        encoding = 'utf-8'
+
+        for v in exc.content_type.split(';'):
+            v = v.lstrip()
+
+            if v.startswith('charset='):
+                charset = v[len('charset='):].strip()
+
+                if charset != '':
+                    encoding = charset
+
+                break
+
         if self.options['debug']:
             data = b'<ul><li>%s</li></ul>' % '</li><li>'.join(
                 traceback.TracebackException.from_exception(exc).format()
-            ).encode(encoding='utf-8')
+            ).encode(encoding=encoding)
         else:
-            data = str(exc).encode(encoding='utf-8')
+            data = str(exc).encode(encoding=encoding)
 
         await response.send(
-            b'HTTP/%s %d %s\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n%s' % (
-            request.version, exc.code, exc.message.encode(encoding='utf-8'), len(data), data))
+            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\nDate: %s\r\nServer: %s\r\n\r\n%s' % (
+            request.version, exc.code, exc.message.encode(encoding='latin-1'), exc.content_type.encode(encoding='latin-1'), len(data),
+            datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'), self._options['server_name'], data))
 
         response.close()
 

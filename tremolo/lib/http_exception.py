@@ -3,8 +3,9 @@
 class HTTPException(Exception):
     code = 500
     message = 'Internal Server Error'
+    content_type = 'text/html; charset=utf-8'
 
-    def __init__(self, *args, code=None, message=None, cause=None):
+    def __init__(self, *args, code=None, message=None, content_type=None, cause=None):
         self.args = args
 
         if isinstance(code, int):
@@ -12,6 +13,9 @@ class HTTPException(Exception):
 
         if isinstance(message, str):
             self.message = message
+
+        if isinstance(content_type, str):
+            self.content_type = content_type
 
         if isinstance(cause, Exception):
             self.__cause__ = cause
