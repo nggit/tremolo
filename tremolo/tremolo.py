@@ -27,8 +27,8 @@ class Tremolo:
 
         self._route_handlers = {
             0: [
-                (None, self._err_badrequest, {}),
-                (None, self._err_notfound, dict(status=(404, b'Not Found')))
+                (400, self._err_badrequest, {}),
+                (404, self._err_notfound, dict(status=(404, b'Not Found')))
             ],
             1: [
                 (b'^/+(?:\\?.*)?$', self._index, dict(status=(503, b'Service Unavailable')))
@@ -53,6 +53,9 @@ class Tremolo:
         self._ports.append((host, port, options))
 
     def route(self, path):
+        if isinstance(path, int):
+            return self.error(path)
+
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
@@ -63,16 +66,17 @@ class Tremolo:
 
         return decorator
 
-    def errorhandler(self, status):
+    def error(self, code):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
             for i, h in enumerate(self._route_handlers[0]):
-                if status == h[2]['status'][0]:
-                    self._route_handlers[0][i] = (None, wrapper, dict(h[2], **self.getoptions(func)))
+                if code == h[0]:
+                    self._route_handlers[0][i] = (h[0], wrapper, dict(h[2], **self.getoptions(func)))
                     break
+
             return wrapper
 
         return decorator
