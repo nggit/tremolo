@@ -159,6 +159,9 @@ class HTTPServer(HTTPProtocol):
                 self._server['response'].close()
                 return
 
+            if not isinstance(data, (bytes, bytearray, str)):
+                return
+
             is_agen = False
 
         status = self._server['response'].get_status()

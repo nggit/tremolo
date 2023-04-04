@@ -1,8 +1,12 @@
 # Copyright (c) 2023 nggit
 
+import os
+import time
+
 from datetime import datetime, timedelta
 from urllib.parse import quote
 
+from .http_exception import BadRequest, RangeNotSatisfiable
 from .response import Response
 
 class HTTPResponse(Response):
@@ -132,7 +136,7 @@ class HTTPResponse(Response):
                 if no_content:
                     self.append_header(b'Connection: close\r\n\r\n')
                 else:
-                    if not self._http_chunked:
+                    if not self._http_chunked and not (self._request.version == b'1.1' and b'range' in self._request.headers):
                         self._request.http_keepalive = False
 
                     self.append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
@@ -162,6 +166,133 @@ class HTTPResponse(Response):
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
             await self.send(data, **kwargs)
+
+    async def sendfile(self, path, buffer_size=16384, content_type=b'application/octet-stream'):
+        try:
+            handle = self._request.context._sendfile_handle
+        except AttributeError:
+            handle = open(path, 'rb')
+            self._request.context._sendfile_handle = handle
+
+            self._request.context.tasks.append(
+                self._request.context._sendfile_handle.close
+            )
+
+        file_size = os.stat(path).st_size
+        mtime = os.path.getmtime(path)
+        mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime)).encode(encoding='latin-1')
+
+        if self._request.version == b'1.1' and b'range' in self._request.headers:
+            if b'if-range' in self._request.headers and self._request.headers[b'if-range'] != mdate:
+                self.set_content_type(content_type)
+                self.set_header(b'Last-Modified', mdate)
+                self.set_header(b'Content-Length', b'%d' % file_size)
+                self.set_header(b'Accept-Ranges', b'bytes')
+
+                data = True
+
+                while data:
+                    data = handle.read(buffer_size)
+
+                    await self.write(data, chunked=False)
+
+                await self.send(None)
+                return
+
+            _range = self._request.headers[b'range']
+
+            if isinstance(_range, list):
+                for v in _range:
+                    if not v.startswith(b'bytes='):
+                        raise BadRequest('bad range')
+
+                _range = b','.join(_range)
+            else:
+                if not _range.startswith(b'bytes='):
+                    raise BadRequest('bad range')
+
+            ranges = []
+
+            try:
+                for v in _range.replace(b'bytes=', b'').split(b','):
+                    v = v.strip()
+
+                    if v.startswith(b'-'):
+                        start = file_size + int(v)
+
+                        if start < 0:
+                            raise RangeNotSatisfiable
+
+                        ranges.append((start, file_size - 1, file_size - start))
+                    elif v.endswith(b'-'):
+                        start = int(v[:-1])
+
+                        if start >= file_size:
+                            raise RangeNotSatisfiable
+
+                        ranges.append((start, file_size - 1, file_size - start))
+                    else:
+                        start, end = v.split(b'-')
+                        start = int(start)
+                        end = int(end)
+
+                        if end == 0:
+                            end = start
+
+                        if start > end or end >= file_size:
+                            raise RangeNotSatisfiable
+
+                        ranges.append((start, end, end - start + 1))
+            except ValueError as exc:
+                raise BadRequest('bad range', cause=exc)
+
+            self.set_status(206, b'Partial Content')
+
+            if len(ranges) == 1:
+                start, end, size = ranges[0]
+
+                self.set_content_type(content_type)
+                self.set_header(b'Content-Length', b'%d' % size)
+                self.set_header(b'Content-Range', b'bytes %d-%d/%d' % (start, end, file_size))
+
+                handle.seek(start)
+                await self.write(handle.read(size), chunked=False)
+            else:
+                peername = self._request.transport.get_extra_info('peername')
+                boundary = b'----Boundary%x%x' % (hash(peername[0]), peername[1])
+
+                self.set_content_type(b'multipart/byteranges; boundary=%s' % boundary)
+
+                for start, end, size in ranges:
+                    await self.write(b'--%s\r\nContent-Type: %s\r\nContent-Range: bytes %d-%d/%d\r\n\r\n' % (
+                        boundary, content_type, start, end, file_size))
+
+                    handle.seek(start)
+                    await self.write(b'%s\r\n' % handle.read(size))
+
+                await self.write(b'--%s--\r\n' % boundary)
+                await self.write(b'')
+        else:
+            if b'if-modified-since' in self._request.headers and self._request.headers[b'if-modified-since'] == mdate:
+                self.set_status(304, b'Not Modified')
+                await self.write(None)
+                return
+
+            self.set_content_type(content_type)
+            self.set_header(b'Last-Modified', mdate)
+            self.set_header(b'Content-Length', b'%d' % file_size)
+
+            if self._request.version == b'1.1':
+                self.set_header(b'Accept-Ranges', b'bytes')
+
+            data = True
+
+            while data:
+                data = handle.read(buffer_size)
+
+                await self.write(data, chunked=False)
+
+        await self.send(None)
 
     @property
     def http_chunked(self):

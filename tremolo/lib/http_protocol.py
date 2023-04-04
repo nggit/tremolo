@@ -264,6 +264,9 @@ class HTTPProtocol(asyncio.Protocol):
                     if self._request is not None:
                         if self._request.http_keepalive and self._data is None:
                             for i, task in enumerate(self.tasks):
+                                if callable(task):
+                                    continue
+
                                 try:
                                     exc = task.exception()
 
@@ -317,6 +320,10 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         for task in self.tasks:
+            if callable(task):
+                task()
+                continue
+
             try:
                 exc = task.exception()
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
 import multiprocessing as mp
+import os
 import sys
+import time
 import unittest
 
 HOST = 'localhost'
@@ -322,6 +324,192 @@ class TestQuick(unittest.TestCase):
 
         self.assertEqual(data, (b'', b''))
 
+    def test_download_10(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.0')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
+        self.assertEqual(header.find(b'\r\nAccept-Ranges:'), -1)
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: %d' % os.stat('tests.py').st_size) > 0)
+
+    def test_download_11(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(header.find(b'\r\nAccept-Ranges: bytes') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: %d' % os.stat('tests.py').st_size) > 0)
+
+    def test_notmodified(self):
+        mtime = os.path.getmtime('tests.py')
+        mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime))
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['If-Modified-Since: %s' % mdate])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 304 Not Modified')
+        self.assertEqual(header.find(b'\r\nAccept-Ranges:'), -1)
+        self.assertEqual(header.find(b'\r\nContent-Type:'), -1)
+        self.assertEqual(header.find(b'\r\nContent-Length:'), -1)
+
+    def test_range_ok(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['If-Range: xxx', 'Range: bytes=15-21'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(header.find(b'\r\nAccept-Ranges: bytes') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: %d' % os.stat('tests.py').st_size) > 0)
+
+    def test_download_range(self):
+        mtime = os.path.getmtime('tests.py')
+        mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime))
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['If-Range: %s' % mdate, 'Range: bytes=15-21'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 206 Partial Content')
+        self.assertEqual(body, b'python3')
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: 7') > 0)
+
+    def test_download_range_start(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=%d-' % (os.stat('tests.py').st_size - 5)])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 206 Partial Content')
+        self.assertEqual(body.strip(b'# \r\n'), b'END')
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: 5') > 0)
+
+    def test_download_range_end(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=-5'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 206 Partial Content')
+        self.assertEqual(body.strip(b'# \r\n'), b'END')
+        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(header.find(b'\r\nContent-Length: 5') > 0)
+
+    def test_download_range_multipart(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=2-0, 2-2'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 206 Partial Content')
+        self.assertEqual(header.find(b'\r\nContent-Length:'), -1)
+        self.assertEqual(body.count(b'\r\nContent-Range: bytes 2-2/'), 2)
+        self.assertEqual(body.count(b'\r\n------Boundary'), 3)
+        self.assertEqual(body[-11:], b'--\r\n\r\n0\r\n\r\n')
+        self.assertTrue(header.find(b'\r\nContent-Type: multipart/byteranges; boundary=----Boundary') > 0)
+        self.assertTrue(valid_chunked(body))
+
+    def test_badrange(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=2-2, 3'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad range')
+
+    def test_badrange1(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=0-1', 'Range: bits=2-1'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad range')
+
+    def test_badrange2(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bits=2-1'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad range')
+
+    def test_rangenotsatisfiable(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=-10000000'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 416 Range Not Satisfiable')
+        self.assertEqual(body, b'Range Not Satisfiable')
+
+    def test_rangenotsatisfiable1(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=10000000-'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 416 Range Not Satisfiable')
+        self.assertEqual(body, b'Range Not Satisfiable')
+
+    def test_rangenotsatisfiable2(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=2-1'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 416 Range Not Satisfiable')
+        self.assertEqual(body, b'Range Not Satisfiable')
+
+    def test_rangenotsatisfiable3(self):
+        header, body = getcontents(host=HOST,
+                                   port=28002,
+                                   method='GET',
+                                   path='/download',
+                                   version='1.1',
+                                   headers=['Range: bytes=2-10000000'])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 416 Range Not Satisfiable')
+        self.assertEqual(body, b'Range Not Satisfiable')
+
 #### SERVER ####
 
 from tremolo import Tremolo
@@ -415,6 +603,10 @@ async def upload3_payloadtoolarge(**server):
 
     return 'OK'
 
+@app.route('/download')
+async def download(**server):
+    await server['response'].sendfile('tests.py', content_type=b'text/plain')
+
 # test multiple ports
 app.listen(28001, request_timeout=2)
 app.listen(28002)
@@ -428,3 +620,5 @@ if __name__ == '__main__':
         unittest.main()
     finally:
         p.terminate()
+
+# END
