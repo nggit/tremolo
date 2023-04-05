@@ -128,13 +128,16 @@ class HTTPProtocol(asyncio.Protocol):
     async def header_received(self, request, response):
         return
 
+    def print_exception(self, exc, *args):
+        self._options['logger'].error(': '.join(
+            (*args, exc.__class__.__name__, str(exc))
+        ), exc_info={True: exc, False: False}[self._options['debug']])
+
     async def handle_exception(self, exc, request, response):
         if request is None or response is None:
             return
 
-        self._options['logger'].error(': '.join(
-            (request.path.decode(encoding='latin-1'), exc.__class__.__name__, str(exc))
-        ), exc_info={True: exc, False: False}[self._options['debug']])
+        self.print_exception(exc, request.path.decode(encoding='latin-1'))
 
         encoding = 'utf-8'
 
@@ -271,9 +274,7 @@ class HTTPProtocol(asyncio.Protocol):
                                     exc = task.exception()
 
                                     if exc:
-                                        self._options['logger'].error(': '.join(
-                                            (exc.__class__.__name__, str(exc))
-                                        ), exc_info={True: exc, False: False}[self._options['debug']])
+                                        self.print_exception(exc)
 
                                     del self.tasks[i]
                                 except asyncio.InvalidStateError:
@@ -311,12 +312,17 @@ class HTTPProtocol(asyncio.Protocol):
 
                     await self.set_timeout(self._timeout_waiters['send'], timeout_cb=self.send_timeout)
 
+                    if self._transport is None:
+                        return
+
                 self._transport.write(data)
+            except asyncio.CancelledError:
+                pass
             except Exception as exc:
                 if self._transport is not None:
                     self._transport.abort()
 
-                raise exc
+                self.print_exception(exc)
 
     def connection_lost(self, exc):
         for task in self.tasks:
@@ -328,9 +334,7 @@ class HTTPProtocol(asyncio.Protocol):
                 exc = task.exception()
 
                 if exc:
-                    self._options['logger'].error(': '.join(
-                        (exc.__class__.__name__, str(exc))
-                    ), exc_info={True: exc, False: False}[self._options['debug']])
+                    self.print_exception(exc)
             except asyncio.InvalidStateError:
                 task.cancel()
 
