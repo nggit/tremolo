@@ -159,16 +159,17 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             data = str(exc).encode(encoding=encoding)
 
-        await response.send(
-            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\
-            Date: %s\r\nServer: %s\r\n\r\n%s' % (request.version,
-                                                 exc.code,
-                                                 exc.message.encode(encoding='latin-1'),
-                                                 exc.content_type.encode(encoding='latin-1'),
-                                                 len(data),
-                                                 datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                                 self._options['server_name'],
-                                                 data))
+        await response.send((
+            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n' +
+            b'Date: %s\r\nServer: %s\r\n\r\n%s') % (request.version,
+                                                    exc.code,
+                                                    exc.message.encode(encoding='latin-1'),
+                                                    exc.content_type.encode(encoding='latin-1'),
+                                                    len(data),
+                                                    datetime.utcnow().strftime(
+                                                        '%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                                    self._options['server_name'],
+                                                    data))
 
         response.close()
 

@@ -108,7 +108,7 @@ class HTTPServer(HTTPProtocol):
         if data is None:
             return options
 
-        if not isinstance(data, (bytes, bytearray, str)):
+        if not isinstance(data, (bytes, bytearray, str, tuple)):
             return
 
         if 'status' in options:
@@ -159,7 +159,7 @@ class HTTPServer(HTTPProtocol):
                 self._server['response'].close()
                 return
 
-            if not isinstance(data, (bytes, bytearray, str)):
+            if not isinstance(data, (bytes, bytearray, str, tuple)):
                 return
 
             is_agen = False
