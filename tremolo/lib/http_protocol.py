@@ -160,62 +160,69 @@ class HTTPProtocol(asyncio.Protocol):
             data = str(exc).encode(encoding=encoding)
 
         await response.send(
-            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\nDate: %s\r\nServer: %s\r\n\r\n%s' % (
-            request.version, exc.code, exc.message.encode(encoding='latin-1'), exc.content_type.encode(encoding='latin-1'), len(data),
-            datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'), self._options['server_name'], data))
+            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n\
+            Date: %s\r\nServer: %s\r\n\r\n%s' % (request.version,
+                                                 exc.code,
+                                                 exc.message.encode(encoding='latin-1'),
+                                                 exc.content_type.encode(encoding='latin-1'),
+                                                 len(data),
+                                                 datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                                 self._options['server_name'],
+                                                 data))
 
         response.close()
 
     async def _handle_request_header(self, data, header_size):
         self._data = None
 
-        if self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
-            self._request = HTTPRequest(self)
-            self._response = HTTPResponse(self._request)
-
-            try:
-                if b'connection' in self._request.headers:
-                    if self._request.headers[b'connection'].lower().find(b'close') == -1:
-                        self._request.http_keepalive = True
-                elif self._request.version == b'1.1':
-                    self._request.http_keepalive = True
-
-                if self._request.method in (b'POST', b'PUT', b'PATCH'):
-                    if b'content-type' in self._request.headers:
-                        self._request.content_type = self._request.headers[b'content-type'].lower()
-
-                    if b'transfer-encoding' in self._request.headers:
-                        if self._request.version == b'1.0':
-                            raise BadRequest
-
-                        self._request.transfer_encoding = self._request.headers[b'transfer-encoding'].lower()
-
-                    if b'content-length' in self._request.headers:
-                        if self._request.transfer_encoding.find(b'chunked') > -1:
-                            raise BadRequest
-
-                        self._request.content_length = int(self._request.headers[b'content-length'])
-                    elif self._request.version == b'1.0':
-                        raise BadRequest
-
-                    if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
-                        self._request.http_continue = True
-
-                    await self.put_to_queue(
-                        data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
-                    )
-
-                await self.header_received(self._request, self._response)
-            except Exception as exc:
-                if not isinstance(exc, HTTPException):
-                    exc = InternalServerError(cause=exc)
-
-                await self.handle_exception(exc, self._request, self._response)
-        else:
+        if not self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
             if self._queue[1] is not None:
                 self._queue[1].put_nowait(None)
 
             self._options['logger'].info('bad request: not a request')
+            return
+
+        self._request = HTTPRequest(self)
+        self._response = HTTPResponse(self._request)
+
+        try:
+            if b'connection' in self._request.headers:
+                if self._request.headers[b'connection'].lower().find(b'close') == -1:
+                    self._request.http_keepalive = True
+            elif self._request.version == b'1.1':
+                self._request.http_keepalive = True
+
+            if self._request.method in (b'POST', b'PUT', b'PATCH'):
+                if b'content-type' in self._request.headers:
+                    self._request.content_type = self._request.headers[b'content-type'].lower()
+
+                if b'transfer-encoding' in self._request.headers:
+                    if self._request.version == b'1.0':
+                        raise BadRequest
+
+                    self._request.transfer_encoding = self._request.headers[b'transfer-encoding'].lower()
+
+                if b'content-length' in self._request.headers:
+                    if self._request.transfer_encoding.find(b'chunked') > -1:
+                        raise BadRequest
+
+                    self._request.content_length = int(self._request.headers[b'content-length'])
+                elif self._request.version == b'1.0':
+                    raise BadRequest
+
+                if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
+                    self._request.http_continue = True
+
+                await self.put_to_queue(
+                    data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
+                )
+
+            await self.header_received(self._request, self._response)
+        except Exception as exc:
+            if not isinstance(exc, HTTPException):
+                exc = InternalServerError(cause=exc)
+
+            await self.handle_exception(exc, self._request, self._response)
 
     def data_received(self, data):
         if self._data is not None:
