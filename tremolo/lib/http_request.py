@@ -10,7 +10,7 @@ class HTTPRequest(Request):
         super().__init__(protocol)
 
         self.is_valid = protocol.header.is_valid_request
-        self.headers = protocol.header.getheaders()
+        self.headers = protocol.header.headers
         self.host = protocol.header.gethost()
 
         if isinstance(self.host, list):
