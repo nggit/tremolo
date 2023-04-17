@@ -256,7 +256,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._queue[0].put_nowait(None)
 
     def resume_writing(self):
-        if not self._timeout_waiters['send'].done():
+        if 'send' in self._timeout_waiters and not self._timeout_waiters['send'].done():
             self._timeout_waiters['send'].set_result(None)
 
     def set_watermarks(self, high=65536, low=8192):
