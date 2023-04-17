@@ -132,12 +132,7 @@ class Tremolo:
             pattern = path.encode(encoding='latin-1')
             self._route_handlers[-1].append((pattern, func, kwargs))
         else:
-            qs_pos = path.find('?')
-
-            if qs_pos > -1:
-                path = path[:qs_pos]
-
-            p = path.strip('/')
+            p = path.split('?', 1)[0].strip('/')
 
             if p == '':
                 ri = 1

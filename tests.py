@@ -13,7 +13,7 @@ PORT = 28000
 def getcontents(host='localhost',
                 port=80,
                 method='GET',
-                path='/',
+                url='/',
                 version='1.1',
                 headers=[],
                 data='',
@@ -31,7 +31,7 @@ def getcontents(host='localhost',
             headers.append('Content-Length: {:d}'.format(content_length))
 
         raw = '{:s} {:s} HTTP/{:s}\r\nHost: {:s}:{:d}\r\n{:s}\r\n\r\n{:s}'.format(
-            method, path, version, host, port, '\r\n'.join(headers), data).encode(encoding='latin-1')
+            method, url, version, host, port, '\r\n'.join(headers), data).encode(encoding='latin-1')
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
@@ -121,12 +121,12 @@ class TestQuick(unittest.TestCase):
         print('\r\033[2K{0:d}. {1:s}'.format(self.__class__.tests_run, self.id().split('.')[-1]))
 
     def test_get_middleware_11(self):
-        header, body = getcontents(host=HOST, port=PORT, method='FOO', path='/', version='1.1')
+        header, body = getcontents(host=HOST, port=PORT, method='FOO', url='/', version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 405 Method Not Allowed')
 
     def test_get_ok_10(self):
-        header, body = getcontents(host=HOST, port=PORT, method='GET', path='/', version='1.0')
+        header, body = getcontents(host=HOST, port=PORT, method='GET', url='/', version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 503 Service Unavailable')
         self.assertFalse(chunked_detected(header))
@@ -136,7 +136,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=PORT,
                                    method='GET',
-                                   path='/page/101?a=111&a=xyz&b=222',
+                                   url='/page/101?a=111&a=xyz&b=222',
                                    version='1.1',
                                    headers=['Cookie: a=123', 'Cookie: a=xxx, yyy'])
 
@@ -149,7 +149,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=PORT,
                                    method='POST',
-                                   path='/page/102?a=111&a=xyz&b=222',
+                                   url='/page/102?a=111&a=xyz&b=222',
                                    version='1.1',
                                    data='username=myuser&password=mypass')
 
@@ -240,13 +240,13 @@ class TestQuick(unittest.TestCase):
         self.assertEqual(body, b'Expectation Failed')
 
     def test_get_notfound_10(self):
-        header, body = getcontents(host=HOST, port=PORT, method='GET', path='/invalid', version='1.0')
+        header, body = getcontents(host=HOST, port=PORT, method='GET', url='/invalid', version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 404 Not Found')
         self.assertFalse(chunked_detected(header))
 
     def test_get_notfound_11(self):
-        header, body = getcontents(host=HOST, port=PORT, method='GET', path='/invalid', version='1.1')
+        header, body = getcontents(host=HOST, port=PORT, method='GET', url='/invalid', version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 404 Not Found')
 
@@ -255,7 +255,7 @@ class TestQuick(unittest.TestCase):
 
     def test_get_notfound_close_10(self):
         header, body = getcontents(
-            host=HOST, port=PORT, method='GET', path='/invalid', version='1.0', headers=['Connection: close']
+            host=HOST, port=PORT, method='GET', url='/invalid', version='1.0', headers=['Connection: close']
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 404 Not Found')
@@ -263,7 +263,7 @@ class TestQuick(unittest.TestCase):
 
     def test_get_notfound_keepalive_10(self):
         header, body = getcontents(
-            host=HOST, port=PORT, method='GET', path='/invalid', version='1.0', headers=['Connection: keep-alive']
+            host=HOST, port=PORT, method='GET', url='/invalid', version='1.0', headers=['Connection: keep-alive']
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 404 Not Found')
@@ -271,7 +271,7 @@ class TestQuick(unittest.TestCase):
 
     def test_get_notfound_close_11(self):
         header, body = getcontents(
-            host=HOST, port=PORT, method='GET', path='/invalid', version='1.1', headers=['Connection: close']
+            host=HOST, port=PORT, method='GET', url='/invalid', version='1.1', headers=['Connection: close']
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 404 Not Found')
@@ -281,7 +281,7 @@ class TestQuick(unittest.TestCase):
 
     def test_get_notfound_keepalive_11(self):
         header, body = getcontents(
-            host=HOST, port=PORT, method='GET', path='/invalid', version='1.1', headers=['Connection: keep-alive']
+            host=HOST, port=PORT, method='GET', url='/invalid', version='1.1', headers=['Connection: keep-alive']
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 404 Not Found')
@@ -328,7 +328,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
@@ -340,7 +340,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -354,7 +354,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['If-Modified-Since: %s' % mdate])
 
@@ -367,7 +367,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['If-Range: xxx', 'Range: bytes=15-21'])
 
@@ -382,7 +382,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['If-Range: %s' % mdate, 'Range: bytes=15-21'])
 
@@ -395,7 +395,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=%d-' % (os.stat('tests.py').st_size - 5)])
 
@@ -408,7 +408,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=-5'])
 
@@ -421,7 +421,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=2-0, 2-2'])
 
@@ -437,7 +437,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=2-2, 3'])
 
@@ -448,7 +448,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=0-1', 'Range: bits=2-1'])
 
@@ -459,7 +459,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bits=2-1'])
 
@@ -470,7 +470,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=-10000000'])
 
@@ -481,7 +481,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=10000000-'])
 
@@ -492,7 +492,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=2-1'])
 
@@ -503,7 +503,7 @@ class TestQuick(unittest.TestCase):
         header, body = getcontents(host=HOST,
                                    port=28002,
                                    method='GET',
-                                   path='/download',
+                                   url='/download',
                                    version='1.1',
                                    headers=['Range: bytes=2-10000000'])
 
@@ -552,7 +552,7 @@ async def my_send_middleware(**server):
 @app.route(r'^/page/(?P<page_id>\d+)')
 async def my_page(**server):
     request = server['request']
-    page_id = request.params['url'].get('page_id')
+    page_id = request.params['path'].get('page_id')
 
     assert page_id is not None, 'empty page_id'
 
@@ -575,9 +575,11 @@ async def my_page(**server):
     print('  ROUTE:',          r'^/page/(?P<page_id>\d+)')
     print('  HTTP_HOST:',      request.host)
     print('  REQUEST_METHOD:', request.method)
-    print('  PATH:',           request.path)
+    print('  REQUEST_URI:',    request.url)
     print('  PARAMS:',         request.params)
-    print('  QUERY_STRING:',   request.query)
+    print('  PATH:',           request.path)
+    print('  QUERY:',          request.query)
+    print('  QUERY_STRING:',   request.query_string)
     print('  COOKIES:',        request.cookies)
     print('  VERSION:',        request.version)
 

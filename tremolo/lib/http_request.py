@@ -17,7 +17,16 @@ class HTTPRequest(Request):
             self.host = self.host[0]
 
         self.method = protocol.header.getmethod().upper()
-        self.path = protocol.header.getpath()
+        self.url = protocol.header.geturl()
+        path_size = self.url.find(b'?')
+
+        if path_size == -1:
+            self.path = self.url
+            self.query_string = b''
+        else:
+            self.path = self.url[:path_size]
+            self.query_string = self.url[path_size + 1:]
+
         self.version = protocol.header.getversion()
 
         if self.version != b'1.0':

@@ -260,15 +260,10 @@ class HTTPServer(HTTPProtocol):
                 return
 
         if request.is_valid:
-            qs_pos = request.path.find(b'?')
+            if request.query_string != b'':
+                self._server['request'].query = parse_qs(request.query_string.decode(encoding='latin-1'))
 
-            if qs_pos > -1:
-                path = request.path[:qs_pos]
-                self._server['request'].query = parse_qs(request.path[qs_pos + 1:].decode(encoding='latin-1'))
-            else:
-                path = request.path
-
-            p = path.strip(b'/')
+            p = request.path.strip(b'/')
 
             if p == b'':
                 ri = 1
@@ -277,7 +272,7 @@ class HTTPServer(HTTPProtocol):
 
             if ri in self._route_handlers:
                 for (pattern, func, kwargs) in self._route_handlers[ri]:
-                    m = pattern.search(request.path)
+                    m = pattern.search(request.url)
 
                     if m:
                         await self._handle_continue()
@@ -287,13 +282,13 @@ class HTTPServer(HTTPProtocol):
                         if not matches:
                             matches = m.groups()
 
-                        self._server['request'].params['url'] = matches
+                        self._server['request'].params['path'] = matches
 
                         await self._handle_response(func, {**kwargs, **options})
                         return
             else:
                 for i, (pattern, func, kwargs) in enumerate(self._route_handlers[-1]):
-                    m = pattern.search(request.path)
+                    m = pattern.search(request.url)
 
                     if m:
                         if ri in self._route_handlers:
@@ -308,7 +303,7 @@ class HTTPServer(HTTPProtocol):
                         if not matches:
                             matches = m.groups()
 
-                        self._server['request'].params['url'] = matches
+                        self._server['request'].params['path'] = matches
 
                         await self._handle_response(func, {**kwargs, **options})
                         del self._route_handlers[-1][i]

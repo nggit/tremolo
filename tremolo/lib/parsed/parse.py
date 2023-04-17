@@ -89,18 +89,18 @@ class ParseHeader:
                         self.headers[b'_status'] = 0
                         self.headers[b'_message'] = b''
                 else:
-                    path_end_pos = line.find(b' HTTP/')
+                    url_end_pos = line.find(b' HTTP/')
 
-                    if path_end_pos > 0:
+                    if url_end_pos > 0:
                         self.is_request = True
 
                         try:
-                            self.headers[b'_method'], self.headers[b'_path'] = line[:path_end_pos].split(b' ', 1)
-                            self.headers[b'_version'] = line[path_end_pos + len(' HTTP/'):]
+                            self.headers[b'_method'], self.headers[b'_url'] = line[:url_end_pos].split(b' ', 1)
+                            self.headers[b'_version'] = line[url_end_pos + len(' HTTP/'):]
                             self.is_valid_request = True
                         except ValueError:
                             self.headers[b'_method'] = b''
-                            self.headers[b'_path'] = b''
+                            self.headers[b'_url'] = b''
                             self.headers[b'_version'] = b''
 
                 self.headers[b'_line'] = line
@@ -144,8 +144,8 @@ class ParseHeader:
     def getmethod(self):
         return self.headers.get(b'_method')
 
-    def getpath(self):
-        return self.headers.get(b'_path')
+    def geturl(self):
+        return self.headers.get(b'_url')
 
     def getversion(self):
         return self.headers.get(b'_version')
