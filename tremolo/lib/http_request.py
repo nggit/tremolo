@@ -80,7 +80,7 @@ class HTTPRequest(Request):
                         buf.extend(await agen.__anext__())
                     except StopAsyncIteration:
                         if not buf.endswith(b'0\r\n\r\n'):
-                            return
+                            raise BadRequest('bad chunked encoding: incomplete read')
 
                 if tobe_read > 0:
                     data = buf[:tobe_read]
@@ -99,11 +99,14 @@ class HTTPRequest(Request):
                     i = buf.find(b'\r\n')
 
                     if i == -1:
+                        if len(buf) > self.protocol.options['buffer_size'] * 4:
+                            raise BadRequest('bad chunked encoding: no chunk size')
+
                         paused = False
                         continue
 
                     try:
-                        chunk_size = int(buf[:i].split(b';')[0], 16)
+                        chunk_size = int(buf[:i].split(b';', 1)[0], 16)
                     except ValueError:
                         del buf[:]
                         raise BadRequest('bad chunked encoding')
@@ -241,13 +244,16 @@ class HTTPRequest(Request):
                     data = await agen.__anext__()
                 except StopAsyncIteration:
                     if header_size == -1 or body_size == -1:
-                        return
+                        raise BadRequest('malformed multipart/form-data')
 
             if isinstance(header, bytearray):
                 header.extend(data)
                 header_size = header.find(b'\r\n\r\n')
 
                 if header_size == -1:
+                    if len(header) > 8192:
+                        raise BadRequest('malformed multipart/form-data')
+
                     paused = False
                 else:
                     body = header[header_size + 4:]

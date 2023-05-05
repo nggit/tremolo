@@ -114,7 +114,8 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._request.body_size += data_size
 
-            if self._request.content_length > -1 and self._request.body_size >= self._request.content_length and queue is not None:
+            if (b'content-length' in self._request.headers and self._request.body_size >= self._request.content_length
+                    and queue is not None):
                 queue.put_nowait(None)
             elif self._request.body_size < self._options['client_max_body_size']:
                 transport.resume_reading()
@@ -193,7 +194,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif self._request.version == b'1.1':
                 self._request.http_keepalive = True
 
-            if self._request.method in (b'POST', b'PUT', b'PATCH'):
+            if b'transfer-encoding' in self._request.headers or b'content-length' in self._request.headers:
                 if b'content-type' in self._request.headers:
                     self._request.content_type = self._request.headers[b'content-type'].lower()
 
@@ -347,13 +348,8 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 task.cancel()
 
-        for queue in self._queue:
-            while not queue.empty():
-                queue.get_nowait()
-                queue.task_done()
-
         self._options['_pool'].put({
-            'queue': self._queue,
+            'queue': (asyncio.Queue(), asyncio.Queue()),
             'header': self._header
         })
 

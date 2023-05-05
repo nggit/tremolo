@@ -1,6 +1,18 @@
 # Copyright (c) 2023 nggit
 
-class HTTPException(Exception):
+class TremoloException(Exception):
+    message = 'TremoloException'
+
+    def __init__(self, *args):
+        self.args = args
+
+    def __str__(self):
+        if self.args:
+            return ' '.join(self.args)
+
+        return self.message
+
+class HTTPException(TremoloException):
     code = 500
     message = 'Internal Server Error'
     content_type = 'text/html; charset=utf-8'
@@ -19,12 +31,6 @@ class HTTPException(Exception):
 
         if isinstance(cause, Exception):
             self.__cause__ = cause
-
-    def __str__(self):
-        if self.args:
-            return ' '.join(self.args)
-
-        return self.message
 
 class BadRequest(HTTPException):
     code = 400

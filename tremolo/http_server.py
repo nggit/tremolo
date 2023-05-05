@@ -5,34 +5,9 @@ __all__ = ('HTTPServer',)
 from datetime import datetime
 from urllib.parse import parse_qs
 
+from .contexts import ServerContext
 from .exceptions import ExpectationFailed
 from .lib.http_protocol import HTTPProtocol
-
-class ServerContext:
-    def __init__(self):
-        self.__dict__ = {
-            'options': {},
-            'tasks': [],
-            'data': {}
-        }
-
-    def __repr__(self):
-        return self.__dict__.__repr__()
-
-    @property
-    def options(self):
-        return self.__dict__['options']
-
-    @property
-    def tasks(self):
-        return self.__dict__['tasks']
-
-    @property
-    def data(self):
-        return self.__dict__['data']
-
-    def set(self, name, value):
-        self.__dict__[name] = value
 
 class HTTPServer(HTTPProtocol):
     def __init__(self, **kwargs):
@@ -188,8 +163,14 @@ class HTTPServer(HTTPProtocol):
                 if not self._server['response'].http_chunked:
                     self._server['request'].http_keepalive = False
 
-                self._server['response'].append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
-                                                       self._server['response'].get_content_type())
+                if status[0] == 101:
+                    self._server['request'].http_upgrade = True
+
+                self._server['response'].append_header(
+                    b'Content-Type: %s\r\nConnection: %s\r\n\r\n' %
+                    (self._server['response'].get_content_type(), {False: b'keep-alive',
+                                                                   True: b'upgrade'}[status[0] in (101, 426)])
+                )
 
             if self._server['request'].method == b'HEAD' or no_content:
                 await self._server['response'].write(None)
@@ -259,58 +240,59 @@ class HTTPServer(HTTPProtocol):
             if not isinstance(options, dict):
                 return
 
-        if request.is_valid:
-            if request.query_string != b'':
-                self._server['request'].query = parse_qs(request.query_string.decode(encoding='latin-1'))
-
-            p = request.path.strip(b'/')
-
-            if p == b'':
-                ri = 1
-            else:
-                ri = b'%d#%s' % (p.count(b'/') + 2, p[:(p + b'/').find(b'/')])
-
-            if ri in self._route_handlers:
-                for (pattern, func, kwargs) in self._route_handlers[ri]:
-                    m = pattern.search(request.url)
-
-                    if m:
-                        await self._handle_continue()
-
-                        matches = m.groupdict()
-
-                        if not matches:
-                            matches = m.groups()
-
-                        self._server['request'].params['path'] = matches
-
-                        await self._handle_response(func, {**kwargs, **options})
-                        return
-            else:
-                for i, (pattern, func, kwargs) in enumerate(self._route_handlers[-1]):
-                    m = pattern.search(request.url)
-
-                    if m:
-                        if ri in self._route_handlers:
-                            self._route_handlers[ri].append((pattern, func, kwargs))
-                        else:
-                            self._route_handlers[ri] = [(pattern, func, kwargs)]
-
-                        await self._handle_continue()
-
-                        matches = m.groupdict()
-
-                        if not matches:
-                            matches = m.groups()
-
-                        self._server['request'].params['path'] = matches
-
-                        await self._handle_response(func, {**kwargs, **options})
-                        del self._route_handlers[-1][i]
-                        return
-
-            # not found
-            await self._handle_response(self._route_handlers[0][1][1], {**self._route_handlers[0][1][2], **options})
-        else:
+        if not request.is_valid:
             # bad request
             await self._handle_response(self._route_handlers[0][0][1], {**self._route_handlers[0][0][2], **options})
+            return
+
+        if request.query_string != b'':
+            self._server['request'].query = parse_qs(request.query_string.decode(encoding='latin-1'))
+
+        p = request.path.strip(b'/')
+
+        if p == b'':
+            ri = 1
+        else:
+            ri = b'%d#%s' % (p.count(b'/') + 2, p[:(p + b'/').find(b'/')])
+
+        if ri in self._route_handlers:
+            for (pattern, func, kwargs) in self._route_handlers[ri]:
+                m = pattern.search(request.url)
+
+                if m:
+                    await self._handle_continue()
+
+                    matches = m.groupdict()
+
+                    if not matches:
+                        matches = m.groups()
+
+                    self._server['request'].params['path'] = matches
+
+                    await self._handle_response(func, {**kwargs, **options})
+                    return
+        else:
+            for i, (pattern, func, kwargs) in enumerate(self._route_handlers[-1]):
+                m = pattern.search(request.url)
+
+                if m:
+                    if ri in self._route_handlers:
+                        self._route_handlers[ri].append((pattern, func, kwargs))
+                    else:
+                        self._route_handlers[ri] = [(pattern, func, kwargs)]
+
+                    await self._handle_continue()
+
+                    matches = m.groupdict()
+
+                    if not matches:
+                        matches = m.groups()
+
+                    self._server['request'].params['path'] = matches
+
+                    await self._handle_response(func, {**kwargs, **options})
+                    del self._route_handlers[-1][i]
+                    return
+
+        # not found
+        await self._handle_response(self._route_handlers[0][1][1], {**self._route_handlers[0][1][2], **options})

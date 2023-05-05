@@ -139,8 +139,13 @@ class HTTPResponse(Response):
                     if not self._http_chunked and not (self._request.version == b'1.1' and b'range' in self._request.headers):
                         self._request.http_keepalive = False
 
-                    self.append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
-                                       self.get_content_type())
+                    if status[0] == 101:
+                        self._request.http_upgrade = True
+
+                    self.append_header(
+                        b'Content-Type: %s\r\nConnection: %s\r\n\r\n' %
+                        (self.get_content_type(), {False: b'keep-alive', True: b'upgrade'}[status[0] in (101, 426)])
+                    )
 
                 if self._request.method == b'HEAD' or no_content:
                     self._request.http_keepalive = False
