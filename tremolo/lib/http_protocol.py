@@ -195,6 +195,7 @@ class HTTPProtocol(asyncio.Protocol):
                 self._request.http_keepalive = True
 
             if b'transfer-encoding' in self._request.headers or b'content-length' in self._request.headers:
+                # assuming a request with a body, such as POST
                 if b'content-type' in self._request.headers:
                     self._request.content_type = self._request.headers[b'content-type'].lower()
 
@@ -215,6 +216,7 @@ class HTTPProtocol(asyncio.Protocol):
                 if b'expect' in self._request.headers and self._request.headers[b'expect'].lower() == b'100-continue':
                     self._request.http_continue = True
 
+                # the initial body that accompanies the header
                 await self.put_to_queue(
                     data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                 )
@@ -234,6 +236,7 @@ class HTTPProtocol(asyncio.Protocol):
             if -1 < header_size <= 8192:
                 self._transport.pause_reading()
 
+                # got header, clear either the request or keepalive timeout
                 for i in self._timeout_waiters:
                     if i != 'send' and not self._timeout_waiters[i].done():
                         self._timeout_waiters[i].set_result(None)
@@ -274,32 +277,10 @@ class HTTPProtocol(asyncio.Protocol):
                 self._queue[1].task_done()
 
                 if data is None:
+                    # close the transport, unless keepalive is enabled
                     if self._request is not None:
                         if self._request.http_keepalive and self._data is None:
-                            for i, task in enumerate(self.tasks):
-                                if callable(task):
-                                    continue
-
-                                try:
-                                    exc = task.exception()
-
-                                    if exc:
-                                        self.print_exception(exc)
-
-                                    del self.tasks[i]
-                                except asyncio.InvalidStateError:
-                                    pass
-
-                            if not self._request.http_continue:
-                                self._data = bytearray()
-                                self._request.clear_body()
-
-                            self._timeout_waiters['keepalive'] = self._loop.create_future()
-
-                            self.tasks.append(self._loop.create_task(self.set_timeout(self._timeout_waiters['keepalive'],
-                                                                                      timeout=self._options['keepalive_timeout'],
-                                                                                      timeout_cb=self.keepalive_timeout)))
-                            self._transport.resume_reading()
+                            self._handle_keepalive()
                             continue
 
                         self._request.clear_body()
@@ -310,6 +291,7 @@ class HTTPProtocol(asyncio.Protocol):
                     self._transport.close()
                     return
 
+                # send data
                 write_buffer_size = self._transport.get_write_buffer_size()
 
                 if write_buffer_size > self._watermarks['high']:
@@ -332,6 +314,32 @@ class HTTPProtocol(asyncio.Protocol):
                 if self._transport is not None:
                     self._transport.abort()
                     self.print_exception(exc)
+
+    def _handle_keepalive(self):
+        for i, task in enumerate(self.tasks):
+            if callable(task):
+                continue
+
+            try:
+                exc = task.exception()
+
+                if exc:
+                    self.print_exception(exc)
+
+                del self.tasks[i]
+            except asyncio.InvalidStateError:
+                pass
+
+        if not self._request.http_continue:
+            self._data = bytearray()
+            self._request.clear_body()
+
+        self._timeout_waiters['keepalive'] = self._loop.create_future()
+
+        self.tasks.append(self._loop.create_task(self.set_timeout(self._timeout_waiters['keepalive'],
+                                                                  timeout=self._options['keepalive_timeout'],
+                                                                  timeout_cb=self.keepalive_timeout)))
+        self._transport.resume_reading()
 
     def connection_lost(self, exc):
         for task in self.tasks:
