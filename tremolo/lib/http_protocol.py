@@ -331,8 +331,7 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 if self._transport is not None:
                     self._transport.abort()
-
-                self.print_exception(exc)
+                    self.print_exception(exc)
 
     def connection_lost(self, exc):
         for task in self.tasks:

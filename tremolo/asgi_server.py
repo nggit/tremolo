@@ -95,34 +95,35 @@ class ASGIServer(HTTPProtocol):
             return {'type': 'http.disconnect'}
 
     async def send(self, data):
-        if self._request is None or self._response is None:
-            return
+        try:
+            if data['type'] == 'http.response.start':
+                self._response.set_status(data['status'], HTTPStatus(data['status']).phrase)
+                self._response.append_header(b'Date: %s\r\nServer: %s\r\n' % (
+                                             datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                             self.options['server_name']))
 
-        if data['type'] == 'http.response.start':
-            self._response.set_status(data['status'], HTTPStatus(data['status']).phrase)
-            self._response.append_header(b'Date: %s\r\nServer: %s\r\n' % (
-                                         datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                         self.options['server_name']))
+                if 'headers' in data:
+                    for header in data['headers']:
+                        if header[0] == b'content-type':
+                            self._response.set_content_type(header[1])
+                            continue
 
-            if 'headers' in data:
-                for header in data['headers']:
-                    if header[0] == b'content-type':
-                        self._response.set_content_type(header[1])
-                        continue
+                        if header[0] in (b'connection', b'date', b'server', b'transfer-encoding'):
+                            # disallow apps from changing them, as they are managed by Tremolo
+                            continue
 
-                    if header[0] in (b'connection', b'date', b'server', b'transfer-encoding'):
-                        # disallow apps from changing them, as they are managed by Tremolo
-                        continue
+                        if header[0] == b'content-length':
+                            # will disable http chunked in the self._response.write()
+                            self._request.http_keepalive = False
 
-                    if header[0] == b'content-length':
-                        # will disable http chunked in the self._response.write()
-                        self._request.http_keepalive = False
+                        self._response.append_header(b'%s: %s\r\n' % header)
+            elif data['type'] == 'http.response.body':
+                if 'body' in data:
+                    await self._response.write(data['body'])
 
-                    self._response.append_header(b'%s: %s\r\n' % header)
-        elif data['type'] == 'http.response.body':
-            if 'body' in data:
-                await self._response.write(data['body'])
-
-            if 'more_body' not in data or data['more_body'] is False:
-                await self._response.write(b'', throttle=False)
-                await self._response.send(None)
+                if 'more_body' not in data or data['more_body'] is False:
+                    await self._response.write(b'', throttle=False)
+                    await self._response.send(None)
+        except Exception as exc:
+            if not (self._request is None or self._response is None):
+                self.print_exception(exc)
