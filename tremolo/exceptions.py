@@ -1,6 +1,7 @@
 # Copyright (c) 2023 nggit
 
 from .lib.http_exception import (
+    TremoloException,
     HTTPException,
     BadRequest,
     Unauthorized,
@@ -15,3 +16,12 @@ from .lib.http_exception import (
     InternalServerError,
     ServiceUnavailable
 )
+
+class ASGIException(TremoloException):
+    message = 'ASGIException'
+
+class LifespanError(ASGIException):
+    pass
+
+class LifespanProtocolUnsupported(ASGIException):
+    message = 'ASGI Lifespan Protocol is not supported by your application'

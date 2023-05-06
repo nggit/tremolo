@@ -50,6 +50,45 @@ You can save it as `hello.py` and just run it with `python3 hello.py`.
 
 Your first *hello world* page with Tremolo will be at http://localhost:8000/hello.
 
+## ASGI Server
+Tremolo is an HTTP Server framework. You can build abstractions on top of it, say an ASGI server.
+
+In fact, Tremolo already has ASGI server implementation.
+
+So you can immediately use existing [ASGI applications / frameworks](https://asgi.readthedocs.io/en/latest/implementations.html#application-frameworks), behind Tremolo (ASGI server).
+
+For example, If a minimal ASGI application with the name `example.py`:
+
+```python
+async def app(scope, receive, send):
+    assert scope['type'] == 'http'
+
+    await send({
+        'type': 'http.response.start',
+        'status': 200,
+        'headers': [
+            (b'content-type', b'text/plain'),
+        ]
+    })
+
+    await send({
+        'type': 'http.response.body',
+        'body': b'Hello world!'
+    })
+```
+
+Then you can run as follows:
+
+```
+python3 -m tremolo --debug --bind 127.0.0.1:8000 example:app
+```
+
+To see more available options:
+
+```
+python3 -m tremolo --help
+```
+
 ## Misc
 Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
 

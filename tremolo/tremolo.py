@@ -16,10 +16,10 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from functools import wraps
+from importlib import import_module
 
 from .lib.connection_pool import ConnectionPool
 from .exceptions import BadRequest
-from .http_server import HTTPServer
 
 class Tremolo:
     def __init__(self):
@@ -188,9 +188,9 @@ class Tremolo:
                 sock = options['conn'].recv()
                 sock.listen(backlog)
 
-        if 'ssl' in options and isinstance(options['ssl'], dict):
+        if 'ssl' in options and options['ssl'] and isinstance(options['ssl'], dict):
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_context.load_cert_chain(certfile=options['ssl'].get('cert'),
+            ssl_context.load_cert_chain(certfile=options['ssl'].get('cert', ''),
                                         keyfile=options['ssl'].get('key'),
                                         password=options['ssl'].get('password'))
         else:
@@ -205,22 +205,59 @@ class Tremolo:
             host = host.encode(encoding='latin-1')
 
         pool = ConnectionPool(1024, self._logger)
+        lifespan = None
+
+        if 'app' in options and isinstance(options['app'], str):
+            from .asgi_lifespan import ASGILifespan
+            from .asgi_server import ASGIServer as Server
+
+            # 'module:app'               -> 'module:app'   (dir: os.getcwd())
+            # '/path/to/module.py'       -> 'module:app'   (dir: '/path/to')
+            # '/path/to/module.py:myapp' -> 'module:myapp' (dir: '/path/to')
+
+            path, attr_name = (options['app'] + ':app').split(':')[:2]
+            dir_name, base_name = os.path.split(path)
+            module_name = os.path.splitext(base_name)[0]
+
+            if dir_name == '':
+                dir_name = os.getcwd()
+
+            sys.path.insert(0, dir_name)
+
+            options['app'] = getattr(import_module(module_name), attr_name)
+
+            if server_name != b'':
+                server_name = server_name + b' (ASGI)'
+
+            lifespan = ASGILifespan(options['app'], loop=self._loop, logger=self._logger)
+
+            lifespan.startup()
+            exc = await lifespan.exception()
+
+            if exc:
+                raise exc
+        else:
+            from .http_server import HTTPServer as Server
+
+            options['app'] = None
+            self._compile_handlers(options['handlers'])
 
         server = await self._loop.create_server(
-            lambda : HTTPServer(loop=self._loop,
-                                logger=self._logger,
-                                sock=sock,
-                                debug=options.get('debug', False),
-                                download_rate=options.get('download_rate', 1048576),
-                                upload_rate=options.get('upload_rate', 1048576),
-                                buffer_size=options.get('buffer_size', 16 * 1024),
-                                client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
-                                request_timeout=options.get('request_timeout', 30),
-                                keepalive_timeout=options.get('keepalive_timeout', 30),
-                                server_name=server_name,
-                                _pool=pool,
-                                _handlers=options['handlers'],
-                                _middlewares=options['middlewares']), sock=sock, backlog=backlog, ssl=ssl_context)
+            lambda : Server(loop=self._loop,
+                            logger=self._logger,
+                            sock=sock,
+                            debug=options.get('debug', False),
+                            download_rate=options.get('download_rate', 1048576),
+                            upload_rate=options.get('upload_rate', 1048576),
+                            buffer_size=options.get('buffer_size', 16 * 1024),
+                            client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
+                            request_timeout=options.get('request_timeout', 30),
+                            keepalive_timeout=options.get('keepalive_timeout', 30),
+                            server_name=server_name,
+                            _pool=pool,
+                            _app=options['app'],
+                            _handlers=options['handlers'],
+                            _middlewares=options['middlewares']), sock=sock, backlog=backlog, ssl=ssl_context)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()
@@ -250,9 +287,11 @@ class Tremolo:
                 server.close()
                 break
 
-    def _worker(self, host, port, **kwargs):
-        self._compile_handlers(kwargs['handlers'])
+        if lifespan is not None:
+            lifespan.shutdown()
+            await lifespan.exception()
 
+    def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
         self._logger.setLevel(getattr(logging, kwargs.get('log_level', 'DEBUG'), logging.DEBUG))
 
