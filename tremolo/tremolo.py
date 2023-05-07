@@ -18,7 +18,7 @@ from datetime import datetime
 from functools import wraps
 from importlib import import_module
 
-from .lib.connection_pool import ConnectionPool
+from .lib.object_pool import ObjectPool
 from .exceptions import BadRequest
 
 class Tremolo:
@@ -204,7 +204,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode(encoding='latin-1')
 
-        pool = ConnectionPool(1024, self._logger)
+        pool = ObjectPool(1024, self._logger)
         lifespan = None
 
         if 'app' in options and isinstance(options['app'], str):
@@ -225,6 +225,11 @@ class Tremolo:
             sys.path.insert(0, dir_name)
 
             options['app'] = getattr(import_module(module_name), attr_name)
+
+            print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+            sys.stdout.flush()
+            sys.stdout.buffer.write(b'Starting %s as an ASGI server for: ' % server_name)
+            print(getattr(options['app'], '__name__', options['app'].__class__.__name__))
 
             if server_name != b'':
                 server_name = server_name + b' (ASGI)'

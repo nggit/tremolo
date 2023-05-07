@@ -54,9 +54,9 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self._transport = transport
-        self._conn = self._options['_pool'].get()
-        self._queue = self._conn['queue']
-        self._header = self._conn['header']
+        self._pool = self._options['_pool'].get()
+        self._queue = self._pool['queue']
+        self._header = self._pool['header']
         self._request = None
         self._response = None
 

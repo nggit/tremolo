@@ -2,9 +2,9 @@
 
 import asyncio
 
-from .parsed import ParseHeader
+from .h1parser import ParseHeader
 
-class ConnectionPool:
+class ObjectPool:
     def __init__(self, pool_size, logger):
         self._pool_size = pool_size
         self._pools = []
