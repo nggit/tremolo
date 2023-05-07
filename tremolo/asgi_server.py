@@ -124,6 +124,8 @@ class ASGIServer(HTTPProtocol):
                 if 'more_body' not in data or data['more_body'] is False:
                     await self._response.write(b'', throttle=False)
                     await self._response.send(None)
+        except asyncio.CancelledError:
+            pass
         except Exception as exc:
             if not (self._request is None or self._response is None):
                 self.print_exception(exc)
