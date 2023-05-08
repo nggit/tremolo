@@ -104,15 +104,17 @@ class ASGIServer(HTTPProtocol):
 
                 if 'headers' in data:
                     for header in data['headers']:
-                        if header[0] == b'content-type':
+                        name = header[0].lower()
+
+                        if name == b'content-type':
                             self._response.set_content_type(header[1])
                             continue
 
-                        if header[0] in (b'connection', b'date', b'server', b'transfer-encoding'):
+                        if name in (b'connection', b'date', b'server', b'transfer-encoding'):
                             # disallow apps from changing them, as they are managed by Tremolo
                             continue
 
-                        if header[0] == b'content-length':
+                        if name == b'content-length':
                             # will disable http chunked in the self._response.write()
                             self._request.http_keepalive = False
 
