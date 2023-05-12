@@ -104,6 +104,9 @@ class ASGIServer(HTTPProtocol):
 
                 if 'headers' in data:
                     for header in data['headers']:
+                        if not (header[0].find(b'\r\n') == -1 and header[1].find(b'\r\n') == -1):
+                            raise ValueError('name or value cannot contain CRLF characters')
+
                         name = header[0].lower()
 
                         if name == b'content-type':
@@ -117,6 +120,9 @@ class ASGIServer(HTTPProtocol):
                         if name == b'content-length':
                             # will disable http chunked in the self._response.write()
                             self._request.http_keepalive = False
+
+                        if isinstance(header, list):
+                            header = tuple(header)
 
                         self._response.append_header(b'%s: %s\r\n' % header)
             elif data['type'] == 'http.response.body':
