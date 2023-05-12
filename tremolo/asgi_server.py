@@ -104,8 +104,8 @@ class ASGIServer(HTTPProtocol):
 
                 if 'headers' in data:
                     for header in data['headers']:
-                        if not (header[0].find(b'\r\n') == -1 and header[1].find(b'\r\n') == -1):
-                            raise ValueError('name or value cannot contain CRLF characters')
+                        if not (header[0].find(b'\n') == -1 and header[1].find(b'\n') == -1):
+                            raise ValueError('name or value cannot contain LF characters')
 
                         name = header[0].lower()
 

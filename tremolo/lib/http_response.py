@@ -50,7 +50,7 @@ class HTTPResponse(Response):
             if k:
                 cookie.extend(v)
 
-        if cookie.find(b'\r\n') != -1:
+        if cookie.find(b'\n') != -1:
             raise InternalServerError
 
         self._header[1].extend(cookie + b'\r\n')
@@ -62,7 +62,7 @@ class HTTPResponse(Response):
         if isinstance(value, str):
             value = value.encode(encoding='latin-1')
 
-        if not (name.find(b'\r\n') == -1 and value.find(b'\r\n') == -1):
+        if not (name.find(b'\n') == -1 and value.find(b'\n') == -1):
             raise InternalServerError
 
         self._header[1].extend(b'%s: %s\r\n' % (name, value))
@@ -71,7 +71,7 @@ class HTTPResponse(Response):
         if isinstance(message, str):
             message = message.encode(encoding='latin-1')
 
-        if not (isinstance(status, int) and message.find(b'\r\n') == -1):
+        if not (isinstance(status, int) and message.find(b'\n') == -1):
             raise InternalServerError
 
         self._status.append((status, message))
@@ -86,7 +86,7 @@ class HTTPResponse(Response):
         if isinstance(content_type, str):
             content_type = content_type.encode(encoding='latin-1')
 
-        if content_type.find(b'\r\n') != -1:
+        if content_type.find(b'\n') != -1:
             raise InternalServerError
 
         self._content_type.append(content_type)
