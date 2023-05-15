@@ -105,7 +105,10 @@ class ASGIServer(HTTPProtocol):
                 if 'headers' in data:
                     for header in data['headers']:
                         if not (header[0].find(b'\n') == -1 and header[1].find(b'\n') == -1):
-                            raise ValueError('name or value cannot contain LF characters')
+                            await self.handle_exception(
+                                InternalServerError('name or value cannot contain illegal characters'),
+                                self._request, self._response)
+                            return
 
                         name = header[0].lower()
 

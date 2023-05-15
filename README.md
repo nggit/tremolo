@@ -89,6 +89,31 @@ To see more available options:
 python3 -m tremolo --help
 ```
 
+## Benchmarking
+The first thing to note is that Tremolo is a pure Python server framework.
+
+As a pure Python server framework, it is hard to find a comparison.
+Because most servers/frameworks today are full of steroids like `httptools`, `uvloop`, Rust, etc.
+
+You can try comparing with [Uvicorn](https://www.uvicorn.org/) with the following option (disabling steroids to be fair):
+
+```
+uvicorn --loop asyncio --http h11 --log-level error example:app
+```
+
+vs
+
+```
+python -m tremolo --log-level ERROR example:app
+```
+
+You will find that Tremolo is reasonably fast.
+
+What's interesting is that this may become different when [CPython becomes faster](https://devblogs.microsoft.com/python/python-311-faster-cpython-team/),
+or another faster Python implementation comes along.
+
+All I can say is that Tremolo is built with simplicity in mind, so performance will naturally follow.
+
 ## Misc
 Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
 
