@@ -6,18 +6,19 @@ from .http_exception import BadRequest, PayloadTooLarge, RequestTimeout
 from .request import Request
 
 class HTTPRequest(Request):
-    def __init__(self, protocol):
+    def __init__(self, protocol, header):
         super().__init__(protocol)
 
-        self.is_valid = protocol.header.is_valid_request
-        self.headers = protocol.header.headers
-        self.host = protocol.header.gethost()
+        self.header = header
+        self.headers = header.headers
+        self.is_valid = header.is_valid_request
+        self.host = header.gethost()
 
         if isinstance(self.host, list):
             self.host = self.host[0]
 
-        self.method = protocol.header.getmethod().upper()
-        self.url = protocol.header.geturl()
+        self.method = header.getmethod().upper()
+        self.url = header.geturl()
         path_size = self.url.find(b'?')
 
         if path_size == -1:
@@ -27,7 +28,7 @@ class HTTPRequest(Request):
             self.path = self.url[:path_size]
             self.query_string = self.url[path_size + 1:]
 
-        self.version = protocol.header.getversion()
+        self.version = header.getversion()
 
         if self.version != b'1.0':
             self.version = b'1.1'
@@ -264,7 +265,7 @@ class HTTPRequest(Request):
                     info = {}
 
                     if header_size <= 8192 and header.startswith(b'--%s\r\n' % boundary):
-                        header = self.protocol.header.parse(header, header_size=header_size).getheaders()
+                        header = self.header.parse(header, header_size=header_size).getheaders()
 
                         if b'content-disposition' in header:
                             for k, v in parse_qsl(header[b'content-disposition']

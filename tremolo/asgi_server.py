@@ -15,8 +15,6 @@ from .lib.http_protocol import HTTPProtocol
 class ASGIServer(HTTPProtocol):
     def __init__(self, **kwargs):
         self._app = kwargs['_app']
-        self._request = None
-        self._response = None
         self._read = None
         self._task = None
         self._timer = None
@@ -24,33 +22,31 @@ class ASGIServer(HTTPProtocol):
 
         super().__init__(ServerContext(), **kwargs)
 
-    async def header_received(self, request, response):
-        if request.http_continue:
-            if request.content_length > self.options['client_max_body_size']:
+    async def header_received(self):
+        if self.request.http_continue:
+            if self.request.content_length > self.options['client_max_body_size']:
                 raise ExpectationFailed
 
-            await response.send(b'HTTP/%s 100 Continue\r\n\r\n' % request.version)
+            await self.response.send(b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version)
 
         scope = {
             'type': 'http',
             'asgi': {'version': '3.0'},
-            'http_version': request.version.decode(encoding='utf-8'),
-            'method': request.method.decode(encoding='utf-8'),
+            'http_version': self.request.version.decode(encoding='utf-8'),
+            'method': self.request.method.decode(encoding='utf-8'),
             'scheme': {True: 'http',
-                       False: 'https'}[request.transport.get_extra_info('sslcontext') is None],
-            'path': unquote(request.path.decode(encoding='utf-8'), encoding='utf-8'),
-            'raw_path': request.path,
-            'query_string': request.query_string,
-            'headers': request.protocol.header.getheaders(),
-            'client': request.transport.get_extra_info('peername'),
-            'server': request.transport.get_extra_info('sockname')
+                       False: 'https'}[self.request.transport.get_extra_info('sslcontext') is None],
+            'path': unquote(self.request.path.decode(encoding='utf-8'), encoding='utf-8'),
+            'raw_path': self.request.path,
+            'query_string': self.request.query_string,
+            'headers': self.request.header.getheaders(),
+            'client': self.request.transport.get_extra_info('peername'),
+            'server': self.request.transport.get_extra_info('sockname')
         }
 
-        self._request = request
-        self._response = response
-        self._read = request.read(cache=False)
+        self._read = self.request.read(cache=False)
 
-        if not (b'transfer-encoding' in request.headers or b'content-length' in request.headers
+        if not (b'transfer-encoding' in self.request.headers or b'content-length' in self.request.headers
                 ) and self.queue[0] is not None:
             # avoid blocking on initial receive() due to empty Queue
             # in the case of bodyless requests, e.g. GET
@@ -73,7 +69,7 @@ class ASGIServer(HTTPProtocol):
         except asyncio.CancelledError:
             self.options['logger'].warning('task: ASGI application is cancelled due to timeout')
         except Exception as exc:
-            await self.handle_exception(InternalServerError(cause=exc), self._request, self._response)
+            await self.handle_exception(InternalServerError(cause=exc))
 
     async def receive(self):
         try:
@@ -82,11 +78,11 @@ class ASGIServer(HTTPProtocol):
             return {
                 'type': 'http.request',
                 'body': data,
-                'more_body': ((data != b'' and self._request.content_length == -1)
-                    or self._request.body_size < self._request.content_length)
+                'more_body': ((data != b'' and self.request.content_length == -1)
+                    or self.request.body_size < self.request.content_length)
             }
         except Exception as exc:
-            if not (self._request is None or isinstance(exc, StopAsyncIteration)):
+            if not (self.request is None or isinstance(exc, StopAsyncIteration)):
                 self.print_exception(exc)
 
             if self._timer is None:
@@ -97,23 +93,22 @@ class ASGIServer(HTTPProtocol):
     async def send(self, data):
         try:
             if data['type'] == 'http.response.start':
-                self._response.set_status(data['status'], HTTPStatus(data['status']).phrase)
-                self._response.append_header(b'Date: %s\r\nServer: %s\r\n' % (
-                                             datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                             self.options['server_name']))
+                self.response.set_status(data['status'], HTTPStatus(data['status']).phrase)
+                self.response.append_header(b'Date: %s\r\nServer: %s\r\n' % (
+                                            datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                            self.options['server_name']))
 
                 if 'headers' in data:
                     for header in data['headers']:
                         if not (header[0].find(b'\n') == -1 and header[1].find(b'\n') == -1):
                             await self.handle_exception(
-                                InternalServerError('name or value cannot contain illegal characters'),
-                                self._request, self._response)
+                                InternalServerError('name or value cannot contain illegal characters'))
                             return
 
                         name = header[0].lower()
 
                         if name == b'content-type':
-                            self._response.set_content_type(header[1])
+                            self.response.set_content_type(header[1])
                             continue
 
                         if name in (b'connection', b'date', b'server', b'transfer-encoding'):
@@ -121,22 +116,22 @@ class ASGIServer(HTTPProtocol):
                             continue
 
                         if name == b'content-length':
-                            # will disable http chunked in the self._response.write()
-                            self._request.http_keepalive = False
+                            # will disable http chunked in the self.response.write()
+                            self.request.http_keepalive = False
 
                         if isinstance(header, list):
                             header = tuple(header)
 
-                        self._response.append_header(b'%s: %s\r\n' % header)
+                        self.response.append_header(b'%s: %s\r\n' % header)
             elif data['type'] == 'http.response.body':
                 if 'body' in data:
-                    await self._response.write(data['body'])
+                    await self.response.write(data['body'])
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self._response.write(b'', throttle=False)
-                    await self._response.send(None)
+                    await self.response.write(b'', throttle=False)
+                    await self.response.send(None)
         except asyncio.CancelledError:
             pass
         except Exception as exc:
-            if not (self._request is None or self._response is None):
+            if not (self.request is None or self.response is None):
                 self.print_exception(exc)

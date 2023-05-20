@@ -5,6 +5,7 @@ import traceback
 
 from datetime import datetime
 
+from .h1parser import ParseHeader
 from .http_exception import HTTPException, BadRequest, InternalServerError
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
@@ -21,7 +22,8 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._transport = None
         self._queue = (None, None)
-        self._header = None
+        self._request = None
+        self._response = None
         self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
@@ -49,16 +51,17 @@ class HTTPProtocol(asyncio.Protocol):
         return self._queue
 
     @property
-    def header(self):
-        return self._header
+    def request(self):
+        return self._request
+
+    @property
+    def response(self):
+        return self._response
 
     def connection_made(self, transport):
         self._transport = transport
         self._pool = self._options['_pool'].get()
         self._queue = self._pool['queue']
-        self._header = self._pool['header']
-        self._request = None
-        self._response = None
 
         self._data = bytearray()
         self._timeout_waiters = {'request': self._loop.create_future()}
@@ -126,7 +129,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self._options['logger'].info('payload too large')
 
-    async def header_received(self, request, response):
+    async def header_received(self):
         return
 
     def print_exception(self, exc, *args):
@@ -134,11 +137,11 @@ class HTTPProtocol(asyncio.Protocol):
             (*args, exc.__class__.__name__, str(exc))
         ), exc_info={True: exc, False: False}[self._options['debug']])
 
-    async def handle_exception(self, exc, request, response):
-        if request is None or response is None:
+    async def handle_exception(self, exc):
+        if self._request is None or self._response is None or self._response.header is None:
             return
 
-        self.print_exception(exc, request.path.decode(encoding='latin-1'))
+        self.print_exception(exc, self._request.path.decode(encoding='latin-1'))
 
         encoding = 'utf-8'
 
@@ -160,9 +163,9 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             data = str(exc).encode(encoding=encoding)
 
-        await response.send((
+        await self._response.send((
             b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\nConnection: close\r\n' +
-            b'Date: %s\r\nServer: %s\r\n\r\n%s') % (request.version,
+            b'Date: %s\r\nServer: %s\r\n\r\n%s') % (self._request.version,
                                                     exc.code,
                                                     exc.message.encode(encoding='latin-1'),
                                                     exc.content_type.encode(encoding='latin-1'),
@@ -172,19 +175,20 @@ class HTTPProtocol(asyncio.Protocol):
                                                     self._options['server_name'],
                                                     data))
 
-        response.close()
+        self._response.close()
 
     async def _handle_request_header(self, data, header_size):
         self._data = None
+        header = ParseHeader(data, header_size=header_size, excludes=[b'proxy'])
 
-        if not self._header.parse(data, header_size=header_size, excludes=[b'proxy']).is_request:
+        if not header.is_request:
             if self._queue[1] is not None:
                 self._queue[1].put_nowait(None)
 
             self._options['logger'].info('bad request: not a request')
             return
 
-        self._request = HTTPRequest(self)
+        self._request = HTTPRequest(self, header)
         self._response = HTTPResponse(self._request)
 
         try:
@@ -221,12 +225,12 @@ class HTTPProtocol(asyncio.Protocol):
                     data[header_size + 4:], queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate']
                 )
 
-            await self.header_received(self._request, self._response)
+            await self.header_received()
         except Exception as exc:
             if not isinstance(exc, HTTPException):
                 exc = InternalServerError(cause=exc)
 
-            await self.handle_exception(exc, self._request, self._response)
+            await self.handle_exception(exc)
 
     def data_received(self, data):
         if self._data is not None:
@@ -356,8 +360,7 @@ class HTTPProtocol(asyncio.Protocol):
                 task.cancel()
 
         self._options['_pool'].put({
-            'queue': (asyncio.Queue(), asyncio.Queue()),
-            'header': self._header
+            'queue': (asyncio.Queue(), asyncio.Queue())
         })
 
         self._transport = None

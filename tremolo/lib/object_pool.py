@@ -2,8 +2,6 @@
 
 import asyncio
 
-from .h1parser import ParseHeader
-
 class ObjectPool:
     def __init__(self, pool_size, logger):
         self._pool_size = pool_size
@@ -15,7 +13,6 @@ class ObjectPool:
 
     def _create(self):
         return {
-            'header': ParseHeader(),
             'queue': (asyncio.Queue(), asyncio.Queue())
         }
 

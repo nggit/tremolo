@@ -17,9 +17,7 @@ class HTTPServer(HTTPProtocol):
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
             'socket': kwargs['sock'],
-            'context': ServerContext(),
-            'request': None,
-            'response': None
+            'context': ServerContext()
         }
 
         super().__init__(self._server['context'], **kwargs)
@@ -61,7 +59,7 @@ class HTTPServer(HTTPProtocol):
         self._server['loop'].create_task(self._connection_lost(func, exc))
 
     def _set_base_header(self, options={}):
-        if self._server['response'].header is None or self._server['response'].header[1] != b'':
+        if self.response.header is None or self.response.header[1] != b'':
             return
 
         options['server_name'] = options.get('server_name', self.options['server_name'])
@@ -69,16 +67,16 @@ class HTTPServer(HTTPProtocol):
         if isinstance(options['server_name'], str):
             options['server_name'] = options['server_name'].encode(encoding='latin-1')
 
-        self._server['response'].append_header(b'Date: %s\r\nServer: %s\r\n' % (
-                                               datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
-                                               options['server_name']))
+        self.response.append_header(b'Date: %s\r\nServer: %s\r\n' % (
+                                    datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT').encode(encoding='latin-1'),
+                                    options['server_name']))
 
     async def _handle_middleware(self, func, options={}):
-        if self._server['response'].header is not None:
+        if self.response.header is not None:
             self._set_base_header(options)
             self._server['context'].set('options', options)
 
-        data = await func(**self._server)
+        data = await func(**self._server, request=self.request, response=self.response)
 
         if data is None:
             return options
@@ -87,10 +85,10 @@ class HTTPServer(HTTPProtocol):
             return
 
         if 'status' in options:
-            self._server['response'].set_status(*options['status'])
+            self.response.set_status(*options['status'])
 
         if 'content_type' in options:
-            self._server['response'].set_content_type(options['content_type'])
+            self.response.set_content_type(options['content_type'])
 
         encoding = ('utf-8',)
 
@@ -100,29 +98,29 @@ class HTTPServer(HTTPProtocol):
         if isinstance(data, str):
             data = data.encode(encoding=encoding[0])
 
-        await self._server['response'].end(data)
+        await self.response.end(data)
 
     async def _handle_continue(self):
-        if self._server['request'].http_continue:
-            if self._server['request'].content_length > self.options['client_max_body_size']:
+        if self.request.http_continue:
+            if self.request.content_length > self.options['client_max_body_size']:
                 raise ExpectationFailed
 
-            await self._server['response'].send(b'HTTP/%s 100 Continue\r\n\r\n' % self._server['request'].version)
+            await self.response.send(b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version)
 
     async def _handle_response(self, func, options={}):
         options['rate'] = options.get('rate', self.options['download_rate'])
         options['buffer_size'] = options.get('buffer_size', self.options['buffer_size'])
 
         if 'status' in options:
-            self._server['response'].set_status(*options['status'])
+            self.response.set_status(*options['status'])
 
         if 'content_type' in options:
-            self._server['response'].set_content_type(options['content_type'])
+            self.response.set_content_type(options['content_type'])
 
         self._set_base_header(options)
 
         self._server['context'].set('options', options)
-        agen = func(**self._server)
+        agen = func(**self._server, request=self.request, response=self.response)
 
         try:
             data = await agen.__anext__()
@@ -131,7 +129,7 @@ class HTTPServer(HTTPProtocol):
             data = await agen
 
             if data is None:
-                self._server['response'].close()
+                self.response.close()
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
@@ -139,45 +137,45 @@ class HTTPServer(HTTPProtocol):
 
             is_agen = False
 
-        status = self._server['response'].get_status()
+        status = self.response.get_status()
         no_content = status[0] in (204, 304) or 100 <= status[0] < 200
-        self._server['response'].http_chunked = options.get(
-            'chunked', self._server['request'].version == b'1.1' and self._server['request'].http_keepalive and not no_content
+        self.response.http_chunked = options.get(
+            'chunked', self.request.version == b'1.1' and self.request.http_keepalive and not no_content
         )
 
-        if self._server['response'].http_chunked:
-            self._server['response'].append_header(b'Transfer-Encoding: chunked\r\n')
+        if self.response.http_chunked:
+            self.response.append_header(b'Transfer-Encoding: chunked\r\n')
 
         if self._middlewares['send'][-1][0] is not None:
-            self._server['response'].set_write_callback(
+            self.response.set_write_callback(
                 lambda : self._handle_middleware(
                     self._middlewares['send'][-1][0], {**self._middlewares['send'][-1][1], **options})
             )
 
-        self._server['response'].header = b'HTTP/%s %d %s\r\n' % (self._server['request'].version, *status)
+        self.response.header = b'HTTP/%s %d %s\r\n' % (self.request.version, *status)
 
         if is_agen:
             if no_content:
-                self._server['response'].append_header(b'Connection: close\r\n\r\n')
+                self.response.append_header(b'Connection: close\r\n\r\n')
             else:
-                if not self._server['response'].http_chunked:
-                    self._server['request'].http_keepalive = False
+                if not self.response.http_chunked:
+                    self.request.http_keepalive = False
 
                 if status[0] == 101:
-                    self._server['request'].http_upgrade = True
+                    self.request.http_upgrade = True
 
-                self._server['response'].append_header(
+                self.response.append_header(
                     b'Content-Type: %s\r\nConnection: %s\r\n\r\n' %
-                    (self._server['response'].get_content_type(), {False: b'keep-alive',
-                                                                   True: b'upgrade'}[status[0] in (101, 426)])
+                    (self.response.get_content_type(), {False: b'keep-alive',
+                                                        True: b'upgrade'}[status[0] in (101, 426)])
                 )
 
-            if self._server['request'].method == b'HEAD' or no_content:
-                await self._server['response'].write(None)
+            if self.request.method == b'HEAD' or no_content:
+                await self.response.write(None)
                 return
 
             self.set_watermarks(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
-            await self._server['response'].write(
+            await self.response.write(
                 data, rate=options['rate'], buffer_size=options['buffer_size']
             )
 
@@ -185,11 +183,11 @@ class HTTPServer(HTTPProtocol):
                 try:
                     data = await agen.__anext__()
 
-                    await self._server['response'].write(
+                    await self.response.write(
                         data, rate=options['rate'], buffer_size=options['buffer_size']
                     )
                 except StopAsyncIteration:
-                    await self._server['response'].write(b'', throttle=False)
+                    await self.response.write(b'', throttle=False)
                     break
         else:
             encoding = ('utf-8',)
@@ -201,33 +199,30 @@ class HTTPServer(HTTPProtocol):
                 data = data.encode(encoding=encoding[0])
 
             if no_content or data == b'':
-                self._server['response'].append_header(b'Connection: close\r\n\r\n')
+                self.response.append_header(b'Connection: close\r\n\r\n')
             else:
-                if self._server['response'].http_chunked:
-                    self._server['response'].append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
-                                                           % self._server['response'].get_content_type())
+                if self.response.http_chunked:
+                    self.response.append_header(b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n'
+                                                % self.response.get_content_type())
                 else:
-                    self._server['response'].append_header(
+                    self.response.append_header(
                         b'Content-Type: %s\r\nContent-Length: %d\r\nConnection: %s\r\n\r\n' % (
-                        self._server['response'].get_content_type(), len(data), {
+                        self.response.get_content_type(), len(data), {
                             True: b'keep-alive',
-                            False: b'close'}[self._server['request'].http_keepalive])
+                            False: b'close'}[self.request.http_keepalive])
                     )
 
-            if data == b'' or self._server['request'].method == b'HEAD' or no_content:
-                await self._server['response'].write(None)
+            if data == b'' or self.request.method == b'HEAD' or no_content:
+                await self.response.write(None)
                 return
 
             self.set_watermarks(high=options['buffer_size'] * 4, low=options['buffer_size'] // 2)
-            await self._server['response'].write(data, rate=options['rate'], buffer_size=options['buffer_size'])
-            await self._server['response'].write(b'', throttle=False)
+            await self.response.write(data, rate=options['rate'], buffer_size=options['buffer_size'])
+            await self.response.write(b'', throttle=False)
 
-        await self._server['response'].send(None)
+        await self.response.send(None)
 
-    async def header_received(self, request, response):
-        self._server['request'] = request
-        self._server['response'] = response
-
+    async def header_received(self):
         if self._server['context']._on_connect is not None:
             await self._server['context']._on_connect
             self._server['context']._on_connect = None
@@ -240,15 +235,15 @@ class HTTPServer(HTTPProtocol):
             if not isinstance(options, dict):
                 return
 
-        if not request.is_valid:
+        if not self.request.is_valid:
             # bad request
             await self._handle_response(self._route_handlers[0][0][1], {**self._route_handlers[0][0][2], **options})
             return
 
-        if request.query_string != b'':
-            self._server['request'].query = parse_qs(request.query_string.decode(encoding='latin-1'))
+        if self.request.query_string != b'':
+            self.request.query = parse_qs(self.request.query_string.decode(encoding='latin-1'))
 
-        p = request.path.strip(b'/')
+        p = self.request.path.strip(b'/')
 
         if p == b'':
             ri = 1
@@ -257,7 +252,7 @@ class HTTPServer(HTTPProtocol):
 
         if ri in self._route_handlers:
             for (pattern, func, kwargs) in self._route_handlers[ri]:
-                m = pattern.search(request.url)
+                m = pattern.search(self.request.url)
 
                 if m:
                     await self._handle_continue()
@@ -267,13 +262,13 @@ class HTTPServer(HTTPProtocol):
                     if not matches:
                         matches = m.groups()
 
-                    self._server['request'].params['path'] = matches
+                    self.request.params['path'] = matches
 
                     await self._handle_response(func, {**kwargs, **options})
                     return
         else:
             for i, (pattern, func, kwargs) in enumerate(self._route_handlers[-1]):
-                m = pattern.search(request.url)
+                m = pattern.search(self.request.url)
 
                 if m:
                     if ri in self._route_handlers:
@@ -288,7 +283,7 @@ class HTTPServer(HTTPProtocol):
                     if not matches:
                         matches = m.groups()
 
-                    self._server['request'].params['path'] = matches
+                    self.request.params['path'] = matches
 
                     await self._handle_response(func, {**kwargs, **options})
                     del self._route_handlers[-1][i]
