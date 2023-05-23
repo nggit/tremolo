@@ -66,10 +66,11 @@ class HTTPProtocol(asyncio.Protocol):
         self._data = bytearray()
         self._waiters = {'request': self._loop.create_future()}
 
-        for task in (self._send_data(), self.set_timeout(self._waiters['request'],
-                                                         timeout=self._options['request_timeout'],
-                                                         timeout_cb=self.request_timeout)):
-            self.tasks.append(self._loop.create_task(task))
+        self.tasks.append(
+            self._loop.create_task(self.set_timeout(self._waiters['request'],
+                                                    timeout=self._options['request_timeout'],
+                                                    timeout_cb=self.request_timeout))
+        )
 
     async def request_timeout(self, timeout):
         self._options['logger'].info('request timeout after {:g}s'.format(timeout))
@@ -250,7 +251,11 @@ class HTTPProtocol(asyncio.Protocol):
 
             if -1 < header_size <= 8192:
                 self._transport.pause_reading()
-                self.tasks.append(self._loop.create_task(self._handle_request_header(self._data, header_size)))
+                self.tasks.extend([
+                    self._loop.create_task(self._send_data()),
+                    self._loop.create_task(self._handle_request_header(self._data, header_size))
+                ])
+
                 self._data = None
             elif header_size > 8192:
                 self._options['logger'].info('request header too large')
@@ -350,14 +355,19 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._waiters['keepalive'] = self._loop.create_future()
 
-        self.tasks.append(self._loop.create_task(self.set_timeout(self._waiters['keepalive'],
-                                                                  timeout=self._options['keepalive_timeout'],
-                                                                  timeout_cb=self.keepalive_timeout)))
+        self.tasks.append(
+            self._loop.create_task(self.set_timeout(self._waiters['keepalive'],
+                                                    timeout=self._options['keepalive_timeout'],
+                                                    timeout_cb=self.keepalive_timeout))
+        )
         self._transport.resume_reading()
 
     def connection_lost(self, exc):
         for task in self.tasks:
             if callable(task):
+                # even if you put callable objects in self.tasks,
+                # they will be executed when the client is disconnected.
+                # this is useful for the cleanup mechanism.
                 task()
                 continue
 
