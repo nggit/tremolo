@@ -261,6 +261,7 @@ class Tremolo:
                             server_name=server_name,
                             _pool=pool,
                             _app=options['app'],
+                            _root_path=options.get('root_path', ''),
                             _handlers=options['handlers'],
                             _middlewares=options['middlewares']), sock=sock, backlog=backlog, ssl=ssl_context)
 
@@ -332,6 +333,22 @@ class Tremolo:
         return sock
 
     def run(self, host=None, port=80, reuse_port=True, worker_num=1, **kwargs):
+        if 'app' in kwargs and not isinstance(kwargs['app'], str):
+            import __main__
+
+            if hasattr(__main__, '__file__'):
+                for attr_name in dir(__main__):
+                    if attr_name.startswith('__'):
+                        continue
+
+                    if getattr(__main__, attr_name) == kwargs['app']:
+                        break
+                else:
+                    attr_name = 'app'
+
+                kwargs['app'] = '{:s}:{:s}'.format(__main__.__file__,
+                                                   attr_name)
+
         if host is None:
             default_host = ''
         else:

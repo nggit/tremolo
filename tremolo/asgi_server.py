@@ -39,6 +39,7 @@ class ASGIServer(HTTPProtocol):
             'path': unquote(self.request.path.decode(encoding='utf-8'), encoding='utf-8'),
             'raw_path': self.request.path,
             'query_string': self.request.query_string,
+            'root_path': self.options['_root_path'],
             'headers': self.request.header.getheaders(),
             'client': self.request.transport.get_extra_info('peername'),
             'server': self.request.transport.get_extra_info('sockname')

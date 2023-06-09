@@ -42,11 +42,12 @@ for i in range(len(sys.argv)):
         print('  --request-timeout         Defaults to 30 (seconds)')
         print('  --keepalive-timeout       Defaults to 30 (seconds)')
         print('  --server-name             Set the "Server" field in the response header')
+        print('  --root-path               Set the ASGI root_path. Defaults to ""')
         print('  --help                    Show this help and exit')
         sys.exit()
     elif sys.argv[i - 1] in ('--debug', '--reuse-port'):
         options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = True
-    elif sys.argv[i - 1] in ('--host', '--log-level', '--server-name'):
+    elif sys.argv[i - 1] in ('--host', '--log-level', '--server-name', '--root-path'):
         options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = sys.argv[i]
     elif sys.argv[i - 1] in ('--port',
                              '--worker-num',
