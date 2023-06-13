@@ -239,7 +239,8 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def _receive_data(self, data, waiter):
         await waiter
-        await self.put_to_queue(data, queue=self._queue[0], transport=self._transport, rate=self._options['upload_rate'])
+        await self.put_to_queue(data, queue=self._queue[0], transport=self._transport,
+                                rate=self._options['upload_rate'], buffer_size=self._options['buffer_size'])
 
     def data_received(self, data):
         if not data:
