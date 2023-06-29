@@ -89,6 +89,12 @@ To see more available options:
 python3 -m tremolo --help
 ```
 
+It's also possible to run the ASGI server programmatically ([example with uvloop](https://github.com/nggit/tremolo/blob/master/example_uvloop.py)):
+
+```
+python3 example_uvloop.py
+```
+
 ## Benchmarking
 The first thing to note is that Tremolo is a pure Python server framework.
 
