@@ -4,6 +4,7 @@ import asyncio
 
 from .exceptions import LifespanError, LifespanProtocolUnsupported
 
+
 class ASGILifespan:
     def __init__(self, app, **kwargs):
         self._loop = kwargs['loop']
@@ -15,7 +16,9 @@ class ASGILifespan:
         }
 
         self._queue = asyncio.Queue()
-        self._task = self._loop.create_task(app(scope, self.receive, self.send))
+        self._task = self._loop.create_task(
+            app(scope, self.receive, self.send)
+        )
         self._complete = False
 
     def startup(self):
@@ -37,10 +40,12 @@ class ASGILifespan:
         return data
 
     async def send(self, data):
-        if data['type'] in ('lifespan.startup.complete', 'lifespan.shutdown.complete'):
+        if data['type'] in ('lifespan.startup.complete',
+                            'lifespan.shutdown.complete'):
             self._complete = True
             self._logger.info(data['type'])
-        elif data['type'] in ('lifespan.startup.failed', 'lifespan.shutdown.failed'):
+        elif data['type'] in ('lifespan.startup.failed',
+                              'lifespan.shutdown.failed'):
             if 'message' in data:
                 message = ': %s' % data['message']
             else:
@@ -61,14 +66,19 @@ class ASGILifespan:
                 if exc:
                     if isinstance(exc, LifespanError):
                         return exc
-                    elif isinstance(exc, LifespanProtocolUnsupported):
+
+                    if isinstance(exc, LifespanProtocolUnsupported):
                         self._logger.info(str(exc))
                     else:
-                        self._logger.info('%s: %s' % (LifespanProtocolUnsupported.message, str(exc)))
+                        self._logger.info('%s: %s' % (
+                                          LifespanProtocolUnsupported.message,
+                                          str(exc)))
 
                 return
             except asyncio.InvalidStateError:
                 await asyncio.sleep(1)
 
         if not self._complete:
-            self._logger.warning('lifespan: timeout after {:g}s'.format(timeout))
+            self._logger.warning(
+                'lifespan: timeout after {:g}s'.format(timeout)
+            )

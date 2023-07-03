@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, parse_qsl
 from .http_exception import BadRequest, PayloadTooLarge, RequestTimeout
 from .request import Request
 
+
 class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -66,7 +67,8 @@ class HTTPRequest(Request):
             if not self.body_size < self._content_length:
                 return
 
-        if self._content_length > self.protocol.options['client_max_body_size']:
+        if (self._content_length >
+                self.protocol.options['client_max_body_size']):
             raise PayloadTooLarge
 
         if self._transfer_encoding.find(b'chunked') > -1:
@@ -82,7 +84,9 @@ class HTTPRequest(Request):
                     except StopAsyncIteration:
                         if not buf.endswith(b'0\r\n\r\n'):
                             del buf[:]
-                            raise BadRequest('bad chunked encoding: incomplete read')
+                            raise BadRequest(
+                                'bad chunked encoding: incomplete read'
+                            )
 
                 if tobe_read > 0:
                     data = buf[:tobe_read]
@@ -103,7 +107,9 @@ class HTTPRequest(Request):
                     if i == -1:
                         if len(buf) > self.protocol.options['buffer_size'] * 4:
                             del buf[:]
-                            raise BadRequest('bad chunked encoding: no chunk size')
+                            raise BadRequest(
+                                'bad chunked encoding: no chunk size'
+                            )
 
                         paused = False
                         continue
@@ -192,11 +198,14 @@ class HTTPRequest(Request):
             if b'cookie' in self.headers:
                 if isinstance(self.headers[b'cookie'], list):
                     self._params['cookies'] = parse_qs(
-                        b'; '.join(self.headers[b'cookie']).replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+                        b'; '.join(self.headers[b'cookie'])
+                        .replace(b'; ', b'&').replace(b';', b'&')
+                        .decode('latin-1')
                     )
                 else:
                     self._params['cookies'] = parse_qs(
-                        self.headers[b'cookie'].replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+                        self.headers[b'cookie'].replace(b'; ', b'&')
+                        .replace(b';', b'&').decode('latin-1')
                     )
 
             return self._params['cookies']
@@ -207,7 +216,8 @@ class HTTPRequest(Request):
         except KeyError:
             self._params['post'] = {}
 
-            if self._content_type.find(b'application/x-www-form-urlencoded') > -1:
+            if self._content_type.find(
+                    b'application/x-www-form-urlencoded') > -1:
                 async for data in self.read():
                     self.append_body(data)
 
@@ -215,17 +225,20 @@ class HTTPRequest(Request):
                         break
 
                 if 2 < self.body_size <= limit:
-                    self._params['post'] = parse_qs(self._body.decode(encoding='latin-1'))
+                    self._params['post'] = parse_qs(
+                        self._body.decode('latin-1')
+                    )
 
             return self._params['post']
 
     async def files(self):
         ct = parse_qs(
-            self._content_type.replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')
+            self._content_type.replace(b'; ', b'&').replace(b';', b'&')
+            .decode('latin-1')
         )
 
         try:
-            boundary = ct['boundary'][-1].encode(encoding='latin-1')
+            boundary = ct['boundary'][-1].encode('latin-1')
         except KeyError:
             raise BadRequest('missing boundary')
 
@@ -264,12 +277,18 @@ class HTTPRequest(Request):
                     body = header[header_size + 4:]
                     info = {}
 
-                    if header_size <= 8192 and header.startswith(b'--%s\r\n' % boundary):
-                        header = self.header.parse(header, header_size=header_size).getheaders()
+                    if header_size <= 8192 and header.startswith(
+                            b'--%s\r\n' % boundary):
+                        header = self.header.parse(
+                            header,
+                            header_size=header_size
+                        ).getheaders()
 
                         if b'content-disposition' in header:
-                            for k, v in parse_qsl(header[b'content-disposition']
-                                    .replace(b'; ', b'&').replace(b';', b'&').decode(encoding='latin-1')):
+                            for k, v in parse_qsl(
+                                    header[b'content-disposition']
+                                    .replace(b'; ', b'&').replace(b';', b'&')
+                                    .decode('latin-1')):
                                 info[k] = v.strip('"')
 
                         if b'content-length' in header:
@@ -277,7 +296,7 @@ class HTTPRequest(Request):
                             info['length'] = content_length
 
                         if b'content-type' in header:
-                            info['type'] = header[b'content-type'].decode(encoding='latin-1')
+                            info['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
                     else:
                         header = {}
 

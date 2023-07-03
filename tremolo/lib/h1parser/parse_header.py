@@ -1,5 +1,6 @@
 # Copyright (c) 2023 nggit
 
+
 class Headers(dict):
     def getlist(self, name):
         values = self.get(name, [])
@@ -13,6 +14,7 @@ class Headers(dict):
             return result
 
         return values.replace(b', ', b',').split(b',')
+
 
 class ParseHeader:
     def __init__(self, data=bytearray(), **kwargs):
@@ -66,7 +68,8 @@ class ParseHeader:
                 if value.startswith(b' '):
                     value = value[1:]
 
-                if name_lc in self.headers and isinstance(self.headers[name_lc], list):
+                if name_lc in self.headers and isinstance(
+                        self.headers[name_lc], list):
                     self.headers[name_lc].append(value)
                 else:
                     if name_lc in self.headers:
@@ -81,7 +84,12 @@ class ParseHeader:
                     self.is_response = True
 
                     try:
-                        _, self.headers[b'_version'], _status, self.headers[b'_message'] = line.replace(b'/', b' ').split(None, 3)
+                        (
+                            _,
+                            self.headers[b'_version'],
+                            _status,
+                            self.headers[b'_message']
+                        ) = line.replace(b'/', b' ').split(None, 3)
                         self.headers[b'_status'] = int(_status)
                         self.is_valid_response = True
                     except ValueError:
@@ -95,8 +103,11 @@ class ParseHeader:
                         self.is_request = True
 
                         try:
-                            self.headers[b'_method'], self.headers[b'_url'] = line[:url_end_pos].split(b' ', 1)
-                            self.headers[b'_version'] = line[url_end_pos + len(' HTTP/'):]
+                            (
+                                self.headers[b'_method'],
+                                self.headers[b'_url']
+                            ) = line[:url_end_pos].split(b' ', 1)
+                            self.headers[b'_version'] = line[url_end_pos + len(' HTTP/'):]  # noqa: E501
                             self.is_valid_request = True
                         except ValueError:
                             self.headers[b'_method'] = b''
@@ -112,7 +123,8 @@ class ParseHeader:
 
             start = end + 2
 
-        if self.is_valid_request and self.headers[b'_version'] == b'1.1' and b'host' not in self.headers:
+        if (self.is_valid_request and self.headers[b'_version'] == b'1.1' and
+                b'host' not in self.headers):
             self.headers[b'host'] = b''
             self.is_valid_request = False
 
@@ -158,5 +170,6 @@ class ParseHeader:
 
     def save(self):
         return bytearray(b'\r\n').join(
-                [self.headers.get(b'_line', b'')] + [bytearray(b': ').join(v) for v in self._headers]
-            ) + self._data[self._header_size:]
+            [self.headers.get(b'_line', b'')] +
+            [bytearray(b': ').join(v) for v in self._headers]
+        ) + self._data[self._header_size:]

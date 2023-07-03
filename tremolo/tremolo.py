@@ -2,24 +2,25 @@
 
 __all__ = ('Tremolo',)
 
-import asyncio
-import ipaddress
-import logging
-import multiprocessing as mp
-import os
-import re
-import socket
-import ssl
-import sys
-import time
+import asyncio  # noqa: E402
+import ipaddress  # noqa: E402
+import logging  # noqa: E402
+import multiprocessing as mp  # noqa: E402
+import os  # noqa: E402
+import re  # noqa: E402
+import socket  # noqa: E402
+import ssl  # noqa: E402
+import sys  # noqa: E402
+import time  # noqa: E402
 
-from copy import deepcopy
-from datetime import datetime
-from functools import wraps
-from importlib import import_module
+from copy import deepcopy  # noqa: E402
+from datetime import datetime  # noqa: E402
+from functools import wraps  # noqa: E402
+from importlib import import_module  # noqa: E402
 
-from .lib.object_pool import ObjectPool
-from .exceptions import BadRequest
+from .lib.object_pool import ObjectPool  # noqa: E402
+from .exceptions import BadRequest  # noqa: E402
+
 
 class Tremolo:
     def __init__(self):
@@ -31,7 +32,10 @@ class Tremolo:
                 (404, self._err_notfound, dict(status=(404, b'Not Found')))
             ],
             1: [
-                (b'^/+(?:\\?.*)?$', self._index, dict(status=(503, b'Service Unavailable')))
+                (
+                    b'^/+(?:\\?.*)?$',
+                    self._index, dict(status=(503, b'Service Unavailable'))
+                )
             ],
             -1: []
         }
@@ -48,6 +52,9 @@ class Tremolo:
             ],
             'request': []
         }
+
+        self._loop = None
+        self._logger = None
 
     def listen(self, port, host=None, **options):
         self._ports.append((host, port, options))
@@ -74,7 +81,9 @@ class Tremolo:
 
             for i, h in enumerate(self._route_handlers[0]):
                 if code == h[0]:
-                    self._route_handlers[0][i] = (h[0], wrapper, dict(h[2], **self.getoptions(func)))
+                    self._route_handlers[0][i] = (
+                        h[0], wrapper, dict(h[2], **self.getoptions(func))
+                    )
                     break
 
             return wrapper
@@ -129,45 +138,60 @@ class Tremolo:
 
     def _add_handler(self, path='/', func=None, kwargs={}):
         if path.startswith('^') or path.endswith('$'):
-            pattern = path.encode(encoding='latin-1')
+            pattern = path.encode('latin-1')
             self._route_handlers[-1].append((pattern, func, kwargs))
         else:
-            p = path.split('?', 1)[0].strip('/')
+            _path = path.split('?', 1)[0].strip('/')
 
-            if p == '':
-                ri = 1
+            if _path == '':
+                key = 1
                 pattern = self._route_handlers[1][0][0]
-                self._route_handlers[ri] = [(pattern, func, kwargs)]
+                self._route_handlers[key] = [(pattern, func, kwargs)]
             else:
-                ri = '{:d}#{:s}'.format(p.count('/') + 2, p[:(p + '/').find('/')]).encode(encoding='latin-1')
-                pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(p).encode(encoding='latin-1')
+                key = '{:d}#{:s}'.format(
+                    _path.count('/') + 2, _path[:(_path + '/').find('/')]
+                ).encode('latin-1')
+                pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(
+                    _path
+                ).encode('latin-1')
 
-                if ri in self._route_handlers:
-                    self._route_handlers[ri].append((pattern, func, kwargs))
+                if key in self._route_handlers:
+                    self._route_handlers[key].append((pattern, func, kwargs))
                 else:
-                    self._route_handlers[ri] = [(pattern, func, kwargs)]
+                    self._route_handlers[key] = [(pattern, func, kwargs)]
 
     def _compile_handlers(self, handlers={}):
-        for ri in handlers:
-            for i, h in enumerate(handlers[ri]):
+        for key in handlers:
+            for i, h in enumerate(handlers[key]):
                 pattern, *handler = h
 
                 if isinstance(pattern, bytes):
-                    handlers[ri][i] = (re.compile(pattern), *handler)
+                    handlers[key][i] = (re.compile(pattern), *handler)
 
-    async def _index(self, **server):
+    async def _index(self, **_):
         return b'Service Unavailable'
 
-    async def _err_badrequest(self, **server):
+    async def _err_badrequest(self, **_):
         raise BadRequest
 
     async def _err_notfound(self, **server):
-        yield b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" content="width=device-width, initial-scale=1.0" />'
-        yield b'<title>404 Not Found</title>'
-        yield b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; font-family: sans-serif; }</style></head><body>'
-        yield b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr /><address>%s</address></body></html>' % (
-            server['request'].path.replace(b'&', b'&amp;').replace(b'<', b'&lt;').replace(b'>', b'&gt;').replace(b'"', b'&quot;'),
-            server['context'].options['server_name'])
+        yield (
+            b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
+            b'content="width=device-width, initial-scale=1.0" />'
+            b'<title>404 Not Found</title>'
+            b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; '
+            b'font-family: sans-serif; }</style></head><body>'
+        )
+        yield (
+            b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr />'
+            b'<address>%s</address></body></html>') % (
+                (server['request'].path
+                 .replace(b'&', b'&amp;')
+                 .replace(b'<', b'&lt;')
+                 .replace(b'>', b'&gt;')
+                 .replace(b'"', b'&quot;')),
+                server['context'].options['server_name']
+        )
 
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
@@ -180,7 +204,8 @@ class Tremolo:
             fd = options['conn'].recv()
 
             try:
-                sock = socket.fromfd(fd, options['sa_family'], socket.SOCK_STREAM)
+                sock = socket.fromfd(fd, options['sa_family'],
+                                     socket.SOCK_STREAM)
                 sock.listen(backlog)
                 options['conn'].send(True)
             except Exception:
@@ -188,21 +213,24 @@ class Tremolo:
                 sock = options['conn'].recv()
                 sock.listen(backlog)
 
-        if 'ssl' in options and options['ssl'] and isinstance(options['ssl'], dict):
+        if ('ssl' in options and options['ssl'] and
+                isinstance(options['ssl'], dict)):
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_context.load_cert_chain(certfile=options['ssl'].get('cert', ''),
-                                        keyfile=options['ssl'].get('key'),
-                                        password=options['ssl'].get('password'))
+            ssl_context.load_cert_chain(
+                certfile=options['ssl'].get('cert', ''),
+                keyfile=options['ssl'].get('key'),
+                password=options['ssl'].get('password')
+            )
         else:
             ssl_context = None
 
         server_name = options.get('server_name', b'Tremolo')
 
         if isinstance(server_name, str):
-            server_name = server_name.encode(encoding='latin-1')
+            server_name = server_name.encode('latin-1')
 
         if isinstance(host, str):
-            host = host.encode(encoding='latin-1')
+            host = host.encode('latin-1')
 
         pool = ObjectPool(1024, self._logger)
         lifespan = None
@@ -228,13 +256,19 @@ class Tremolo:
 
             print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
             sys.stdout.flush()
-            sys.stdout.buffer.write(b'Starting %s as an ASGI server for: ' % server_name)
-            print(getattr(options['app'], '__name__', options['app'].__class__.__name__))
+            sys.stdout.buffer.write(
+                b'Starting %s as an ASGI server for: ' % server_name
+            )
+            print(
+                getattr(options['app'], '__name__',
+                        options['app'].__class__.__name__)
+            )
 
             if server_name != b'':
                 server_name = server_name + b' (ASGI)'
 
-            lifespan = ASGILifespan(options['app'], loop=self._loop, logger=self._logger)
+            lifespan = ASGILifespan(options['app'],
+                                    loop=self._loop, logger=self._logger)
 
             lifespan.startup()
             exc = await lifespan.exception()
@@ -248,26 +282,34 @@ class Tremolo:
             self._compile_handlers(options['handlers'])
 
         server = await self._loop.create_server(
-            lambda : Server(loop=self._loop,
-                            logger=self._logger,
-                            sock=sock,
-                            debug=options.get('debug', False),
-                            download_rate=options.get('download_rate', 1048576),
-                            upload_rate=options.get('upload_rate', 1048576),
-                            buffer_size=options.get('buffer_size', 16 * 1024),
-                            client_max_body_size=options.get('client_max_body_size', 2 * 1048576),
-                            request_timeout=options.get('request_timeout', 30),
-                            keepalive_timeout=options.get('keepalive_timeout', 30),
-                            server_name=server_name,
-                            _pool=pool,
-                            _app=options['app'],
-                            _root_path=options.get('root_path', ''),
-                            _handlers=options['handlers'],
-                            _middlewares=options['middlewares']), sock=sock, backlog=backlog, ssl=ssl_context)
+            lambda: Server(loop=self._loop,
+                           logger=self._logger,
+                           sock=sock,
+                           debug=options.get('debug', False),
+                           download_rate=options.get('download_rate', 1048576),
+                           upload_rate=options.get('upload_rate', 1048576),
+                           buffer_size=options.get('buffer_size', 16 * 1024),
+                           client_max_body_size=options.get(
+                               'client_max_body_size', 2 * 1048576
+                           ),
+                           request_timeout=options.get('request_timeout', 30),
+                           keepalive_timeout=options.get(
+                               'keepalive_timeout', 30
+                           ),
+                           server_name=server_name,
+                           _pool=pool,
+                           _app=options['app'],
+                           _root_path=options.get('root_path', ''),
+                           _handlers=options['handlers'],
+                           _middlewares=options['middlewares']),
+            sock=sock, backlog=backlog, ssl=ssl_context)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()
-        sys.stdout.buffer.write(b'%s (pid %d) is started at %s port %d' % (server_name, os.getpid(), host, port))
+        sys.stdout.buffer.write(
+            b'%s (pid %d) is started at %s port %d' % (
+                server_name, os.getpid(), host, port)
+        )
 
         if ssl_context is not None:
             sys.stdout.buffer.write(b' (https)')
@@ -299,10 +341,14 @@ class Tremolo:
 
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
-        self._logger.setLevel(getattr(logging, kwargs.get('log_level', 'DEBUG'), logging.DEBUG))
+        self._logger.setLevel(
+            getattr(logging, kwargs.get('log_level', 'DEBUG'), logging.DEBUG)
+        )
 
         handler = logging.StreamHandler()
-        formatter = logging.Formatter('[%(asctime)s] %(levelname)s: %(message)s')
+        formatter = logging.Formatter(
+            '[%(asctime)s] %(levelname)s: %(message)s'
+        )
 
         handler.setFormatter(formatter)
         self._logger.addHandler(handler)
@@ -317,16 +363,18 @@ class Tremolo:
 
     def _create_sock(self, host, port, reuse_port):
         try:
-            sock = socket.socket({4: socket.AF_INET,
-                                  6: socket.AF_INET6
-                                  }[ipaddress.ip_address(host).version], socket.SOCK_STREAM)
+            sock = socket.socket({
+                4: socket.AF_INET,
+                6: socket.AF_INET6
+            }[ipaddress.ip_address(host).version], socket.SOCK_STREAM)
         except ValueError:
             sock = socket.socket(type=socket.SOCK_STREAM)
 
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, {True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
-                                            False: socket.SO_REUSEADDR
-                                            }[reuse_port], 1)
+        sock.setsockopt(socket.SOL_SOCKET, {
+            True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
+            False: socket.SO_REUSEADDR
+        }[reuse_port], 1)
         sock.bind((host, port))
         sock.set_inheritable(True)
 
@@ -368,18 +416,22 @@ class Tremolo:
                 host = default_host
 
             args = (host, port)
-            socks[args] = self._create_sock(host, port, options.get('reuse_port', reuse_port))
+            socks[args] = self._create_sock(
+                host, port, options.get('reuse_port', reuse_port)
+            )
 
             for _ in range(options.get('worker_num', worker_num)):
                 parent_conn, child_conn = mp.Pipe()
 
                 p = mp.Process(
-                    target=self._worker, args=args, kwargs=dict(options,
-                                                                conn=child_conn,
-                                                                sa_family=socks[args].family,
-                                                                handlers=deepcopy(self._route_handlers),
-                                                                middlewares=self._middlewares)
-                    )
+                    target=self._worker,
+                    args=args,
+                    kwargs=dict(options,
+                                conn=child_conn,
+                                sa_family=socks[args].family,
+                                handlers=deepcopy(self._route_handlers),
+                                middlewares=self._middlewares)
+                )
 
                 p.start()
                 child_pid = parent_conn.recv()
@@ -403,12 +455,15 @@ class Tremolo:
                         parent_conn.close()
                         parent_conn, child_conn = mp.Pipe()
                         p = mp.Process(
-                            target=self._worker, args=args, kwargs=dict(options,
-                                                                        conn=child_conn,
-                                                                        sa_family=socks[args].family,
-                                                                        handlers=deepcopy(self._route_handlers),
-                                                                        middlewares=self._middlewares)
-                            )
+                            target=self._worker,
+                            args=args,
+                            kwargs=dict(options,
+                                        conn=child_conn,
+                                        sa_family=socks[args].family,
+                                        handlers=deepcopy(
+                                            self._route_handlers),
+                                        middlewares=self._middlewares)
+                        )
 
                         p.start()
                         pid = parent_conn.recv()

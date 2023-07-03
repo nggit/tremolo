@@ -2,6 +2,7 @@
 
 import asyncio
 
+
 class ObjectPool:
     def __init__(self, pool_size, logger):
         self._pool_size = pool_size
@@ -22,7 +23,10 @@ class ObjectPool:
         except IndexError:
             self._pool_size += 1
 
-            self._logger.info('limit exceeded. pool size has been adjusted to {:d}'.format(self._pool_size))
+            self._logger.info(
+                'limit exceeded. pool size has been adjusted to {:d}'
+                .format(self._pool_size)
+            )
             return self._create()
 
     def put(self, value):

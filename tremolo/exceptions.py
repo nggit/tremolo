@@ -17,11 +17,14 @@ from .lib.http_exception import (
     ServiceUnavailable
 )
 
+
 class ASGIException(TremoloException):
     message = 'ASGIException'
 
+
 class LifespanError(ASGIException):
     pass
+
 
 class LifespanProtocolUnsupported(ASGIException):
     message = 'ASGI Lifespan Protocol is not supported by your application'

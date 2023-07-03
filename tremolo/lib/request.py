@@ -1,5 +1,6 @@
 # Copyright (c) 2023 nggit
 
+
 class Request:
     def __init__(self, protocol):
         self._protocol = protocol
@@ -22,13 +23,17 @@ class Request:
         self._body_size = 0
 
     async def recv_timeout(self, timeout):
-        self._protocol.options['logger'].info('recv timeout after {:g}s'.format(timeout))
+        self._protocol.options['logger'].info(
+            'recv timeout after {:g}s'.format(timeout)
+        )
 
     async def recv(self):
         while self._protocol.queue[0] is not None:
             recv_waiter = self._protocol.loop.create_future()
-            self._protocol.loop.create_task(self._protocol.set_timeout(recv_waiter,
-                                                                       timeout_cb=self.recv_timeout))
+            self._protocol.loop.create_task(
+                self._protocol.set_timeout(recv_waiter,
+                                           timeout_cb=self.recv_timeout)
+            )
 
             data = await self._protocol.queue[0].get()
             self._protocol.queue[0].task_done()

@@ -4,6 +4,7 @@ from tremolo import Tremolo
 
 app = Tremolo()
 
+
 @app.route('/hello')
 async def hello_world(**server):
     return 'Hello world!', 'latin-1'
