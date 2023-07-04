@@ -78,12 +78,16 @@ def getcontents(
 
                 if (
                         response_header.lower().find(
-                            b'\r\ntransfer-encoding: chunked') == -1 and
-                        response_data[header_size + 4:] != b''
+                            b'\r\ntransfer-encoding: chunked') > -1 and
+                        response_data.endswith(b'\r\n0\r\n\r\n')
                         ):
                     break
 
-                if response_data.endswith(b'\r\n0\r\n\r\n'):
+                if (
+                        response_header.lower().find(
+                            b'\r\ncontent-length: %d' %
+                            (len(response_data) - header_size - 4)) > -1
+                        ):
                     break
 
         return response_header, response_data[header_size + 4:]
