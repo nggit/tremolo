@@ -182,16 +182,14 @@ class Tremolo:
             b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; '
             b'font-family: sans-serif; }</style></head><body>'
         )
-        yield (
-            b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr />'
-            b'<address>%s</address></body></html>') % (
-                (server['request'].path
-                 .replace(b'&', b'&amp;')
-                 .replace(b'<', b'&lt;')
-                 .replace(b'>', b'&gt;')
-                 .replace(b'"', b'&quot;')),
-                server['context'].options['server_name']
-        )
+        yield (b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr />'
+               b'<address>%s</address></body></html>') % (
+                  (server['request'].path
+                   .replace(b'&', b'&amp;')
+                   .replace(b'<', b'&lt;')
+                   .replace(b'>', b'&gt;')
+                   .replace(b'"', b'&quot;')),
+                  server['context'].options['server_name'])
 
     async def _serve(self, host, port, **options):
         options['conn'].send(os.getpid())
