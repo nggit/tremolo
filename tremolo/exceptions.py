@@ -1,6 +1,6 @@
 # Copyright (c) 2023 nggit
 
-from .lib.http_exception import (
+from .lib.http_exception import (  # noqa: F401
     TremoloException,
     HTTPException,
     BadRequest,

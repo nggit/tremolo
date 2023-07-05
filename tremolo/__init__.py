@@ -1,5 +1,5 @@
 from .tremolo import Tremolo
-from . import exceptions
+from . import exceptions  # noqa: F401
 
 
 def run(app, **options):

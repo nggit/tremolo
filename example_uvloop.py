@@ -4,6 +4,7 @@ import asyncio
 
 import tremolo
 
+
 async def app(scope, receive, send):
     assert scope['type'] == 'http'
 
