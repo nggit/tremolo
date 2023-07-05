@@ -70,9 +70,10 @@ class ASGILifespan:
                     if isinstance(exc, LifespanProtocolUnsupported):
                         self._logger.info(str(exc))
                     else:
-                        self._logger.info('%s: %s' % (
-                                          LifespanProtocolUnsupported.message,
-                                          str(exc)))
+                        self._logger.info(
+                            '%s: %s' % (LifespanProtocolUnsupported.message,
+                                        str(exc))
+                        )
 
                 return
             except asyncio.InvalidStateError:
