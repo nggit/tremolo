@@ -28,13 +28,13 @@ class Tremolo:
 
         self._route_handlers = {
             0: [
-                (400, self._err_badrequest, {}),
-                (404, self._err_notfound, dict(status=(404, b'Not Found')))
+                (400, self.error_400, {}),
+                (404, self.error_404, dict(status=(404, b'Not Found')))
             ],
             1: [
                 (
                     b'^/+(?:\\?.*)?$',
-                    self._index, dict(status=(503, b'Service Unavailable'))
+                    self.index, dict(status=(503, b'Service Unavailable'))
                 )
             ],
             -1: []
@@ -56,8 +56,19 @@ class Tremolo:
         self._loop = None
         self._logger = None
 
+    @property
+    def handlers(self):
+        return self._route_handlers
+
+    @property
+    def middlewares(self):
+        return self._middlewares
+
     def listen(self, port, host=None, **options):
-        self._ports.append((host, port, options))
+        if (host, port, options) not in self._ports:
+            self._ports.append((host, port, options))
+
+        return (host, port, options) in self._ports
 
     def route(self, path):
         if isinstance(path, int):
@@ -160,7 +171,7 @@ class Tremolo:
                 else:
                     self._route_handlers[key] = [(pattern, func, kwargs)]
 
-    def _compile_handlers(self, handlers={}):
+    def compile_handlers(self, handlers={}):
         for key in handlers:
             for i, h in enumerate(handlers[key]):
                 pattern, *handler = h
@@ -168,13 +179,13 @@ class Tremolo:
                 if isinstance(pattern, bytes):
                     handlers[key][i] = (re.compile(pattern), *handler)
 
-    async def _index(self, **_):
+    async def index(self, **_):
         return b'Service Unavailable'
 
-    async def _err_badrequest(self, **_):
+    async def error_400(self, **_):
         raise BadRequest
 
-    async def _err_notfound(self, **server):
+    async def error_404(self, **server):
         yield (
             b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
             b'content="width=device-width, initial-scale=1.0" />'
@@ -277,7 +288,7 @@ class Tremolo:
             from .http_server import HTTPServer as Server
 
             options['app'] = None
-            self._compile_handlers(options['handlers'])
+            self.compile_handlers(options['handlers'])
 
         server = await self._loop.create_server(
             lambda: Server(loop=self._loop,
@@ -359,7 +370,7 @@ class Tremolo:
         finally:
             self._loop.close()
 
-    def _create_sock(self, host, port, reuse_port):
+    def create_sock(self, host, port, reuse_port=True):
         try:
             sock = socket.socket({
                 4: socket.AF_INET,
@@ -414,7 +425,7 @@ class Tremolo:
                 host = default_host
 
             args = (host, port)
-            socks[args] = self._create_sock(
+            socks[args] = self.create_sock(
                 host, port, options.get('reuse_port', reuse_port)
             )
 
