@@ -24,7 +24,7 @@ from .exceptions import BadRequest  # noqa: E402
 
 class Tremolo:
     def __init__(self):
-        self._ports = []
+        self._ports = {}
 
         self._route_handlers = {
             0: [
@@ -64,11 +64,12 @@ class Tremolo:
     def middlewares(self):
         return self._middlewares
 
-    def listen(self, port, host=None, **options):
-        if (host, port, options) not in self._ports:
-            self._ports.append((host, port, options))
+    def listen(self, port, host=None, **options):            
+        if (host, port) in self._ports:
+            return False
 
-        return (host, port, options) in self._ports
+        self._ports[(host, port)] = options
+        return (host, port) in self._ports
 
     def route(self, path):
         if isinstance(path, int):
@@ -407,9 +408,8 @@ class Tremolo:
                                                    attr_name)
 
         if host is None:
-            default_host = ''
+            host = ''
         else:
-            default_host = host
             self.listen(port, host=host, **kwargs)
 
         try:
@@ -420,13 +420,13 @@ class Tremolo:
         processes = []
         socks = {}
 
-        for host, port, options in self._ports:
-            if host is None:
-                host = default_host
+        for (_host, _port), options in self._ports.items():
+            if _host is None:
+                _host = host
 
-            args = (host, port)
+            args = (_host, _port)
             socks[args] = self.create_sock(
-                host, port, options.get('reuse_port', reuse_port)
+                _host, _port, options.get('reuse_port', reuse_port)
             )
 
             for _ in range(options.get('worker_num', worker_num)):
