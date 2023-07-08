@@ -64,7 +64,7 @@ class Tremolo:
     def middlewares(self):
         return self._middlewares
 
-    def listen(self, port, host=None, **options):            
+    def listen(self, port, host=None, **options):
         if (host, port) in self._ports:
             return False
 
