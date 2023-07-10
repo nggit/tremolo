@@ -1,8 +1,25 @@
-__all__ = ('getcontents', 'chunked_detected',
-           'valid_chunked', 'create_dummy_body')
+__all__ = ('function', 'getcontents', 'chunked_detected',
+           'valid_chunked', 'create_dummy_body', 'logger')
 
+import asyncio  # noqa: E402
+import logging  # noqa: E402
 import socket  # noqa: E402
 import time  # noqa: E402
+
+from functools import wraps  # noqa: E402
+
+
+def function(coro):
+    @wraps(coro)
+    def wrapper(*args, **kwargs):
+        loop = asyncio.new_event_loop()
+
+        try:
+            return loop.run_until_complete(coro(*args, **kwargs))
+        finally:
+            loop.close()
+
+    return wrapper
 
 
 # a simple HTTP client for tests
@@ -124,3 +141,15 @@ def create_dummy_body(size, chunk_size=0):
         result.extend(b'%X\r\n%s\r\n' % (len(chunk), chunk))
 
     return result + b'0\r\n\r\n'
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    '[%(asctime)s] %(levelname)s: %(message)s'
+)
+
+handler.setFormatter(formatter)
+logger.addHandler(handler)
