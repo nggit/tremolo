@@ -138,6 +138,9 @@ def create_dummy_data(size, head=b'BEGIN', tail=b'END'):
 
 
 def create_chunked_body(data, chunk_size=16384):
+    if isinstance(data, bytes):
+        data = bytearray(data)
+
     body = bytearray()
 
     while data != b'':

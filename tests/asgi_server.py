@@ -40,10 +40,12 @@ async def app(scope, receive, send):
         more_body = data.get('more_body', False)
 
     headers = [
-        (b'content-type', b'text/plain')
+        (b'content-type', b'text/plain'),
+        [b'x-debug', b'usinglist'],
+        (b'server', b'cannotbechanged')
     ]
 
-    if scope['path'] == '/download':
+    if scope['path'].startswith('/download'):
         headers.append((b'content-length', b'%d' % os.stat(TEST_FILE).st_size))
 
         await send({
@@ -59,6 +61,14 @@ async def app(scope, receive, send):
             })
 
         return
+
+    if scope['path'].startswith('/foo'):
+        # make sure the scope['path'] value is a decoded version of
+        # /foo%0D%0Abar%3A%20baz
+        assert scope['path'] == '/foo\r\nbar: baz'
+
+        # a response splitting attempt
+        headers.append((b'referer', scope['path'].encode('utf-8')))
 
     await send({
         'type': 'http.response.start',

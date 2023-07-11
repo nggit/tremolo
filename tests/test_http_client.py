@@ -189,7 +189,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 413 Payload Too Large')
-        self.assertEqual(body, b'Payload Too Large')
+        self.assertTrue(b'Payload Too Large' in body)
 
     def test_continue(self):
         header, body = getcontents(
@@ -216,7 +216,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 417 Expectation Failed')
-        self.assertEqual(body, b'Expectation Failed')
+        self.assertTrue(b'Expectation Failed' in body)
 
     def test_get_notfound_10(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -484,7 +484,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad range')
+        self.assertTrue(b'bad range' in body)
 
     def test_badrange1(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -499,7 +499,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad range')
+        self.assertTrue(b'bad range' in body)
 
     def test_badrange2(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -511,7 +511,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad range')
+        self.assertTrue(b'bad range' in body)
 
     def test_rangenotsatisfiable(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -523,7 +523,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertEqual(body, b'Range Not Satisfiable')
+        self.assertTrue(b'Range Not Satisfiable' in body)
 
     def test_rangenotsatisfiable1(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -535,7 +535,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertEqual(body, b'Range Not Satisfiable')
+        self.assertTrue(b'Range Not Satisfiable' in body)
 
     def test_rangenotsatisfiable2(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -547,7 +547,7 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertEqual(body, b'Range Not Satisfiable')
+        self.assertTrue(b'Range Not Satisfiable' in body)
 
     def test_rangenotsatisfiable3(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -559,7 +559,19 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertEqual(body, b'Range Not Satisfiable')
+        self.assertTrue(b'Range Not Satisfiable' in body)
+
+    def test_get_doublehost(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /gethost HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Host: host.local\r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(body,
+                         create_chunked_body(b'localhost:%d' % HTTP_PORT))
 
 
 if __name__ == '__main__':

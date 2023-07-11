@@ -56,6 +56,11 @@ async def my_send_middleware(**server):
         print()
 
 
+@app.route('/gethost')
+async def get_host(**server):
+    return server['request'].host
+
+
 @app.route(r'^/page/(?P<page_id>\d+)')
 async def my_page(**server):
     request = server['request']

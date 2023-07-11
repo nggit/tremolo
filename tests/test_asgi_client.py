@@ -46,7 +46,7 @@ class TestASGIClient(unittest.TestCase):
         )
         self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertFalse(chunked_detected(header))
-        self.assertEqual(body, b'Hello world!')
+        self.assertTrue(b'Hello world!' in body)
 
     def test_get_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -107,6 +107,7 @@ class TestASGIClient(unittest.TestCase):
                                    version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
+        self.assertFalse(chunked_detected(header))
         self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
             (b'\r\ncontent-length: %d' % os.stat(TEST_FILE).st_size) in header
@@ -123,6 +124,20 @@ class TestASGIClient(unittest.TestCase):
         self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
             (b'\r\ncontent-length: %d' % os.stat(TEST_FILE).st_size) in header
+        )
+
+    def test_response_splitting(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=ASGI_PORT,
+                                   method='GET',
+                                   url='/foo%0D%0Abar%3A%20baz',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+        self.assertTrue(b'\r\nContent-Type: text/html' in header)
+        self.assertTrue(
+            b'name or value cannot contain illegal characters' in body
         )
 
 
