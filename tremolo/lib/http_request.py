@@ -71,7 +71,7 @@ class HTTPRequest(Request):
                 self.protocol.options['client_max_body_size']):
             raise PayloadTooLarge
 
-        if self._transfer_encoding.find(b'chunked') > -1:
+        if b'chunked' in self._transfer_encoding:
             buf = bytearray()
             agen = self.recv()
             paused = False
@@ -216,8 +216,8 @@ class HTTPRequest(Request):
         except KeyError:
             self._params['post'] = {}
 
-            if self._content_type.lower().find(
-                    b'application/x-www-form-urlencoded') > -1:
+            if (b'application/x-www-form-urlencoded' in
+                    self._content_type.lower()):
                 async for data in self.read():
                     self.append_body(data)
 

@@ -44,7 +44,7 @@ class TestASGIClient(unittest.TestCase):
             header[:header.find(b'\r\n')],
             b'HTTP/1.0 200 OK'
         )
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertFalse(chunked_detected(header))
         self.assertEqual(body, b'Hello world!')
 
@@ -107,10 +107,9 @@ class TestASGIClient(unittest.TestCase):
                                    version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
-            header.find(b'\r\ncontent-length: %d' %
-                        os.stat(TEST_FILE).st_size) > 0
+            (b'\r\ncontent-length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
     def test_download_11(self):
@@ -121,10 +120,9 @@ class TestASGIClient(unittest.TestCase):
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
-            header.find(b'\r\ncontent-length: %d' %
-                        os.stat(TEST_FILE).st_size) > 0
+            (b'\r\ncontent-length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
 

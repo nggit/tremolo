@@ -120,8 +120,7 @@ class ASGIServer(HTTPProtocol):
 
                 if 'headers' in data:
                     for header in data['headers']:
-                        if not (header[0].find(b'\n') == -1 and
-                                header[1].find(b'\n') == -1):
+                        if b'\n' in header[0] or b'\n' in header[1]:
                             await self.handle_exception(
                                 InternalServerError(
                                     'name or value cannot contain '

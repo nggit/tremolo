@@ -63,8 +63,8 @@ class TestHTTPClient(unittest.TestCase):
             b'HTTP/1.0 503 Service Unavailable'
         )
         self.assertFalse(chunked_detected(header))
-        self.assertTrue(header.find(b'\r\nX-Foo: bar') > -1 and
-                        header.find(b'Set-Cookie: sess=www') > -1)
+        self.assertTrue(b'\r\nX-Foo: bar' in header and
+                        b'Set-Cookie: sess=www' in header)
 
     def test_get_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -350,11 +350,10 @@ class TestHTTPClient(unittest.TestCase):
                                    version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
-        self.assertEqual(header.find(b'\r\nAccept-Ranges:'), -1)
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertFalse(b'\r\nAccept-Ranges:' in header)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
-            header.find(b'\r\nContent-Length: %d' %
-                        os.stat(TEST_FILE).st_size) > 0
+            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
     def test_download_11(self):
@@ -365,11 +364,10 @@ class TestHTTPClient(unittest.TestCase):
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(header.find(b'\r\nAccept-Ranges: bytes') > 0)
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(b'\r\nAccept-Ranges: bytes' in header)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
-            header.find(b'\r\nContent-Length: %d' %
-                        os.stat(TEST_FILE).st_size) > 0
+            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
     def test_notmodified(self):
@@ -384,9 +382,9 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 304 Not Modified')
-        self.assertEqual(header.find(b'\r\nAccept-Ranges:'), -1)
-        self.assertEqual(header.find(b'\r\nContent-Type:'), -1)
-        self.assertEqual(header.find(b'\r\nContent-Length:'), -1)
+        self.assertFalse(b'\r\nAccept-Ranges:' in header)
+        self.assertFalse(b'\r\nContent-Type:' in header)
+        self.assertFalse(b'\r\nContent-Length:' in header)
 
     def test_range_ok(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -400,11 +398,10 @@ class TestHTTPClient(unittest.TestCase):
                                    ])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(header.find(b'\r\nAccept-Ranges: bytes') > 0)
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
+        self.assertTrue(b'\r\nAccept-Ranges: bytes' in header)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
-            header.find(b'\r\nContent-Length: %d' %
-                        os.stat(TEST_FILE).st_size) > 0
+            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
     def test_download_range(self):
@@ -423,8 +420,8 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 206 Partial Content')
         self.assertEqual(body, b'python3')
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
-        self.assertTrue(header.find(b'\r\nContent-Length: 7') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
+        self.assertTrue(b'\r\nContent-Length: 7' in header)
 
     def test_download_range_start(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -440,8 +437,8 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 206 Partial Content')
         self.assertEqual(body.strip(b'# \r\n'), b'END')
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
-        self.assertTrue(header.find(b'\r\nContent-Length: 5') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
+        self.assertTrue(b'\r\nContent-Length: 5' in header)
 
     def test_download_range_end(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -454,8 +451,8 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 206 Partial Content')
         self.assertEqual(body.strip(b'# \r\n'), b'END')
-        self.assertTrue(header.find(b'\r\nContent-Type: text/plain') > 0)
-        self.assertTrue(header.find(b'\r\nContent-Length: 5') > 0)
+        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
+        self.assertTrue(b'\r\nContent-Length: 5' in header)
 
     def test_download_range_multipart(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -467,13 +464,13 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 206 Partial Content')
-        self.assertEqual(header.find(b'\r\nContent-Length:'), -1)
+        self.assertFalse(b'\r\nContent-Length:' in header)
         self.assertEqual(body.count(b'\r\nContent-Range: bytes 2-2/'), 2)
         self.assertEqual(body.count(b'\r\n------Boundary'), 3)
         self.assertEqual(body[-11:], b'--\r\n\r\n0\r\n\r\n')
         self.assertTrue(
-            header.find(b'\r\nContent-Type: multipart/byteranges; '
-                        b'boundary=----Boundary') > 0
+            (b'\r\nContent-Type: multipart/byteranges; '
+             b'boundary=----Boundary') in header
         )
         self.assertTrue(valid_chunked(body))
 

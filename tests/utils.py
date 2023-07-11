@@ -84,16 +84,16 @@ def getcontents(
                     break
 
                 if (
-                        response_header.lower().find(
-                            b'\r\ntransfer-encoding: chunked') > -1 and
+                        b'\r\ntransfer-encoding: chunked' in
+                        response_header.lower() and
                         response_data.endswith(b'\r\n0\r\n\r\n')
                         ):
                     break
 
                 if (
-                        response_header.lower().find(
-                            b'\r\ncontent-length: %d' %
-                            (len(response_data) - header_size - 4)) > -1
+                        (b'\r\ncontent-length: %d' %
+                            (len(response_data) - header_size - 4)) in
+                        response_header.lower()
                         ):
                     break
 
@@ -101,7 +101,7 @@ def getcontents(
 
 
 def chunked_detected(header):
-    return header.lower().find(b'\r\ntransfer-encoding: chunked') > -1
+    return b'\r\ntransfer-encoding: chunked' in header.lower()
 
 
 def valid_chunked(body):
