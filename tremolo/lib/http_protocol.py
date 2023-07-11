@@ -236,7 +236,8 @@ class HTTPProtocol(asyncio.Protocol):
                     b'content-length' in self._request.headers):
                 # assuming a request with a body, such as POST
                 if b'content-type' in self._request.headers:
-                    self._request.content_type = self._request.headers[b'content-type'].lower()  # noqa: E501
+                    # don't lower() content-type, as it may contain a boundary
+                    self._request.content_type = self._request.headers[b'content-type']  # noqa: E501
 
                 if b'transfer-encoding' in self._request.headers:
                     if self._request.version == b'1.0':

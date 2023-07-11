@@ -1,6 +1,6 @@
-__all__ = ('function', 'getcontents',
-           'chunked_detected', 'valid_chunked',
-           'create_dummy_data', 'create_dummy_body', 'logger')
+__all__ = ('function', 'getcontents', 'chunked_detected', 'valid_chunked',
+           'create_dummy_data', 'create_chunked_body', 'create_dummy_body',
+           'create_multipart_body', 'logger')
 
 import asyncio  # noqa: E402
 import logging  # noqa: E402
@@ -137,21 +137,39 @@ def create_dummy_data(size, head=b'BEGIN', tail=b'END'):
     ) + bytearray(tail)
 
 
+def create_chunked_body(data, chunk_size=16384):
+    body = bytearray()
+
+    while data != b'':
+        chunk = data[:chunk_size]
+
+        body.extend(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+        del data[:chunk_size]
+
+    return body + b'0\r\n\r\n'
+
+
 def create_dummy_body(size, chunk_size=0):
     data = create_dummy_data(size)
 
     if chunk_size <= 1:
         return data
 
-    result = bytearray()
+    return create_chunked_body(data, chunk_size)
 
-    for _ in range(max(len(data) // chunk_size, 1)):
-        chunk = data[:chunk_size]
 
-        result.extend(b'%X\r\n%s\r\n' % (len(chunk), chunk))
-        del data[:chunk_size]
+def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
+    body = bytearray()
 
-    return result + b'0\r\n\r\n'
+    for name, data in parts.items():
+        body.extend(b'--%s\r\nContent-Length: %d\r\n' % (boundary, len(data)))
+        body.extend(b'Content-Disposition: form-data; name="%s"\r\n' %
+                    name.encode('latin-1'))
+        body.extend(
+            b'Content-Type: application/octet-stream\r\n\r\n%s\r\n' % data
+        )
+
+    return body + bytearray(b'--%s--\r\n' % boundary)
 
 
 logger = logging.getLogger(__name__)

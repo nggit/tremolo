@@ -22,7 +22,10 @@ from tests.utils import (  # noqa: E402
     getcontents,
     chunked_detected,
     valid_chunked,
-    create_dummy_body
+    create_dummy_data,
+    create_chunked_body,
+    create_dummy_body,
+    create_multipart_body
 )
 
 
@@ -137,6 +140,27 @@ class TestHTTPClient(unittest.TestCase):
             raw=b'POST /upload2 HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(64 * 1024, chunk_size=4096))
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+
+        if chunked_detected(header):
+            self.assertTrue(valid_chunked(body))
+
+    def test_post_upload4_ok_11(self):
+        boundary = b'----MultipartBoundary'
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /upload4 HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Content-Type: multipart/form-data; boundary=%s\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
+                    HTTP_PORT,
+                    boundary,
+                    create_chunked_body(create_multipart_body(
+                        boundary,
+                        file1=create_dummy_data(4096),
+                        file2=create_dummy_data(65536))))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')

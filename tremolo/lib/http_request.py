@@ -216,7 +216,7 @@ class HTTPRequest(Request):
         except KeyError:
             self._params['post'] = {}
 
-            if self._content_type.find(
+            if self._content_type.lower().find(
                     b'application/x-www-form-urlencoded') > -1:
                 async for data in self.read():
                     self.append_body(data)
@@ -282,7 +282,7 @@ class HTTPRequest(Request):
                         header = self.header.parse(
                             header,
                             header_size=header_size
-                        ).getheaders()
+                        ).headers
 
                         if b'content-disposition' in header:
                             for k, v in parse_qsl(

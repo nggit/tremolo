@@ -118,6 +118,20 @@ async def upload3_payloadtoolarge(**server):
     return 'OK'
 
 
+@app.route('/upload4')
+async def upload4_ok(**server):
+    async for info, data in server['request'].files():
+        assert 'name' in info
+        assert 'length' in info
+        assert 'type' in info
+        assert data[:5] == b'BEGIN'
+        assert data[-3:] == b'END'
+
+        print(info, data[-12:])
+
+    return 'OK'
+
+
 @app.route('/download')
 async def download(**server):
     await server['response'].sendfile(TEST_FILE, content_type=b'text/plain')
