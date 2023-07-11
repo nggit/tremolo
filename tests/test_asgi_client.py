@@ -23,7 +23,7 @@ from tests.utils import (  # noqa: E402
 )
 
 
-class TestHTTPClient(unittest.TestCase):
+class TestASGIClient(unittest.TestCase):
     def setUp(self):
         try:
             sys.modules['__main__'].tests_run += 1

@@ -1,5 +1,6 @@
-__all__ = ('function', 'getcontents', 'chunked_detected',
-           'valid_chunked', 'create_dummy_body', 'logger')
+__all__ = ('function', 'getcontents',
+           'chunked_detected', 'valid_chunked',
+           'create_dummy_data', 'create_dummy_body', 'logger')
 
 import asyncio  # noqa: E402
 import logging  # noqa: E402
@@ -128,17 +129,27 @@ def valid_chunked(body):
     return True
 
 
+def create_dummy_data(size, head=b'BEGIN', tail=b'END'):
+    data = bytearray([255 - byte for byte in (head + tail)])
+
+    return bytearray(head) + (
+        data * (max((size - len(head + tail)) // len(data), 1))
+    ) + bytearray(tail)
+
+
 def create_dummy_body(size, chunk_size=0):
-    data = bytearray(size)
+    data = create_dummy_data(size)
 
     if chunk_size <= 1:
         return data
 
     result = bytearray()
 
-    for _ in range(len(data) // chunk_size):
+    for _ in range(max(len(data) // chunk_size, 1)):
         chunk = data[:chunk_size]
+
         result.extend(b'%X\r\n%s\r\n' % (len(chunk), chunk))
+        del data[:chunk_size]
 
     return result + b'0\r\n\r\n'
 

@@ -207,7 +207,8 @@ class HTTPProtocol(asyncio.Protocol):
                 data)
         )
 
-        self._response.close()
+        if self._response is not None:
+            self._response.close()
 
     async def _handle_request_header(self, data, header_size):
         header = ParseHeader(data,
