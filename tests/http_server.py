@@ -133,6 +133,7 @@ async def upload_multipart(**server):
     server['response'].set_content_type(b'text/csv')
     yield b'name,length,type,data\r\n'
 
+    # stream multipart file upload then send it back as csv
     async for info, data in server['request'].files():
         yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
                                     info['length'],

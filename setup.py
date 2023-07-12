@@ -15,7 +15,7 @@ setup(
     name='tremolo',
     packages=['tremolo'],
     package_data={'': ['lib/*', 'lib/h1parser/*']},
-    version='0.0.99',
+    version='0.0.100',
     license='MIT',
     author='nggit',
     author_email='contact@anggit.com',

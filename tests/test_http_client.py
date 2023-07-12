@@ -191,7 +191,7 @@ class TestHTTPClient(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(64 * 1024, chunk_size=4096))
+                    HTTP_PORT, create_dummy_body(65536, chunk_size=4096))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
