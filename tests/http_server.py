@@ -13,7 +13,6 @@ sys.path.insert(
 
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
-from tests.utils import create_dummy_body  # noqa: E402
 
 HTTP_HOST = 'localhost'
 HTTP_PORT = 28000
@@ -36,7 +35,7 @@ async def my_request_middleware(**server):
 
         return b'Request method %s is not supported!' % request.method
 
-    # test response object
+    # these should appear in the next middlewares or handlers
     response.set_header('X-Foo', 'bar')
     response.set_cookie('sess', 'www')
 
@@ -52,89 +51,93 @@ async def my_send_middleware(**server):
 
         assert data + b'------------------' == b''.join(response.header)
 
-        sys.stdout.buffer.write(b''.join(response.header))
-        print()
+        # sys.stdout.buffer.write(b''.join(response.header))
+        # print()
+
+
+@app.route('/getheaderline')
+async def get_headerline(**server):
+    request = server['request']
+
+    assert (b'%s?%s' % (request.path, request.query_string)) == request.url
+
+    # b'GET /getheaderline HTTP/1.1'
+    return b'%s %s HTTP/%s' % (
+        request.method,
+        request.url,
+        request.version
+    )
 
 
 @app.route('/gethost')
 async def get_host(**server):
+    # b'localhost:28000'
     return server['request'].host
 
 
-@app.route(r'^/page/(?P<page_id>\d+)')
-async def my_page(**server):
+@app.route('/getquery')
+async def get_query(**server):
     request = server['request']
-    page_id = request.params['path'].get('page_id')
-
-    assert page_id is not None, 'empty page_id'
-
-    if page_id == b'101':
-        assert request.headers.get(b'cookie') == [b'a=123', b'a=xxx, yyy']
-        assert request.headers.getlist(b'cookie') == [b'a=123',
-                                                      b'a=xxx',
-                                                      b'yyy']
-        assert request.cookies['a'] == ['123', 'xxx, yyy']
-
-    elif page_id == b'102':
-        assert request.headers.get(b'cookie') is None
-        assert request.headers.getlist(b'cookie') == []
-        await request.form()
-        assert request.params['post']['username'] == ['myuser']
-        assert request.params['post']['password'] == ['mypass']
 
     assert request.query['a'] == ['111', 'xyz']
     assert request.query['b'] == ['222']
 
-    # test request object
-    print('  ROUTE:',          r'^/page/(?P<page_id>\d+)')
-    print('  HTTP_HTTP_HOST:',      request.host)
-    print('  REQUEST_METHOD:', request.method)
-    print('  REQUEST_URI:',    request.url)
-    print('  PARAMS:',         request.params)
-    print('  PATH:',           request.path)
-    print('  QUERY:',          request.query)
-    print('  QUERY_STRING:',   request.query_string)
-    print('  COOKIES:',        request.cookies)
-    print('  VERSION:',        request.version)
+    data = []
 
-    # test logger
-    server['logger'].info(b'You are on page %s' % page_id)
-    yield b'You are on page ' + page_id
+    for name, value in request.query.items():
+        data.append('{:s}={:s}'.format(name, value[0]))
+
+    # b'a=111&b=222'
+    return '&'.join(data)
+
+
+@app.route(r'^/page/(?P<page_id>\d+)')
+async def get_page(**server):
+    # b'101'
+    return server['request'].params['path'].get('page_id')
+
+
+@app.route('/getcookies')
+async def get_cookies(**server):
+    request = server['request']
+
+    assert request.headers.get(b'cookie') == [b'a=123', b'a=xxx, yyy']
+    assert request.cookies['a'] == ['123', 'xxx, yyy']
+
+    # b'a=123, a=xxx, yyy'
+    return b', '.join(request.headers.getlist(b'cookie'))
+
+
+@app.route('/submitform')
+async def post_form(**server):
+    request = server['request']
+
+    await request.form()
+
+    data = []
+
+    for name, value in request.params['post'].items():
+        data.append('{:s}={:s}'.format(name, value[0]))
+
+    # b'user=myuser&pass=mypass'
+    return '&'.join(data)
 
 
 @app.route('/upload')
-async def upload_ok(**server):
-    assert await server['request'].body() == create_dummy_body(8192)
-
-    return 'OK'
+async def upload(content_type=b'application/octet-stream', **server):
+    return await server['request'].body()
 
 
-@app.route('/upload2')
-async def upload2_ok(**server):
-    assert await server['request'].body() == create_dummy_body(64 * 1024)
+@app.route('/upload/multipart')
+async def upload_multipart(**server):
+    server['response'].set_content_type(b'text/csv')
+    yield b'name,length,type,data\r\n'
 
-    return 'OK'
-
-
-@app.route('/upload3')
-async def upload3_payloadtoolarge(**server):
-    await server['request'].body()
-
-    return 'OK'
-
-
-@app.route('/upload4')
-async def upload4_ok(**server):
     async for info, data in server['request'].files():
-        assert 'name' in info
-        assert 'length' in info
-        assert 'type' in info
-        assert data[:5] == b'BEGIN'
-        assert data[-3:] == b'END'
-
-        print(info, data[-12:])
-
-    return 'OK'
+        yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
+                                    info['length'],
+                                    info['type'].encode(),
+                                    (data[:5] + data[-3:]))
 
 
 @app.route('/download')

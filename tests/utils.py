@@ -1,6 +1,6 @@
-__all__ = ('function', 'getcontents', 'chunked_detected', 'valid_chunked',
-           'create_dummy_data', 'create_chunked_body', 'create_dummy_body',
-           'create_multipart_body', 'logger')
+__all__ = ('function', 'getcontents', 'chunked_detected', 'read_chunked',
+           'valid_chunked', 'create_dummy_data', 'create_chunked_body',
+           'create_dummy_body', 'create_multipart_body', 'logger')
 
 import asyncio  # noqa: E402
 import logging  # noqa: E402
@@ -91,7 +91,7 @@ def getcontents(
                     break
 
                 if (
-                        (b'\r\ncontent-length: %d' %
+                        (b'\r\ncontent-length: %d\r\n' %
                             (len(response_data) - header_size - 4)) in
                         response_header.lower()
                         ):
@@ -104,29 +104,36 @@ def chunked_detected(header):
     return b'\r\ntransfer-encoding: chunked' in header.lower()
 
 
-def valid_chunked(body):
-    if not body.endswith(b'\r\n0\r\n\r\n'):
+def read_chunked(data):
+    if not data.endswith(b'\r\n0\r\n\r\n'):
         return False
 
-    while body != b'0\r\n\r\n':
-        i = body.find(b'\r\n')
+    body = bytearray()
+
+    while data != b'0\r\n\r\n':
+        i = data.find(b'\r\n')
 
         if i == -1:
             return False
 
         try:
-            chunk_size = int(body[:i].split(b';')[0], 16)
+            chunk_size = int(data[:i].split(b';')[0], 16)
         except ValueError:
             return False
 
-        del body[:i + 2]
+        del data[:i + 2]
 
-        if body[chunk_size:chunk_size + 2] != b'\r\n':
+        if data[chunk_size:chunk_size + 2] != b'\r\n':
             return False
 
-        del body[:chunk_size + 2]
+        body.extend(data[:chunk_size])
+        del data[:chunk_size + 2]
 
-    return True
+    return body
+
+
+def valid_chunked(data):
+    return read_chunked(data) is not False
 
 
 def create_dummy_data(size, head=b'BEGIN', tail=b'END'):

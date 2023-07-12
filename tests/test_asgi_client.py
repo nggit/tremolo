@@ -18,7 +18,6 @@ from tests.asgi_server import app, ASGI_PORT  # noqa: E402
 from tests.utils import (  # noqa: E402
     getcontents,
     chunked_detected,
-    valid_chunked,
     create_dummy_body
 )
 
@@ -60,9 +59,6 @@ class TestASGIClient(unittest.TestCase):
                                    ])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
 
     def test_post_upload_ok_10(self):
         header, body = getcontents(
@@ -135,7 +131,7 @@ class TestASGIClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 500 Internal Server Error')
-        self.assertTrue(b'\r\nContent-Type: text/html' in header)
+        self.assertFalse(b'\r\nContent-Type: text/plain' in header)
         self.assertTrue(
             b'name or value cannot contain illegal characters' in body
         )

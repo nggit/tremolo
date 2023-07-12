@@ -21,6 +21,7 @@ from tests.http_server import (  # noqa: E402
 from tests.utils import (  # noqa: E402
     getcontents,
     chunked_detected,
+    read_chunked,
     valid_chunked,
     create_dummy_data,
     create_chunked_body,
@@ -63,14 +64,59 @@ class TestHTTPClient(unittest.TestCase):
             b'HTTP/1.0 503 Service Unavailable'
         )
         self.assertFalse(chunked_detected(header))
+
+        # these values are set by the request middleware
         self.assertTrue(b'\r\nX-Foo: bar' in header and
                         b'Set-Cookie: sess=www' in header)
 
-    def test_get_ok_11(self):
+    def test_get_headerline_11(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /getheaderline?foo HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Host: host.local\r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body),
+                         b'GET /getheaderline?foo HTTP/1.1')
+
+    def test_get_doublehost_11(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /gethost HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Host: host.local\r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'localhost:%d' % HTTP_PORT)
+
+    def test_get_query_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
                                    method='GET',
-                                   url='/page/101?a=111&a=xyz&b=222',
+                                   url='/getquery?a=111&a=xyz&b=222',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'a=111&b=222')
+
+    def test_get_page_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/page/101',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'101')
+
+    def test_get_cookies_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/getcookies',
                                    version='1.1',
                                    headers=[
                                        'Cookie: a=123',
@@ -78,22 +124,19 @@ class TestHTTPClient(unittest.TestCase):
                                    ])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
+        self.assertEqual(read_chunked(body), b'a=123, a=xxx, yyy')
 
     def test_post_form_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
                                    method='POST',
-                                   url='/page/102?a=111&a=xyz&b=222',
+                                   url='/submitform',
                                    version='1.1',
                                    data='username=myuser&password=mypass')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
+        self.assertEqual(read_chunked(body),
+                         b'username=myuser&password=mypass')
 
     def test_post_upload_ok_10(self):
         header, body = getcontents(
@@ -105,19 +148,27 @@ class TestHTTPClient(unittest.TestCase):
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
         self.assertFalse(chunked_detected(header))
+        self.assertEqual(body, create_dummy_body(8192))
 
     def test_post_upload2_ok_10(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload2 HTTP/1.0\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 65536\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(65536))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
         self.assertFalse(chunked_detected(header))
+        self.assertEqual(body, create_dummy_body(65536))
 
     def test_post_upload_ok_11(self):
         header, body = getcontents(
@@ -129,30 +180,32 @@ class TestHTTPClient(unittest.TestCase):
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
+        self.assertEqual(read_chunked(body), create_dummy_body(8192))
 
     def test_post_upload2_ok_11(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload2 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(64 * 1024, chunk_size=4096))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
+        self.assertEqual(read_chunked(body), create_dummy_body(65536))
 
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
-
-    def test_post_upload4_ok_11(self):
+    def test_post_upload_multipart_11(self):
         boundary = b'----MultipartBoundary'
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload4 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload/multipart HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Content-Type: multipart/form-data; boundary=%s\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT,
@@ -164,58 +217,78 @@ class TestHTTPClient(unittest.TestCase):
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(b'\r\nContent-Type: text/csv' in header)
+        self.assertEqual(
+            read_chunked(body) if chunked_detected(header) else body,
+            b'name,length,type,data\r\n'
+            b'file1,4096,application/octet-stream,BEGINEND\r\n'
+            b'file2,65536,application/octet-stream,BEGINEND\r\n'
+        )
 
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
-
-    def test_post_upload3_payloadtoolarge_11(self):
+    def test_post_upload_payloadtoolarge_11(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload3 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(2 * 1048576 + 16 * 1024,
                                                  chunk_size=16 * 1024))
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
+        self.assertEqual(
+            read_chunked(body) if chunked_detected(header) else body,
+            False
         )
 
     def test_payloadtoolarge(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload3 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Content-Length: %d\r\n\r\n\x00' % (
                     HTTP_PORT, 2 * 1048576 + 16 * 1024)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 413 Payload Too Large')
+        self.assertFalse(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
         self.assertTrue(b'Payload Too Large' in body)
 
     def test_continue(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload2 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n%s' % (
-                    HTTP_PORT, 64 * 1024, create_dummy_body(64 * 1024))
+                    HTTP_PORT, 65536, create_dummy_body(65536))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
+        self.assertTrue(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
+        self.assertEqual(read_chunked(body), create_dummy_body(65536))
 
     def test_expectationfailed(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload3 HTTP/1.1\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n\x00' % (
                     HTTP_PORT, 2 * 1048576 + 16 * 1024)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 417 Expectation Failed')
+        self.assertFalse(
+            b'\r\nContent-Type: application/octet-stream' in header
+        )
         self.assertTrue(b'Expectation Failed' in body)
 
     def test_get_notfound_10(self):
@@ -238,9 +311,6 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 404 Not Found')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
 
     def test_get_notfound_close_10(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -277,9 +347,6 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 404 Not Found')
 
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
-
     def test_get_notfound_keepalive_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
@@ -290,9 +357,6 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 404 Not Found')
-
-        if chunked_detected(header):
-            self.assertTrue(valid_chunked(body))
 
     def test_get_badrequest(self):
         header, body = getcontents(
@@ -560,18 +624,6 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
         self.assertTrue(b'Range Not Satisfiable' in body)
-
-    def test_get_doublehost(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /gethost HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Host: host.local\r\n\r\n' % HTTP_PORT
-        )
-
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(body,
-                         create_chunked_body(b'localhost:%d' % HTTP_PORT))
 
 
 if __name__ == '__main__':
