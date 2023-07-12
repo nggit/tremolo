@@ -152,7 +152,7 @@ python3 -m pip install --upgrade tremolo
 ```
 
 ## Testing
-Just run `python3 alltests.py` for all tests. Or each *test_\*.py* in the [tests/](test) folder, for example `python3 tests/test_cli.py`.
+Just run `python3 alltests.py` for all tests. Or each *test_\*.py* in the [tests/](tests) folder, for example `python3 tests/test_cli.py`.
 
 If you also want measurements with [coverage](https://coverage.readthedocs.io/):
 
