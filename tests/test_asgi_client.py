@@ -145,8 +145,9 @@ if __name__ == '__main__':
         kwargs=dict(app=app, host=HTTP_HOST, port=ASGI_PORT, debug=False)
     )
 
+    p.start()
+
     try:
-        p.start()
         unittest.main()
     finally:
         p.terminate()

@@ -22,10 +22,10 @@ if __name__ == '__main__':
         kwargs=dict(app=asgi_app, host=HTTP_HOST, port=ASGI_PORT, debug=False))
     )
 
-    try:
-        for p in processes:
-            p.start()
+    for p in processes:
+        p.start()
 
+    try:
         suite = unittest.TestLoader().discover('tests')
         unittest.TextTestRunner().run(suite)
     finally:

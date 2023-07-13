@@ -634,8 +634,9 @@ if __name__ == '__main__':
         kwargs=dict(host=HTTP_HOST, port=HTTP_PORT, debug=False)
     )
 
+    p.start()
+
     try:
-        p.start()
         unittest.main()
     finally:
         p.terminate()
