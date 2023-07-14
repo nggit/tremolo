@@ -127,7 +127,7 @@ class HTTPRequest(Request):
 
                     if tobe_read > 0:
                         paused = False
-                        del buf[:i + 2 + chunk_size]
+                        del buf[:]
                     else:
                         paused = True
                         del buf[:chunk_size + i + 4]
