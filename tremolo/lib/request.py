@@ -5,7 +5,7 @@ class Request:
     def __init__(self, protocol):
         self._protocol = protocol
 
-        self._body_size = 0
+        self.body_size = 0
 
     @property
     def protocol(self):
@@ -20,7 +20,7 @@ class Request:
         return self._protocol.transport
 
     def clear_body(self):
-        self._body_size = 0
+        self.body_size = 0
 
     async def recv_timeout(self, timeout):
         self._protocol.options['logger'].info(
@@ -43,11 +43,3 @@ class Request:
                 break
 
             yield data
-
-    @property
-    def body_size(self):
-        return self._body_size
-
-    @body_size.setter
-    def body_size(self, value):
-        self._body_size = value

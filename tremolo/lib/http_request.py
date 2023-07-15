@@ -34,12 +34,12 @@ class HTTPRequest(Request):
         if self.version != b'1.0':
             self.version = b'1.1'
 
-        self._content_length = -1
-        self._content_type = b'application/octet-stream'
-        self._transfer_encoding = b'none'
+        self.content_length = -1
+        self.content_type = b'application/octet-stream'
+        self.transfer_encoding = b'none'
         self._body = bytearray()
-        self._http_continue = False
-        self._http_keepalive = False
+        self.http_continue = False
+        self.http_keepalive = False
         self._http_upgrade = False
         self._params = {}
 
@@ -64,14 +64,14 @@ class HTTPRequest(Request):
         if cache and self._body != b'':
             yield self._body
 
-            if not self.body_size < self._content_length:
+            if not self.body_size < self.content_length:
                 return
 
-        if (self._content_length >
+        if (self.content_length >
                 self.protocol.options['client_max_body_size']):
             raise PayloadTooLarge
 
-        if b'chunked' in self._transfer_encoding:
+        if b'chunked' in self.transfer_encoding:
             buf = bytearray()
             agen = self.recv()
             paused = False
@@ -136,46 +136,6 @@ class HTTPRequest(Request):
                 yield data
 
     @property
-    def content_length(self):
-        return self._content_length
-
-    @content_length.setter
-    def content_length(self, value):
-        self._content_length = value
-
-    @property
-    def content_type(self):
-        return self._content_type
-
-    @content_type.setter
-    def content_type(self, value):
-        self._content_type = value
-
-    @property
-    def transfer_encoding(self):
-        return self._transfer_encoding
-
-    @transfer_encoding.setter
-    def transfer_encoding(self, value):
-        self._transfer_encoding = value
-
-    @property
-    def http_continue(self):
-        return self._http_continue
-
-    @http_continue.setter
-    def http_continue(self, value):
-        self._http_continue = value
-
-    @property
-    def http_keepalive(self):
-        return self._http_keepalive
-
-    @http_keepalive.setter
-    def http_keepalive(self, value):
-        self._http_keepalive = value
-
-    @property
     def http_upgrade(self):
         return self._http_upgrade
 
@@ -217,7 +177,7 @@ class HTTPRequest(Request):
             self._params['post'] = {}
 
             if (b'application/x-www-form-urlencoded' in
-                    self._content_type.lower()):
+                    self.content_type.lower()):
                 async for data in self.read():
                     self.append_body(data)
 
@@ -233,7 +193,7 @@ class HTTPRequest(Request):
 
     async def files(self):
         ct = parse_qs(
-            self._content_type.replace(b'; ', b'&').replace(b';', b'&')
+            self.content_type.replace(b'; ', b'&').replace(b';', b'&')
             .decode('latin-1')
         )
 

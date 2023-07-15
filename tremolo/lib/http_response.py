@@ -22,7 +22,7 @@ class HTTPResponse(Response):
         self._content_type = []
         self._write_cb = None
 
-        self._http_chunked = False
+        self.http_chunked = False
 
     @property
     def header(self):
@@ -159,12 +159,12 @@ class HTTPResponse(Response):
             if self._header[0] == b'':
                 status = self.get_status()
                 no_content = status[0] in (204, 304) or 100 <= status[0] < 200
-                self._http_chunked = kwargs.get(
+                self.http_chunked = kwargs.get(
                     'chunked', self._request.version == b'1.1' and
                     self._request.http_keepalive and not no_content
                 )
 
-                if self._http_chunked:
+                if self.http_chunked:
                     self.append_header(b'Transfer-Encoding: chunked\r\n')
 
                 self._header[0] = b'HTTP/%s %d %s\r\n' % (
@@ -173,7 +173,7 @@ class HTTPResponse(Response):
                 if no_content:
                     self.append_header(b'Connection: close\r\n\r\n')
                 else:
-                    if not self._http_chunked and not (
+                    if not self.http_chunked and not (
                             self._request.version == b'1.1' and
                             b'range' in self._request.headers):
                         self._request.http_keepalive = False
@@ -209,7 +209,7 @@ class HTTPResponse(Response):
             self._request.context.set('data', ('body', data))
             await self._write_cb()
 
-        if (self._http_chunked and not self._request.http_upgrade and
+        if (self.http_chunked and not self._request.http_upgrade and
                 data is not None):
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
@@ -363,11 +363,3 @@ class HTTPResponse(Response):
                 await self.write(data, chunked=False)
 
         await self.send(None)
-
-    @property
-    def http_chunked(self):
-        return self._http_chunked
-
-    @http_chunked.setter
-    def http_chunked(self, value):
-        self._http_chunked = value
