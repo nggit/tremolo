@@ -17,6 +17,7 @@ class HTTPServer(HTTPProtocol):
         self._server = {
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
+            'lock': kwargs['lock'],
             'socket': kwargs['sock'],
             'context': ServerContext()
         }

@@ -18,6 +18,7 @@ from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
+from .lib.multiprocessing_lock import MultiprocessingLock  # noqa: E402
 from .lib.object_pool import ObjectPool  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
 
@@ -242,6 +243,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode('latin-1')
 
+        lock = MultiprocessingLock(options['lock'])
         pool = ObjectPool(1024, self._logger)
         lifespan = None
 
@@ -253,7 +255,11 @@ class Tremolo:
             # '/path/to/module.py'       -> 'module:app'   (dir: '/path/to')
             # '/path/to/module.py:myapp' -> 'module:myapp' (dir: '/path/to')
 
-            path, attr_name = (options['app'] + ':app').split(':')[:2]
+            if (':\\' in options['app'] and options['app'].count(':') < 2 or
+                    ':' not in options['app']):
+                options['app'] += ':app'
+
+            path, attr_name = options['app'].rsplit(':', 1)
             dir_name, base_name = os.path.split(path)
             module_name = os.path.splitext(base_name)[0]
 
@@ -294,6 +300,7 @@ class Tremolo:
         server = await self._loop.create_server(
             lambda: Server(loop=self._loop,
                            logger=self._logger,
+                           lock=lock,
                            sock=sock,
                            debug=options.get('debug', False),
                            download_rate=options.get('download_rate', 1048576),
@@ -342,8 +349,9 @@ class Tremolo:
 
                 process_num = options['conn'].recv()
             except (BrokenPipeError, ConnectionResetError, EOFError):
-                server.close()
                 break
+
+        server.close()
 
         if lifespan is not None:
             lifespan.shutdown()
@@ -368,6 +376,8 @@ class Tremolo:
 
         try:
             self._loop.run_until_complete(self._serve(host, port, **kwargs))
+        except KeyboardInterrupt:
+            pass
         finally:
             self._loop.close()
 
@@ -385,6 +395,7 @@ class Tremolo:
             True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
             False: socket.SO_REUSEADDR
         }[reuse_port], 1)
+        sock.setblocking(False)
         sock.bind((host, port))
         sock.set_inheritable(True)
 
@@ -417,6 +428,7 @@ class Tremolo:
         except AttributeError:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
+        lock = mp.RLock()
         processes = []
         socks = {}
 
@@ -436,6 +448,7 @@ class Tremolo:
                     target=self._worker,
                     args=args,
                     kwargs=dict(options,
+                                lock=lock,
                                 conn=child_conn,
                                 sa_family=socks[args].family,
                                 handlers=deepcopy(self._route_handlers),
@@ -467,6 +480,7 @@ class Tremolo:
                             target=self._worker,
                             args=args,
                             kwargs=dict(options,
+                                        lock=lock,
                                         conn=child_conn,
                                         sa_family=socks[args].family,
                                         handlers=deepcopy(
@@ -498,7 +512,7 @@ class Tremolo:
 
         for parent_conn, p, *_ in processes:
             parent_conn.close()
-            p.terminate()
+            p.join()
 
             print('pid {:d} terminated'.format(p.pid))
 

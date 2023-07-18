@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-import multiprocessing as mp  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
-import time  # noqa: E402
-import unittest  # noqa: E402
+import multiprocessing as mp
+import os
+import signal
+import sys
+import time
+import unittest
 
 # makes imports relative from the repo directory
 sys.path.insert(
@@ -125,6 +126,16 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'a=123, a=xxx, yyy')
+
+    def test_get_lock_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/getlock',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'Lock acquired!')
 
     def test_post_form_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -639,6 +650,18 @@ if __name__ == '__main__':
     try:
         unittest.main()
     finally:
-        p.terminate()
+        TIMEOUT = 30
+        FACTOR = 10
+
+        for _ in range(TIMEOUT * FACTOR):
+            if p.is_alive():
+                os.kill(p.pid, signal.SIGINT)
+                p.join()
+            else:
+                break
+
+            time.sleep(1 / FACTOR)
+        else:
+            p.terminate()
 
 # END

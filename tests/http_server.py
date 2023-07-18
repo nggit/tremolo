@@ -108,6 +108,19 @@ async def get_cookies(**server):
     return b', '.join(request.headers.getlist(b'cookie'))
 
 
+@app.route('/getlock')
+async def get_lock(**server):
+    lock = server['lock']
+
+    async with lock:
+        yield b'Lock'
+
+    try:
+        await lock.acquire(timeout=0)
+    except TimeoutError:
+        yield b' acquired!'
+
+
 @app.route('/submitform')
 async def post_form(**server):
     request = server['request']
