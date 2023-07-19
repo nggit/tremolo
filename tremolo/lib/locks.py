@@ -3,7 +3,7 @@
 import asyncio
 
 
-class MultiprocessingLock:
+class ServerLock:
     def __init__(self, lock):
         self._lock = lock
         self._factor = 100

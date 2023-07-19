@@ -18,8 +18,8 @@ from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
-from .lib.multiprocessing_lock import MultiprocessingLock  # noqa: E402
-from .lib.object_pool import ObjectPool  # noqa: E402
+from .lib.locks import ServerLock  # noqa: E402
+from .lib.pools import ObjectPool  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
 
 
@@ -243,7 +243,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode('latin-1')
 
-        lock = MultiprocessingLock(options['lock'])
+        lock = ServerLock(options['lock'])
         pool = ObjectPool(1024, self._logger)
         lifespan = None
 

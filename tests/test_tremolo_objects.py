@@ -13,7 +13,7 @@ sys.path.insert(
 from tremolo import Tremolo  # noqa: E402
 from tremolo.contexts import ServerContext  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
-from tremolo.lib.object_pool import ObjectPool  # noqa: E402
+from tremolo.lib.pools import ObjectPool  # noqa: E402
 from tests import handlers, middlewares  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
 from tests.utils import function, logger  # noqa: E402
