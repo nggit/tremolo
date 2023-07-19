@@ -46,7 +46,7 @@ class ASGIServer(HTTPProtocol):
             'query_string': self.request.query_string,
             'root_path': self.options['_root_path'],
             'headers': self.request.header.getheaders(),
-            'client': self.request.transport.get_extra_info('peername'),
+            'client': self.request.client,
             'server': self.request.transport.get_extra_info('sockname')
         }
 

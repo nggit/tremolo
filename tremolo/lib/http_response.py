@@ -321,9 +321,8 @@ class HTTPResponse(Response):
                 handle.seek(start)
                 await self.write(handle.read(size), chunked=False)
             else:
-                peername = self._request.transport.get_extra_info('peername')
-                boundary = b'----Boundary%x%x' % (
-                    hash(peername[0]), peername[1])
+                ip, port = self._request.client
+                boundary = b'----Boundary%x%x' % (hash(ip), port)
 
                 self.set_content_type(
                     b'multipart/byteranges; boundary=%s' % boundary

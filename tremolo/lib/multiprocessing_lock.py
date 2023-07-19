@@ -24,4 +24,7 @@ class MultiprocessingLock:
             raise TimeoutError
 
     def release(self):
-        self._lock.release()
+        try:
+            self._lock.release()
+        except (AssertionError, ValueError):
+            pass

@@ -70,6 +70,43 @@ class TestHTTPClient(unittest.TestCase):
         self.assertTrue(b'\r\nX-Foo: bar' in header and
                         b'Set-Cookie: sess=www' in header)
 
+    def test_get_ip_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/getip',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'127.0.0.1')
+
+    def test_get_xip_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/getip',
+                                   version='1.1',
+                                   headers=[
+                                       'X-Forwarded-For: 192.168.0.2, xxx',
+                                       'X-Forwarded-For: 192.168.0.20'
+                                   ])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'192.168.0.2')
+
+    def test_get_xip_empty_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/getip',
+                                   version='1.1',
+                                   headers=[
+                                       'X-Forwarded-For:  '
+                                   ])
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'127.0.0.1')
+
     def test_get_headerline_11(self):
         header, body = getcontents(
             host=HTTP_HOST,

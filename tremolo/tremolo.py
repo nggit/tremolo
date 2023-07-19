@@ -428,7 +428,7 @@ class Tremolo:
         except AttributeError:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
-        lock = mp.RLock()
+        lock = mp.Lock()
         processes = []
         socks = {}
 

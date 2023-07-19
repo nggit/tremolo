@@ -10,6 +10,8 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
+        self.client = protocol.transport.get_extra_info('peername')
+        self._ip = None
         self.header = header
         self.headers = header.headers
         self.is_valid = header.is_valid_request
@@ -42,6 +44,25 @@ class HTTPRequest(Request):
         self.http_keepalive = False
         self._http_upgrade = False
         self._params = {}
+
+    @property
+    def ip(self):
+        if self._ip:
+            return self._ip
+
+        ip = self.headers.get(b'x-forwarded-for', b'')
+
+        if isinstance(ip, list):
+            ip = ip[0]
+
+        ip = ip.strip()
+
+        if ip == b'' and isinstance(self.client, tuple):
+            self._ip = self.client[0].encode('utf-8')
+        else:
+            self._ip = ip[:(ip + b',').find(b',')]
+
+        return self._ip
 
     def append_body(self, value):
         self._body.extend(value)

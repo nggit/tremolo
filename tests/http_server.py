@@ -69,6 +69,14 @@ async def get_headerline(**server):
     )
 
 
+@app.route('/getip')
+async def get_ip(**server):
+    request = server['request']
+
+    # b'127.0.0.1'
+    return request.ip and request.ip
+
+
 @app.route('/gethost')
 async def get_host(**server):
     # b'localhost:28000'
