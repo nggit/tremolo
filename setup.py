@@ -15,12 +15,13 @@ setup(
     name='tremolo',
     packages=['tremolo'],
     package_data={'': ['lib/*', 'lib/h1parser/*']},
-    version='0.0.102',
+    version='0.0.103',
     license='MIT',
     author='nggit',
     author_email='contact@anggit.com',
-    description=('Tremolo is a stream-oriented, asynchronous web server/'
-                 'framework written in pure Python'),
+    description=('Tremolo is a stream-oriented, asynchronous,'
+                 'programmable HTTP server written in pure Python.'
+                 'It can also serve as an ASGI server.'),
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/nggit/tremolo',

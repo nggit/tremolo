@@ -13,7 +13,6 @@ import ssl  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 
-from copy import deepcopy  # noqa: E402
 from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
@@ -52,6 +51,18 @@ class Tremolo:
                 (None, {})
             ],
             'request': []
+        }
+
+        self._events = {
+            'request': self._middlewares,
+            'worker': {
+                'start': [
+                    None
+                ],
+                'stop': [
+                    None
+                ]
+            }
         }
 
         self._loop = None
@@ -102,6 +113,29 @@ class Tremolo:
             return wrapper
 
         return decorator
+
+    def worker(self, name):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(**kwargs):
+                return func(**kwargs)
+
+            self._events['worker'][name].append(wrapper)
+            return wrapper
+
+        return decorator
+
+    def on_start(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.worker('start')(args[0])
+
+        return self.worker('start')
+
+    def on_stop(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.worker('stop')(args[0])
+
+        return self.worker('stop')
 
     def middleware(self, name):
         def decorator(func):
@@ -205,6 +239,11 @@ class Tremolo:
                   server['context'].options['server_name'])
 
     async def _serve(self, host, port, **options):
+        on_start = self._events['worker']['start'][-1]
+
+        if on_start is not None:
+            await on_start(loop=self._loop, logger=self._logger)
+
         options['conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
 
@@ -243,7 +282,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode('latin-1')
 
-        lock = ServerLock(options['lock'])
+        lock = ServerLock(options['locks'], loop=self._loop)
         pool = ObjectPool(1024, self._logger)
         lifespan = None
 
@@ -357,6 +396,11 @@ class Tremolo:
             lifespan.shutdown()
             await lifespan.exception()
 
+        on_stop = self._events['worker']['stop'][-1]
+
+        if on_stop is not None:
+            await on_stop(loop=self._loop, logger=self._logger)
+
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
         self._logger.setLevel(
@@ -402,21 +446,26 @@ class Tremolo:
         return sock
 
     def run(self, host=None, port=80, reuse_port=True, worker_num=1, **kwargs):
-        if 'app' in kwargs and not isinstance(kwargs['app'], str):
-            import __main__
+        if 'app' in kwargs:
+            if not isinstance(kwargs['app'], str):
+                import __main__
 
-            if hasattr(__main__, '__file__'):
-                for attr_name in dir(__main__):
-                    if attr_name.startswith('__'):
-                        continue
+                if hasattr(__main__, '__file__'):
+                    for attr_name in dir(__main__):
+                        if attr_name.startswith('__'):
+                            continue
 
-                    if getattr(__main__, attr_name) == kwargs['app']:
-                        break
-                else:
-                    attr_name = 'app'
+                        if getattr(__main__, attr_name) == kwargs['app']:
+                            break
+                    else:
+                        attr_name = 'app'
 
-                kwargs['app'] = '{:s}:{:s}'.format(__main__.__file__,
-                                                   attr_name)
+                    kwargs['app'] = '{:s}:{:s}'.format(__main__.__file__,
+                                                       attr_name)
+
+            locks = []
+        else:
+            locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
         if host is None:
             host = ''
@@ -428,7 +477,6 @@ class Tremolo:
         except AttributeError:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
-        lock = mp.Lock()
         processes = []
         socks = {}
 
@@ -448,10 +496,10 @@ class Tremolo:
                     target=self._worker,
                     args=args,
                     kwargs=dict(options,
-                                lock=lock,
+                                locks=locks,
                                 conn=child_conn,
                                 sa_family=socks[args].family,
-                                handlers=deepcopy(self._route_handlers),
+                                handlers=self._route_handlers,
                                 middlewares=self._middlewares)
                 )
 
@@ -480,11 +528,10 @@ class Tremolo:
                             target=self._worker,
                             args=args,
                             kwargs=dict(options,
-                                        lock=lock,
+                                        locks=locks,
                                         conn=child_conn,
                                         sa_family=socks[args].family,
-                                        handlers=deepcopy(
-                                            self._route_handlers),
+                                        handlers=self._route_handlers,
                                         middlewares=self._middlewares)
                         )
 

@@ -172,7 +172,7 @@ class TestHTTPClient(unittest.TestCase):
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'Lock acquired!')
+        self.assertEqual(read_chunked(body), b'Lock was acquired!')
 
     def test_post_form_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,

@@ -2,6 +2,7 @@
 
 __all__ = ('app', 'HTTP_PORT', 'HTTP_HOST', 'TEST_FILE')
 
+import asyncio  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 
@@ -116,17 +117,32 @@ async def get_cookies(**server):
     return b', '.join(request.headers.getlist(b'cookie'))
 
 
+async def coro_acquire(lock):
+    await lock.acquire()
+    await asyncio.sleep(10)
+
+
 @app.route('/getlock')
 async def get_lock(**server):
+    loop = server['loop']
     lock = server['lock']
+    tasks = server['context'].tasks
 
     async with lock:
         yield b'Lock'
 
+    async with lock(5):
+        yield b' '
+
+    tasks.append(loop.create_task(coro_acquire(lock)))
+
     try:
+        await asyncio.sleep(0.1)
         await lock.acquire(timeout=0)
     except TimeoutError:
-        yield b' acquired!'
+        yield b'was acquired!'
+    finally:
+        lock.release()
 
 
 @app.route('/submitform')
