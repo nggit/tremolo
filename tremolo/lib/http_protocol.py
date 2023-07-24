@@ -15,12 +15,7 @@ class HTTPProtocol(asyncio.Protocol):
     def __init__(self, context, **kwargs):
         self._context = context
         self._options = kwargs
-
-        try:
-            self._loop = kwargs['loop']
-        except KeyError:
-            self._loop = asyncio.get_event_loop()
-
+        self._loop = kwargs['loop']
         self._transport = None
         self._queue = (None, None)
         self._request = None
@@ -29,7 +24,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._pool = None
         self._data = None
-        self._waiters = None
+        self._waiters = {}
 
     @property
     def context(self):
@@ -69,7 +64,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._queue = self._pool['queue']
 
         self._data = bytearray()
-        self._waiters = {'request': self._loop.create_future()}
+        self._waiters['request'] = self._loop.create_future()
 
         self.tasks.append(
             self._loop.create_task(self.set_timeout(

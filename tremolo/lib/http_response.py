@@ -222,13 +222,13 @@ class HTTPResponse(Response):
             content_type=b'application/octet-stream'
             ):
         try:
-            handle = self._request.context._sendfile_handle
+            handle = self._request.context.RESPONSE_SENDFILE_HANDLE
         except AttributeError:
             handle = open(path, 'rb')
-            self._request.context._sendfile_handle = handle
+            self._request.context.RESPONSE_SENDFILE_HANDLE = handle
 
             self._request.context.tasks.append(
-                self._request.context._sendfile_handle.close
+                self._request.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
         file_size = os.stat(path).st_size

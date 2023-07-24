@@ -6,13 +6,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 class ServerLock:
-    def __init__(self, locks, name=0, loop=None, executors=None):
+    def __init__(self, locks, name=0, timeout=30, loop=None, executors=None):
         try:
             self.name = name % len(locks)
         except ZeroDivisionError:
             return
 
         self.locks = locks
+        self._timeout = timeout
 
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -27,9 +28,15 @@ class ServerLock:
         if self.name not in executors:
             self._executors[self.name] = ThreadPoolExecutor(max_workers=1)
 
-    def __call__(self, name=0):
-        return self.__class__(
-            self.locks, name=name, loop=self._loop, executors=self._executors)
+    def __call__(self, name=0, timeout=None):
+        if timeout is None:
+            timeout = self._timeout
+
+        return self.__class__(self.locks,
+                              name=name,
+                              timeout=timeout,
+                              loop=self._loop,
+                              executors=self._executors)
 
     async def __aenter__(self):
         try:
@@ -42,7 +49,10 @@ class ServerLock:
     async def __aexit__(self, exc_type, exc, tb):
         self.release()
 
-    async def acquire(self, timeout=30):
+    async def acquire(self, timeout=None):
+        if timeout is None:
+            timeout = self._timeout
+
         fut = self._loop.run_in_executor(
             self._executors[self.name],
             self.locks[self.name].acquire, True, timeout)
