@@ -43,14 +43,14 @@ class HTTPServer(HTTPProtocol):
         )
 
         if func is None:
-            self._server['context'].SERVER_ON_CONNECT = None
+            self._server['context'].ON_CONNECT = None
         else:
-            self._server['context'].SERVER_ON_CONNECT = self._server['loop'].create_task(  # noqa: E501
+            self._server['context'].ON_CONNECT = self._server['loop'].create_task(  # noqa: E501
                 self._connection_made(func)
             )
 
             self._server['context'].tasks.append(
-                self._server['context'].SERVER_ON_CONNECT
+                self._server['context'].ON_CONNECT
             )
 
     def connection_lost(self, exc):
@@ -250,8 +250,8 @@ class HTTPServer(HTTPProtocol):
         await self.response.send(None)
 
     async def header_received(self):
-        if self._server['context'].SERVER_ON_CONNECT is not None:
-            await self._server['context'].SERVER_ON_CONNECT
+        if self._server['context'].ON_CONNECT is not None:
+            await self._server['context'].ON_CONNECT
 
         options = self._server['context'].options
 
