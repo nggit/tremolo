@@ -1,34 +1,38 @@
 # Copyright (c) 2023 nggit
 
-import asyncio
+from collections import deque
+
+from .__queue import Queue
 
 
-class ObjectPool:
+class Pool:
     def __init__(self, pool_size, logger):
-        self._pool_size = pool_size
-        self._pools = []
+        self._pool = deque(maxlen=pool_size)
         self._logger = logger
 
         for _ in range(pool_size):
-            self._pools.append(self._create())
+            self._pool.append(self.create())
 
-    def _create(self):
-        return {
-            'queue': (asyncio.Queue(), asyncio.Queue())
-        }
+    def create(self):
+        return
 
     def get(self):
         try:
-            return self._pools.pop()
+            return self._pool.popleft()
         except IndexError:
-            self._pool_size += 1
+            pool_size = len(self._pool) + 1
+            self._pool = deque(self._pool, maxlen=pool_size)
 
             self._logger.info(
-                'limit exceeded. pool size has been adjusted to {:d}'
-                .format(self._pool_size)
+                '{:s}: limit exceeded. pool size has been adjusted to {:d}'
+                .format(self.__class__.__name__, pool_size)
             )
-            return self._create()
+            return self.create()
 
-    def put(self, value):
-        if len(self._pools) < self._pool_size:
-            self._pools.append(value)
+    def put(self, item):
+        self._pool.append(item)
+
+
+class QueuePool(Pool):
+    def create(self):
+        return (Queue(), Queue())

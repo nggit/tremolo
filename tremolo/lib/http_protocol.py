@@ -22,7 +22,6 @@ class HTTPProtocol(asyncio.Protocol):
         self._response = None
         self._watermarks = {'high': 65536, 'low': 8192}
 
-        self._pool = None
         self._data = None
         self._waiters = {}
 
@@ -60,8 +59,7 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self._transport = transport
-        self._pool = self._options['_pool'].get()
-        self._queue = self._pool['queue']
+        self._queue = self._options['_pools']['queue'].get()
 
         self._data = bytearray()
         self._waiters['request'] = self._loop.create_future()
@@ -433,9 +431,11 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 task.cancel()
 
-        self._options['_pool'].put({
-            'queue': (asyncio.Queue(), asyncio.Queue())
-        })
+        for queue in self._queue:
+            if not queue.clear():
+                break
+        else:
+            self._options['_pools']['queue'].put(self._queue)
 
         self._transport = None
         self._queue = (None, None)

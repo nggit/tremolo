@@ -18,7 +18,7 @@ from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
 from .lib.locks import ServerLock  # noqa: E402
-from .lib.pools import ObjectPool  # noqa: E402
+from .lib.pools import QueuePool  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
 
 
@@ -283,7 +283,9 @@ class Tremolo:
             host = host.encode('latin-1')
 
         lock = ServerLock(options['locks'], loop=self._loop)
-        pool = ObjectPool(1024, self._logger)
+        pools = {
+            'queue': QueuePool(1024, self._logger)
+        }
         lifespan = None
 
         if 'app' in options and isinstance(options['app'], str):
@@ -353,7 +355,7 @@ class Tremolo:
                                'keepalive_timeout', 30
                            ),
                            server_name=server_name,
-                           _pool=pool,
+                           _pools=pools,
                            _app=options['app'],
                            _root_path=options.get('root_path', ''),
                            _handlers=options['handlers'],
