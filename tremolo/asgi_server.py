@@ -50,7 +50,7 @@ class ASGIServer(HTTPProtocol):
             'server': self.request.transport.get_extra_info('sockname')
         }
 
-        self._read = self.request.read(cache=False)
+        self._read = self.request.stream()
 
         if not (b'transfer-encoding' in self.request.headers or
                 b'content-length' in self.request.headers

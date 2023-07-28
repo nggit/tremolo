@@ -45,6 +45,10 @@ class HTTPRequest(Request):
         self._http_upgrade = False
         self._params = {}
 
+        self._eof = False
+        self._read_instance = None
+        self._read_buf = bytearray()
+
     @property
     def ip(self):
         if self._ip:
@@ -69,34 +73,53 @@ class HTTPRequest(Request):
 
     def clear_body(self):
         del self._body[:]
+        del self._read_buf[:]
         super().clear_body()
 
     async def recv_timeout(self, timeout):
         raise RequestTimeout
 
-    async def body(self, cache=True):
-        if self._body == b'' or not cache:
-            async for data in self.read(cache=False):
-                self.append_body(data)
+    async def body(self):
+        async for data in self.stream():
+            self.append_body(data)
 
         return self._body
 
-    async def read(self, cache=True):
-        if cache and self._body != b'':
-            yield self._body
+    def read(self, size=None):
+        if size is None:
+            return self.stream()
 
-            if not self.body_size < self.content_length:
-                return
+        return self._read(size=size)
 
-        if (self.content_length >
-                self.protocol.options['client_max_body_size']):
-            raise PayloadTooLarge
+    async def _read(self, size=-1):
+        if size == 0 or self._eof and self._read_buf == b'':
+            return bytearray()
+
+        if size == -1:
+            return await self.body()
+
+        if self._read_instance is None:
+            self._read_instance = self.stream()
+
+        async for data in self._read_instance:
+            self._read_buf.extend(data)
+
+            if len(self._read_buf) >= size:
+                break
+
+        buf = self._read_buf[:size]
+        del self._read_buf[:size]
+        return buf
+
+    async def stream(self):
+        if self._eof:
+            return
 
         if b'chunked' in self.transfer_encoding:
             buf = bytearray()
             agen = self.recv()
             paused = False
-            tobe_read = 0
+            unread_bytes = 0
 
             while buf != b'0\r\n\r\n':
                 if not paused:
@@ -109,15 +132,15 @@ class HTTPRequest(Request):
                                 'bad chunked encoding: incomplete read'
                             )
 
-                if tobe_read > 0:
-                    data = buf[:tobe_read]
+                if unread_bytes > 0:
+                    data = buf[:unread_bytes]
 
                     yield data
-                    del buf[:tobe_read]
+                    del buf[:unread_bytes]
 
-                    tobe_read -= len(data)
+                    unread_bytes -= len(data)
 
-                    if tobe_read > 0:
+                    if unread_bytes > 0:
                         continue
 
                     paused = True
@@ -142,19 +165,25 @@ class HTTPRequest(Request):
                         raise BadRequest('bad chunked encoding')
 
                     data = buf[i + 2:i + 2 + chunk_size]
-                    tobe_read = chunk_size - len(data)
+                    unread_bytes = chunk_size - len(data)
 
                     yield data
 
-                    if tobe_read > 0:
+                    if unread_bytes > 0:
                         paused = False
                         del buf[:]
                     else:
                         paused = True
                         del buf[:chunk_size + i + 4]
         else:
+            if (self.content_length >
+                    self.protocol.options['client_max_body_size']):
+                raise PayloadTooLarge
+
             async for data in self.recv():
                 yield data
+
+        self._eof = True
 
     @property
     def http_upgrade(self):
@@ -199,7 +228,7 @@ class HTTPRequest(Request):
 
             if (b'application/x-www-form-urlencoded' in
                     self.content_type.lower()):
-                async for data in self.read():
+                async for data in self.stream():
                     self.append_body(data)
 
                     if self.body_size > limit:
@@ -230,7 +259,7 @@ class HTTPRequest(Request):
         body_size = 0
         content_length = 0
 
-        agen = self.read()
+        agen = self.stream()
         paused = False
 
         while header != b'--%s--\r\n' % boundary:

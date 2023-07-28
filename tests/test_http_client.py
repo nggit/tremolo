@@ -190,7 +190,7 @@ class TestHTTPClient(unittest.TestCase):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.0\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload?size=-1 HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 8192\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(8192))
         )
@@ -206,7 +206,7 @@ class TestHTTPClient(unittest.TestCase):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.0\r\nHost: localhost:%d\r\n'
+            raw=b'POST /upload?size=10 HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 65536\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(65536))
         )
@@ -216,7 +216,7 @@ class TestHTTPClient(unittest.TestCase):
             b'\r\nContent-Type: application/octet-stream' in header
         )
         self.assertFalse(chunked_detected(header))
-        self.assertEqual(body, create_dummy_body(65536))
+        self.assertEqual(body, create_dummy_body(65536)[:10])
 
     def test_post_upload_ok_11(self):
         header, body = getcontents(

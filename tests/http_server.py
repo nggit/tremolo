@@ -162,7 +162,19 @@ async def post_form(**server):
 
 @app.route('/upload')
 async def upload(content_type=b'application/octet-stream', **server):
-    return await server['request'].body()
+    request = server['request']
+
+    try:
+        size = int(request.query['size'][0])
+        yield (await request.read(0)) + (await request.read(size))
+    except KeyError:
+        # request.stream()
+        async for data in request.read(None):
+            yield data
+
+        async for data in request.read(None):
+            # should not raised
+            raise Exception('EOF!!!')
 
 
 @app.route('/upload/multipart')
