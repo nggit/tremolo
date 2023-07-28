@@ -72,6 +72,6 @@ class ServerLock:
 
     def release(self):
         try:
-            self._executors[self.name].submit(self.locks[self.name].release)
-        except RuntimeError:
+            self.locks[self.name].release()
+        except ValueError:
             pass
