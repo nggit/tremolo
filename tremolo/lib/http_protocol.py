@@ -64,12 +64,13 @@ class HTTPProtocol(asyncio.Protocol):
         self._data = bytearray()
         self._waiters['request'] = self._loop.create_future()
 
-        self.tasks.append(
+        self.tasks.extend([
+            self._loop.create_task(self._send_data()).cancel,
             self._loop.create_task(self.set_timeout(
                 self._waiters['request'],
                 timeout=self._options['request_timeout'],
                 timeout_cb=self.request_timeout))
-        )
+        ])
 
     async def request_timeout(self, timeout):
         self._options['logger'].info(
@@ -111,23 +112,15 @@ class HTTPProtocol(asyncio.Protocol):
             buffer_size=16 * 1024
             ):
         data_size = len(data)
+        mv = memoryview(data)
 
-        if data_size >= 2 * buffer_size:
-            mv = memoryview(data)
-
-            while mv and queue is not None:
-                queue.put_nowait(mv[:buffer_size].tobytes())
-                await asyncio.sleep(
-                    1 / (rate / max(queue.qsize(), 1) /
-                         mv[:buffer_size].nbytes)
-                )
-                mv = mv[buffer_size:]
-
-        elif data != b'' and queue is not None:
-            queue.put_nowait(data)
+        while mv and queue is not None:
+            queue.put_nowait(mv[:buffer_size].tobytes())
             await asyncio.sleep(
-                1 / (rate / max(queue.qsize(), 1) / data_size)
+                1 / (rate / max(queue.qsize(), 1) /
+                     mv[:buffer_size].nbytes)
             )
+            mv = mv[buffer_size:]
 
         if transport is not None and self._request is not None:
             if self._request.http_upgrade:
@@ -154,9 +147,10 @@ class HTTPProtocol(asyncio.Protocol):
         return
 
     def print_exception(self, exc, *args):
-        self._options['logger'].error(': '.join(
-            (*args, exc.__class__.__name__, str(exc))
-        ), exc_info={True: exc, False: False}[self._options['debug']])
+        self._options['logger'].error(
+            ': '.join((*args, exc.__class__.__name__, str(exc))),
+            exc_info={True: exc, False: False}[self._options['debug']]
+        )
 
     async def handle_exception(self, exc):
         if (self._request is None or self._response is None or
@@ -263,10 +257,10 @@ class HTTPProtocol(asyncio.Protocol):
 
             # successfully got header,
             # clear either the request or keepalive timeout
-            for i in self._waiters:
-                if i in ('request',
-                         'keepalive') and not self._waiters[i].done():
-                    self._waiters[i].set_result(None)
+            for key, fut in self._waiters.items():
+                if key in ('request',
+                           'keepalive') and not fut.done():
+                    fut.set_result(None)
 
             await self.header_received()
         except Exception as exc:
@@ -295,12 +289,10 @@ class HTTPProtocol(asyncio.Protocol):
 
             if -1 < header_size <= 8192:
                 self._transport.pause_reading()
-                self.tasks.extend([
-                    self._loop.create_task(self._send_data()),
+                self.tasks.append(
                     self._loop.create_task(
-                        self._handle_request_header(self._data, header_size)
-                    )
-                ])
+                        self._handle_request_header(self._data, header_size))
+                )
 
                 self._data = None
             elif header_size > 8192:
@@ -316,8 +308,10 @@ class HTTPProtocol(asyncio.Protocol):
 
         if 'receive' in self._waiters:
             waiter = self._waiters['receive']
-        else:
+        elif 'request' in self._waiters:
             waiter = self._waiters['request']
+        else:
+            waiter = self._waiters['keepalive']
 
         self._waiters['receive'] = self._loop.create_task(
             self._receive_data(data, waiter)
@@ -403,15 +397,17 @@ class HTTPProtocol(asyncio.Protocol):
         if not self._request.http_continue:
             self._data = bytearray()
             self._request.clear_body()
+            self._waiters.clear()
 
-        self._waiters['keepalive'] = self._loop.create_future()
+            self._waiters['keepalive'] = self._loop.create_future()
 
-        self.tasks.append(
-            self._loop.create_task(self.set_timeout(
-                self._waiters['keepalive'],
-                timeout=self._options['keepalive_timeout'],
-                timeout_cb=self.keepalive_timeout))
-        )
+            self.tasks.append(
+                self._loop.create_task(self.set_timeout(
+                    self._waiters['keepalive'],
+                    timeout=self._options['keepalive_timeout'],
+                    timeout_cb=self.keepalive_timeout))
+            )
+
         self._transport.resume_reading()
 
     def connection_lost(self, exc):

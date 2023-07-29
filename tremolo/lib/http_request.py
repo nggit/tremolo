@@ -79,8 +79,14 @@ class HTTPRequest(Request):
     async def recv_timeout(self, timeout):
         raise RequestTimeout
 
-    async def body(self):
-        async for data in self.stream():
+    def recv(self, size=None):
+        if size is None:
+            return self.stream(raw=True)
+
+        return self._read(size=size, raw=True)
+
+    async def body(self, raw=False):
+        async for data in self.stream(raw=raw):
             self.append_body(data)
 
         return self._body
@@ -91,15 +97,18 @@ class HTTPRequest(Request):
 
         return self._read(size=size)
 
-    async def _read(self, size=-1):
-        if size == 0 or self._eof and self._read_buf == b'':
+    def eof(self):
+        return self._eof and self._read_buf == b''
+
+    async def _read(self, size=-1, raw=False):
+        if size == 0 or self.eof():
             return bytearray()
 
         if size == -1:
-            return await self.body()
+            return await self.body(raw=raw)
 
         if self._read_instance is None:
-            self._read_instance = self.stream()
+            self._read_instance = self.stream(raw=raw)
 
         async for data in self._read_instance:
             self._read_buf.extend(data)
@@ -111,13 +120,13 @@ class HTTPRequest(Request):
         del self._read_buf[:size]
         return buf
 
-    async def stream(self):
+    async def stream(self, raw=False):
         if self._eof:
             return
 
-        if b'chunked' in self.transfer_encoding:
+        if not raw and b'chunked' in self.transfer_encoding:
             buf = bytearray()
-            agen = self.recv()
+            agen = super().recv()
             paused = False
             unread_bytes = 0
 
@@ -180,7 +189,7 @@ class HTTPRequest(Request):
                     self.protocol.options['client_max_body_size']):
                 raise PayloadTooLarge
 
-            async for data in self.recv():
+            async for data in super().recv():
                 yield data
 
         self._eof = True
@@ -197,6 +206,14 @@ class HTTPRequest(Request):
     @property
     def params(self):
         return self._params
+
+    @property
+    def query(self):
+        return self._params['query']
+
+    @query.setter
+    def query(self, value):
+        self._params['query'] = value
 
     @property
     def cookies(self):
@@ -326,11 +343,3 @@ class HTTPRequest(Request):
             paused = True
 
             del body[:]
-
-    @property
-    def query(self):
-        return self._params['query']
-
-    @query.setter
-    def query(self, value):
-        self._params['query'] = value

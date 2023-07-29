@@ -42,8 +42,6 @@ class ServerLock:
         try:
             await self.acquire()
         except TimeoutError:
-            pass
-        finally:
             self.release()
 
     async def __aexit__(self, exc_type, exc, tb):
