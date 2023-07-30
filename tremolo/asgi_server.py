@@ -1,7 +1,5 @@
 # Copyright (c) 2023 nggit
 
-__all__ = ('ASGIServer',)
-
 import asyncio  # noqa: E402
 
 from datetime import datetime  # noqa: E402
@@ -14,6 +12,12 @@ from .lib.http_protocol import HTTPProtocol  # noqa: E402
 
 
 class ASGIServer(HTTPProtocol):
+    __slots__ = ('_app',
+                 '_read',
+                 '_task',
+                 '_timer',
+                 '_timeout')
+
     def __init__(self, **kwargs):
         self._app = kwargs['_app']
         self._read = None

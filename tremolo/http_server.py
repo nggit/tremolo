@@ -1,7 +1,5 @@
 # Copyright (c) 2023 nggit
 
-__all__ = ('HTTPServer',)
-
 from datetime import datetime  # noqa: E402
 from urllib.parse import parse_qs  # noqa: E402
 
@@ -11,6 +9,10 @@ from .lib.http_protocol import HTTPProtocol  # noqa: E402
 
 
 class HTTPServer(HTTPProtocol):
+    __slots__ = ('_route_handlers',
+                 '_middlewares',
+                 '_server')
+
     def __init__(self, **kwargs):
         self._route_handlers = kwargs['_handlers']
         self._middlewares = kwargs['_middlewares']

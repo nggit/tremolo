@@ -2,6 +2,8 @@
 
 
 class Response:
+    __slots__ = ('_protocol',)
+
     def __init__(self, request):
         self._protocol = request.protocol
 

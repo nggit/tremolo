@@ -7,6 +7,29 @@ from .request import Request
 
 
 class HTTPRequest(Request):
+    __slots__ = ('client',
+                 '_ip',
+                 'header',
+                 'headers',
+                 'is_valid',
+                 'host',
+                 'method',
+                 'url',
+                 'path',
+                 'query_string',
+                 'version',
+                 'content_length',
+                 'content_type',
+                 'transfer_encoding',
+                 '_body',
+                 'http_continue',
+                 'http_keepalive',
+                 '_http_upgrade',
+                 '_params',
+                 '_eof',
+                 '_read_instance',
+                 '_read_buf')
+
     def __init__(self, protocol, header):
         super().__init__(protocol)
 

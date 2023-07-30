@@ -17,6 +17,15 @@ class Headers(dict):
 
 
 class ParseHeader:
+    __slots__ = ('is_request',
+                 'is_response',
+                 'is_valid_request',
+                 'is_valid_response',
+                 '_data',
+                 'headers',
+                 '_headers',
+                 '_header_size')
+
     def __init__(self, data=bytearray(), **kwargs):
         self.parse(data, **kwargs)
 

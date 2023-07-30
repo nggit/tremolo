@@ -13,6 +13,13 @@ from .response import Response
 
 
 class HTTPResponse(Response):
+    __slots__ = ('_header',
+                 '_request',
+                 '_status',
+                 '_content_type',
+                 '_write_cb',
+                 'http_chunked')
+
     def __init__(self, request):
         super().__init__(request)
 

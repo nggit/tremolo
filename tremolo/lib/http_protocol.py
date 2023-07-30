@@ -12,6 +12,17 @@ from .http_response import HTTPResponse
 
 
 class HTTPProtocol(asyncio.Protocol):
+    __slots__ = ('_context',
+                 '_options',
+                 '_loop',
+                 '_transport',
+                 '_queue',
+                 '_request',
+                 '_response',
+                 '_watermarks',
+                 '_data',
+                 '_waiters')
+
     def __init__(self, context, **kwargs):
         self._context = context
         self._options = kwargs
