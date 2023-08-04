@@ -15,6 +15,7 @@ sys.path.insert(
 
 import tremolo  # noqa: E402
 
+from tremolo.lib.websocket import WebSocket  # noqa: E402
 from tests.http_server import HTTP_HOST, TEST_FILE  # noqa: E402
 from tests.asgi_server import app, ASGI_PORT  # noqa: E402
 from tests.utils import (  # noqa: E402
@@ -137,6 +138,19 @@ class TestASGIClient(unittest.TestCase):
         self.assertTrue(
             b'name or value cannot contain illegal characters' in body
         )
+
+    def test_websocket(self):
+        payload = getcontents(
+            host=HTTP_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    ASGI_PORT,
+                    WebSocket.create_frame(b'Hello, world!', mask=True))
+        )
+        self.assertEqual(payload, WebSocket.create_frame(b'Hello, world!'))
 
 
 if __name__ == '__main__':

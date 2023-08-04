@@ -34,8 +34,10 @@ class Request:
         while self._protocol.queue[0] is not None:
             recv_waiter = self._protocol.loop.create_future()
             self._protocol.loop.create_task(
-                self._protocol.set_timeout(recv_waiter,
-                                           timeout_cb=self.recv_timeout)
+                self._protocol.set_timeout(
+                    recv_waiter,
+                    timeout=self._protocol.options['keepalive_timeout'],
+                    timeout_cb=self.recv_timeout)
             )
 
             data = await self._protocol.queue[0].get()

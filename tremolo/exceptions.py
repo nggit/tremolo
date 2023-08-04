@@ -14,7 +14,8 @@ from .lib.http_exception import (  # noqa: F401
     RangeNotSatisfiable,
     ExpectationFailed,
     InternalServerError,
-    ServiceUnavailable
+    ServiceUnavailable,
+    WebSocketException
 )
 
 

@@ -1,11 +1,12 @@
 # Copyright (c) 2023 nggit
 
-from datetime import datetime  # noqa: E402
-from urllib.parse import parse_qs  # noqa: E402
+from datetime import datetime
+from urllib.parse import parse_qs
 
-from .contexts import ServerContext  # noqa: E402
-from .exceptions import ExpectationFailed  # noqa: E402
-from .lib.http_protocol import HTTPProtocol  # noqa: E402
+from .contexts import ServerContext
+from .exceptions import ExpectationFailed
+from .lib.http_protocol import HTTPProtocol
+from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
@@ -121,10 +122,20 @@ class HTTPServer(HTTPProtocol):
             await self.response.send(b'HTTP/%s 100 Continue\r\n\r\n' %
                                      self.request.version)
 
+    def _handle_websocket(self):
+        if (b'upgrade' in self.request.headers and
+                b'connection' in self.request.headers and
+                b'sec-websocket-key' in self.request.headers and
+                self.request.headers[b'upgrade'].lower() == b'websocket'):
+            self._server['websocket'] = WebSocket(self.request, self.response)
+
     async def _handle_response(self, func, options={}):
         options['rate'] = options.get('rate', self.options['download_rate'])
         options['buffer_size'] = options.get('buffer_size',
                                              self.options['buffer_size'])
+
+        if self.options['ws'] and 'websocket' in options:
+            self._handle_websocket()
 
         if 'status' in options:
             self.response.set_status(*options['status'])
@@ -174,20 +185,24 @@ class HTTPServer(HTTPProtocol):
                                                        *status)
 
         if is_agen:
-            if no_content:
+            if no_content and status[0] not in (101, 426):
                 self.response.append_header(b'Connection: close\r\n\r\n')
             else:
-                if not self.response.http_chunked:
-                    self.request.http_keepalive = False
-
                 if status[0] == 101:
                     self.request.http_upgrade = True
+                else:
+                    if not self.response.http_chunked:
+                        self.request.http_keepalive = False
+
+                    self.response.append_header(
+                        b'Content-Type: %s\r\n' %
+                        self.response.get_content_type()
+                    )
 
                 self.response.append_header(
-                    b'Content-Type: %s\r\nConnection: %s\r\n\r\n' % (
-                        self.response.get_content_type(),
-                        {False: b'keep-alive',
-                            True: b'upgrade'}[status[0] in (101, 426)])
+                    b'Connection: %s\r\n\r\n' % {
+                        False: b'keep-alive',
+                        True: b'upgrade'}[status[0] in (101, 426)]
                 )
 
             if self.request.method == b'HEAD' or no_content:

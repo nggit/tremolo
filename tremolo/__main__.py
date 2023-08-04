@@ -32,6 +32,7 @@ for i in range(len(sys.argv)):
         print('  --ssl-key                 SSL private key location')
         print('                            E.g. "/path/to/privkey.pem"')
         print('  --debug                   Enable debug mode.')
+        print('  --no-ws                   Disable built-in WebSocket support.')  # noqa: E501
         print('                            Intended for development')
         print('  --log-level               Defaults to "DEBUG". See')
         print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
@@ -47,6 +48,8 @@ for i in range(len(sys.argv)):
         print('  --root-path               Set the ASGI root_path. Defaults to ""')  # noqa: E501
         print('  --help                    Show this help and exit')
         sys.exit()
+    elif sys.argv[i - 1] == '--no-ws':
+        options['ws'] = False
     elif sys.argv[i - 1] in ('--debug', '--reuse-port'):
         options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = True
     elif sys.argv[i - 1] in ('--host',

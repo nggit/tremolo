@@ -177,26 +177,31 @@ class HTTPResponse(Response):
                 self._header[0] = b'HTTP/%s %d %s\r\n' % (
                     self._request.version, *status)
 
-                if no_content:
+                if no_content and status[0] not in (101, 426):
                     self.append_header(b'Connection: close\r\n\r\n')
                 else:
                     if not self.http_chunked and not (
-                            self._request.version == b'1.1' and
-                            b'range' in self._request.headers):
+                            self._request.version == b'1.1' and (
+                                status[0] in (101, 426) or
+                                b'range' in self._request.headers)):
                         self._request.http_keepalive = False
 
                     if status[0] == 101:
                         self._request.http_upgrade = True
+                    else:
+                        self.append_header(b'Content-Type: %s\r\n' %
+                                           self.get_content_type())
 
                     self.append_header(
-                        b'Content-Type: %s\r\nConnection: %s\r\n\r\n' % (
-                            self.get_content_type(),
-                            {False: b'keep-alive',
-                                True: b'upgrade'}[status[0] in (101, 426)])
+                        b'Connection: %s\r\n\r\n' % {
+                            False: b'keep-alive',
+                            True: b'upgrade'}[status[0] in (101, 426)]
                     )
 
                 if self._request.method == b'HEAD' or no_content:
-                    self._request.http_keepalive = False
+                    if status[0] not in (101, 426):
+                        self._request.http_keepalive = False
+
                     data = None
                 else:
                     self._request.protocol.set_watermarks(high=buffer_size * 4,

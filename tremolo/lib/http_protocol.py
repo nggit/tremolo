@@ -105,12 +105,13 @@ class HTTPProtocol(asyncio.Protocol):
             return await waiter
         except asyncio.CancelledError:
             if self._transport is not None:
-                if callable(timeout_cb):
-                    await timeout_cb(timeout)
-
-                if (self._transport is not None and
-                        not self._transport.is_closing()):
-                    self._transport.abort()
+                try:
+                    if callable(timeout_cb):
+                        await timeout_cb(timeout)
+                finally:
+                    if (self._transport is not None and
+                            not self._transport.is_closing()):
+                        self._transport.abort()
         finally:
             timer.cancel()
 
@@ -256,6 +257,8 @@ class HTTPProtocol(asyncio.Protocol):
                 if (b'expect' in self._request.headers and
                         self._request.headers[b'expect']
                         .lower() == b'100-continue'):
+                    # we can handle continue later after the route is found
+                    # by checking this state
                     self._request.http_continue = True
 
                 # the initial body that accompanies the header
@@ -376,8 +379,11 @@ class HTTPProtocol(asyncio.Protocol):
                     )
                     self._waiters['send'] = self._loop.create_future()
 
-                    await self.set_timeout(self._waiters['send'],
-                                           timeout_cb=self.send_timeout)
+                    await self.set_timeout(
+                        self._waiters['send'],
+                        timeout=self._options['keepalive_timeout'],
+                        timeout_cb=self.send_timeout
+                    )
 
                     if self._transport is None:
                         return
@@ -405,7 +411,9 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 pass
 
-        if not self._request.http_continue:
+        if not (self._request.http_continue or self._request.http_upgrade):
+            # reset. so the next data in data_received will be considered as
+            # a fresh http request (not a continuation data)
             self._data = bytearray()
             self._request.clear_body()
             self._waiters.clear()
@@ -423,20 +431,23 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_lost(self, exc):
         for task in self.tasks:
-            if callable(task):
-                # even if you put callable objects in self.tasks,
-                # they will be executed when the client is disconnected.
-                # this is useful for the cleanup mechanism.
-                task()
-                continue
-
             try:
+                if callable(task):
+                    # even if you put callable objects in self.tasks,
+                    # they will be executed when the client is disconnected.
+                    # this is useful for the cleanup mechanism.
+                    task()
+                    continue
+
                 exc = task.exception()
 
                 if exc:
                     self.print_exception(exc)
             except asyncio.InvalidStateError:
                 task.cancel()
+            except Exception as exc:
+                self.print_exception(exc)
+                continue
 
         for queue in self._queue:
             if not queue.clear():

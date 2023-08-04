@@ -61,9 +61,16 @@ def getcontents(
         while sock.connect_ex((host, port)) != 0:
             time.sleep(1)
 
+        payload = b''
+
+        if b'\r\nupgrade:' in raw.lower():
+            payload = raw[raw.find(b'\r\n\r\n') + 4:]
+            raw = raw[:raw.find(b'\r\n\r\n') + 4]
+
         sock.sendall(raw)
 
         response_data = bytearray()
+        response_header = b''
         buf = True
 
         while buf:
@@ -78,6 +85,13 @@ def getcontents(
                         'http/{:s} 100 continue'
                         .format(version).encode('latin-1')):
                     del response_data[:]
+                    continue
+
+                if response_header.lower().startswith(
+                        'http/{:s} 101 '
+                        .format(version).encode('latin-1')):
+                    del response_data[:]
+                    sock.sendall(payload)
                     continue
 
                 if method.upper() == 'HEAD':
@@ -96,6 +110,9 @@ def getcontents(
                         response_header.lower()
                         ):
                     break
+
+            if payload != b'':
+                return response_data
 
         return response_header, response_data[header_size + 4:]
 

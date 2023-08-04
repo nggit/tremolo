@@ -20,6 +20,20 @@ ASGI_PORT = HTTP_PORT + 10
 
 
 async def app(scope, receive, send):
+    if scope['type'] == 'websocket':
+        data = await receive()
+
+        if data['type'] == 'websocket.connect':
+            await send({
+                'type': 'websocket.accept'
+            })
+
+        await send({
+            'type': 'websocket.send',
+            'bytes': (await receive()).get('bytes', b'')
+        })
+        return
+
     assert scope['type'] == 'http'
     more_body = True
 

@@ -13,6 +13,7 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
+from tremolo.lib.websocket import WebSocket  # noqa: E402
 from tests.http_server import (  # noqa: E402
     app,
     HTTP_HOST,
@@ -672,6 +673,24 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 416 Range Not Satisfiable')
         self.assertTrue(b'Range Not Satisfiable' in body)
+
+    def test_websocket(self):
+        for query, data in ((b'receive', b'\x82\rHello, world!'),
+                            (b'ping', b'\x89\x00'),
+                            (b'close', b'\x88\x02\x03\xe8')):
+            payload = getcontents(
+                host=HTTP_HOST,
+                port=HTTP_PORT,
+                raw=b'GET /ws?%s HTTP/1.1\r\nHost: localhost:%d\r\n'
+                    b'Upgrade: websocket\r\n'
+                    b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                    b'Connection: upgrade\r\n\r\n%s' % (
+                        query,
+                        HTTP_PORT,
+                        WebSocket.create_frame(b'Hello, world!', mask=True))
+            )
+
+            self.assertEqual(payload, data)
 
 
 if __name__ == '__main__':

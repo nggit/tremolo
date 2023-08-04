@@ -56,6 +56,23 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(self.output.getvalue()[:6], 'Usage:')
         self.assertEqual(code, 0)
 
+    def test_cli_no_ws(self):
+        sys.argv.append('--no-ws')
+
+        code = 0
+        sys.stdout = self.output
+
+        try:
+            run()
+        except SystemExit as exc:
+            if exc.code:
+                code = exc.code
+
+        sys.stdout = STDOUT
+
+        self.assertEqual(self.output.getvalue(), '')
+        self.assertEqual(code, 0)
+
     def test_cli_debug(self):
         sys.argv.append('--debug')
 

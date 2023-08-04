@@ -344,6 +344,7 @@ class Tremolo:
                            lock=lock,
                            sock=sock,
                            debug=options.get('debug', False),
+                           ws=options.get('ws', True),
                            download_rate=options.get('download_rate', 1048576),
                            upload_rate=options.get('upload_rate', 1048576),
                            buffer_size=options.get('buffer_size', 16 * 1024),

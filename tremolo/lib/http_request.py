@@ -91,9 +91,6 @@ class HTTPRequest(Request):
 
         return self._ip
 
-    def append_body(self, value):
-        self._body.extend(value)
-
     def clear_body(self):
         del self._body[:]
         del self._read_buf[:]
@@ -102,15 +99,9 @@ class HTTPRequest(Request):
     async def recv_timeout(self, timeout):
         raise RequestTimeout
 
-    def recv(self, size=None):
-        if size is None:
-            return self.stream(raw=True)
-
-        return self._read(size=size, raw=True)
-
     async def body(self, raw=False):
         async for data in self.stream(raw=raw):
-            self.append_body(data)
+            self._body.extend(data)
 
         return self._body
 
@@ -118,12 +109,12 @@ class HTTPRequest(Request):
         if size is None:
             return self.stream()
 
-        return self._read(size=size)
+        return self.recv(size=size, raw=False)
 
     def eof(self):
         return self._eof and self._read_buf == b''
 
-    async def _read(self, size=-1, raw=False):
+    async def recv(self, size=-1, raw=True):
         if size == 0 or self.eof():
             return bytearray()
 
@@ -133,11 +124,12 @@ class HTTPRequest(Request):
         if self._read_instance is None:
             self._read_instance = self.stream(raw=raw)
 
-        async for data in self._read_instance:
-            self._read_buf.extend(data)
+        if len(self._read_buf) < size:
+            async for data in self._read_instance:
+                self._read_buf.extend(data)
 
-            if len(self._read_buf) >= size:
-                break
+                if len(self._read_buf) >= size:
+                    break
 
         buf = self._read_buf[:size]
         del self._read_buf[:size]
@@ -269,7 +261,7 @@ class HTTPRequest(Request):
             if (b'application/x-www-form-urlencoded' in
                     self.content_type.lower()):
                 async for data in self.stream():
-                    self.append_body(data)
+                    self._body.extend(data)
 
                     if self.body_size > limit:
                         break

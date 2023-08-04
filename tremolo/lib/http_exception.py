@@ -99,3 +99,7 @@ class InternalServerError(HTTPException):
 class ServiceUnavailable(HTTPException):
     code = 503
     message = 'Service Unavailable'
+
+
+class WebSocketException(HTTPException):
+    code = 1011

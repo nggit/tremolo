@@ -194,6 +194,19 @@ async def upload_multipart(**server):
 async def download(**server):
     await server['response'].sendfile(TEST_FILE, content_type=b'text/plain')
 
+
+@app.route('/ws')
+async def ws_handler(websocket=None, **_):
+    await websocket.accept()
+
+    if websocket.request.query_string == b'ping':
+        await websocket.ping()
+    elif websocket.request.query_string == b'close':
+        await websocket.close()
+    else:
+        await websocket.send(await websocket.receive())
+
+
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=2)
 app.listen(HTTP_PORT + 2)
