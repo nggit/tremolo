@@ -36,7 +36,7 @@ class ASGIServer(HTTPProtocol):
 
         super().__init__(ServerContext(), **kwargs)
 
-    async def _handle_websocket(self):
+    def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
 
         self._scope['type'] = 'websocket'
@@ -88,7 +88,7 @@ class ASGIServer(HTTPProtocol):
                 b'connection' in self.request.headers and
                 b'sec-websocket-key' in self.request.headers and
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
-            await self._handle_websocket()
+            self._handle_websocket()
         else:
             await self._handle_http()
             self._read = self.request.stream()
@@ -126,8 +126,8 @@ class ASGIServer(HTTPProtocol):
         if self._scope['type'] == 'websocket':
             # initially, the Request.http_upgrade value is False
             # it will become True later
-            # after the response status is set to 301:
-            # Response.set_status(301) in WebSocket.accept()
+            # after the response status is set to 101:
+            # Response.set_status(101) in WebSocket.accept()
             if not self.request.http_upgrade:
                 return {'type': 'websocket.connect'}
 
