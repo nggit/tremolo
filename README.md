@@ -1,6 +1,6 @@
 # Tremolo
 
-Tremolo is a stream-oriented, asynchronous, programmable HTTP server written in pure Python. It can also serve as an ASGI server.
+Tremolo is a stream-oriented, asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
 
 Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
 
@@ -55,7 +55,7 @@ Your first *hello world* page with Tremolo will be at http://localhost:8000/hell
 ## ASGI Server
 Tremolo is an HTTP Server framework. You can build abstractions on top of it, say an ASGI server.
 
-In fact, Tremolo already has ASGI server implementation.
+In fact, Tremolo already has ASGI server (plus WebSocket) implementation.
 
 So you can immediately use existing [ASGI applications / frameworks](https://asgi.readthedocs.io/en/latest/implementations.html#application-frameworks), behind Tremolo (ASGI server).
 
@@ -154,7 +154,7 @@ python3 -m pip install --upgrade tremolo
 ```
 
 ## Testing
-Just run `python3 alltests.py` for all tests. Or each *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/master/tests) folder, for example `python3 tests/test_cli.py`.
+Just run `python3 alltests.py` for all tests. Or individual *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/master/tests) folder, for example `python3 tests/test_cli.py`.
 
 If you also want measurements with [coverage](https://coverage.readthedocs.io/):
 

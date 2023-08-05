@@ -23,7 +23,6 @@ async def ws_handler(websocket=None, request=None, **_):
 
     Normally, you should separate http:// and ws:// respectively.
     """
-
     if websocket is not None:
         # an upgrade request is received.
         # accept it by sending the "101 Switching Protocols"
