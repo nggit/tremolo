@@ -17,6 +17,7 @@ from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
+from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import QueuePool  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
@@ -283,6 +284,9 @@ class Tremolo:
             host = host.encode('latin-1')
 
         lock = ServerLock(options['locks'], loop=self._loop)
+        connections = KeepAliveConnections(
+            maxlen=options.get('keepalive_connections', 512)
+        )
         pools = {
             'queue': QueuePool(1024, self._logger)
         }
@@ -343,6 +347,7 @@ class Tremolo:
                            logger=self._logger,
                            lock=lock,
                            sock=sock,
+                           connections=connections,
                            debug=options.get('debug', False),
                            ws=options.get('ws', True),
                            download_rate=options.get('download_rate', 1048576),

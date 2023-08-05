@@ -44,6 +44,8 @@ for i in range(len(sys.argv)):
         print('  --client-max-body-size    Defaults to 2 * 1048576, or 2MiB')
         print('  --request-timeout         Defaults to 30 (seconds)')
         print('  --keepalive-timeout       Defaults to 30 (seconds)')
+        print('  --keepalive-connections   Maximum number of keep-alive connections')  # noqa: E501
+        print('                            Defaults to 512 (connections/worker)')  # noqa: E501
         print('  --server-name             Set the "Server" field in the response header')  # noqa: E501
         print('  --root-path               Set the ASGI root_path. Defaults to ""')  # noqa: E501
         print('  --help                    Show this help and exit')
@@ -65,7 +67,8 @@ for i in range(len(sys.argv)):
                              '--buffer-size',
                              '--client-max-body-size',
                              '--request-timeout',
-                             '--keepalive-timeout'):
+                             '--keepalive-timeout',
+                             '--keepalive-connections'):
         try:
             options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = int(sys.argv[i])  # noqa: E501
         except ValueError:

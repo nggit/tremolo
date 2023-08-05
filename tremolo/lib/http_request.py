@@ -96,9 +96,6 @@ class HTTPRequest(Request):
         del self._read_buf[:]
         super().clear_body()
 
-    async def recv_timeout(self, timeout):
-        raise RequestTimeout
-
     async def body(self, raw=False):
         async for data in self.stream(raw=raw):
             self._body.extend(data)

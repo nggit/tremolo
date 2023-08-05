@@ -154,7 +154,10 @@ class WebSocket:
         )
 
     def _ping(self):
-        return self.protocol.loop.create_task(self.ping())
+        # ping only if this connection is still listed,
+        # otherwise let the recv timeout drop it
+        if self.protocol in self.protocol.options['connections']:
+            return self.protocol.loop.create_task(self.ping())
 
     async def ping(self):
         await self.send(b'', opcode=9)

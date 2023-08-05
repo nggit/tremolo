@@ -397,6 +397,20 @@ class HTTPProtocol(asyncio.Protocol):
                     self.print_exception(exc)
 
     def _handle_keepalive(self):
+        if 'request' in self._waiters:
+            # store this keepalive connection
+            self._options['connections'][self] = None
+
+        if self not in self._options['connections']:
+            if self._transport.can_write_eof():
+                self._transport.write_eof()
+
+            self._transport.close()
+            self._options['logger'].info(
+                'a keepalive connection is kicked out of the list'
+            )
+            return
+
         for task in self.tasks[:]:
             if callable(task):
                 continue
@@ -430,6 +444,9 @@ class HTTPProtocol(asyncio.Protocol):
         self._transport.resume_reading()
 
     def connection_lost(self, exc):
+        if self in self._options['connections']:
+            del self._options['connections'][self]
+
         for task in self.tasks:
             try:
                 if callable(task):
