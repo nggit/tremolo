@@ -46,7 +46,7 @@ class ASGIServer(HTTPProtocol):
         }[self.request.transport.get_extra_info('sslcontext') is None]
         self._scope['subprotocols'] = [
             value.decode('utf-8') for value in
-            self.request.headers.getlist('sec-websocket-protocol')]
+            self.request.headers.getlist(b'sec-websocket-protocol')]
 
     async def _handle_http(self):
         if self.request.http_continue:
