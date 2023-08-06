@@ -39,6 +39,9 @@ class HTTPResponse(Response):
     def header(self, value):
         self._header[0] = value
 
+    def headers_sent(self):
+        return self._header is None
+
     def append_header(self, value):
         self._header[1].extend(value)
 
@@ -130,7 +133,7 @@ class HTTPResponse(Response):
         super().close()
 
     async def end(self, data=b'', **kwargs):
-        if self._header is None:
+        if self.headers_sent():
             await self.write(data, throttle=False)
         else:
             status = self.get_status()
@@ -162,7 +165,7 @@ class HTTPResponse(Response):
     async def write(self, data, buffer_size=16 * 1024, **kwargs):
         kwargs['buffer_size'] = buffer_size
 
-        if self._header is not None:
+        if not self.headers_sent():
             if self._header[0] == b'':
                 status = self.get_status()
                 no_content = status[0] in (204, 304) or 100 <= status[0] < 200

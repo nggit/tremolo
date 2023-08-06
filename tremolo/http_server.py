@@ -40,21 +40,18 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         func = self._middlewares['connect'][-1][0]
-        self._server['context'].set(
+        self.context.set(
             'options',
             self._middlewares['connect'][-1][1]
         )
 
         if func is None:
-            self._server['context'].ON_CONNECT = None
+            self.context.ON_CONNECT = None
         else:
-            self._server['context'].ON_CONNECT = self._server['loop'].create_task(  # noqa: E501
+            self.context.ON_CONNECT = self.loop.create_task(
                 self._connection_made(func)
             )
-
-            self._server['context'].tasks.append(
-                self._server['context'].ON_CONNECT
-            )
+            self.context.tasks.append(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
         func = self._middlewares['close'][-1][0]
@@ -63,10 +60,10 @@ class HTTPServer(HTTPProtocol):
             super().connection_lost(exc)
             return
 
-        self._server['loop'].create_task(self._connection_lost(func, exc))
+        self.loop.create_task(self._connection_lost(func, exc))
 
     def _set_base_header(self, options={}):
-        if self.response.header is None or self.response.header[1] != b'':
+        if self.response.headers_sent() or self.response.header[1] != b'':
             return
 
         options['server_name'] = options.get('server_name',
@@ -83,9 +80,9 @@ class HTTPServer(HTTPProtocol):
         )
 
     async def _handle_middleware(self, func, options={}):
-        if self.response.header is not None:
+        if not self.response.headers_sent():
             self._set_base_header(options)
-            self._server['context'].set('options', options)
+            self.context.set('options', options)
 
         data = await func(**self._server,
                           request=self.request,
@@ -145,7 +142,7 @@ class HTTPServer(HTTPProtocol):
 
         self._set_base_header(options)
 
-        self._server['context'].set('options', options)
+        self.context.set('options', options)
         agen = func(**self._server,
                     request=self.request, response=self.response)
 
@@ -267,10 +264,10 @@ class HTTPServer(HTTPProtocol):
         await self.response.send(None)
 
     async def header_received(self):
-        if self._server['context'].ON_CONNECT is not None:
-            await self._server['context'].ON_CONNECT
+        if self.context.ON_CONNECT is not None:
+            await self.context.ON_CONNECT
 
-        options = self._server['context'].options
+        options = self.context.options
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(

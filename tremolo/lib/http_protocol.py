@@ -166,7 +166,7 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def handle_exception(self, exc):
         if (self._request is None or self._response is None or
-                self._response.header is None):
+                self._response.headers_sent()):
             return
 
         self.print_exception(exc, self._request.path.decode('latin-1'))
