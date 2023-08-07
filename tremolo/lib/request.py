@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+import asyncio
+
 
 class Request:
     __slots__ = ('_protocol',
@@ -25,24 +27,26 @@ class Request:
     def clear_body(self):
         self.body_size = 0
 
-    async def recv_timeout(self, timeout):
-        self._protocol.options['logger'].info(
-            'recv timeout after {:g}s'.format(timeout)
-        )
-
     async def recv(self):
         while self._protocol.queue[0] is not None:
-            recv_waiter = self._protocol.loop.create_future()
-            self._protocol.loop.create_task(
-                self._protocol.set_timeout(
-                    recv_waiter,
-                    timeout=self._protocol.options['keepalive_timeout'],
-                    timeout_cb=self.recv_timeout)
+            task = self._protocol.loop.create_task(
+                self._protocol.queue[0].get()
+            )
+            timer = self._protocol.loop.call_at(
+                self._protocol.loop.time() +
+                self._protocol.options['keepalive_timeout'],
+                task.cancel
             )
 
-            data = await self._protocol.queue[0].get()
-            self._protocol.queue[0].task_done()
-            recv_waiter.set_result(None)
+            try:
+                await task
+                self._protocol.queue[0].task_done()
+            except asyncio.CancelledError:
+                raise TimeoutError('recv timeout')
+            finally:
+                timer.cancel()
+
+            data = task.result()
 
             if data is None:
                 break

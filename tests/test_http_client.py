@@ -455,6 +455,18 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(data, (b'', b''))
 
+    def test_recvtimeout(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 1,
+            raw=b'GET /timeouts?recv HTTP/1.1\r\nHost: localhost:%d\r\n\r\n' %
+                (HTTP_PORT + 1)
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 408 Request Timeout')
+        self.assertEqual(body, b'Request Timeout')
+
     def test_download_10(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT + 2,

@@ -10,7 +10,8 @@ from .contexts import ServerContext
 from .exceptions import (
     ExpectationFailed,
     InternalServerError,
-    WebSocketException
+    WebSocketException,
+    WebSocketClientClosed
 )
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
@@ -114,7 +115,7 @@ class ASGIServer(HTTPProtocol):
                 'task: ASGI application is cancelled due to timeout'
             )
         except Exception as exc:
-            await self.handle_exception(InternalServerError(cause=exc))
+            await self.handle_exception(exc)
 
     def _set_app_timeout(self):
         if self._timer is None:
@@ -145,13 +146,18 @@ class ASGIServer(HTTPProtocol):
                     'bytes': payload
                 }
             except WebSocketException as exc:
+                code = 1005
+
+                if isinstance(exc, WebSocketClientClosed):
+                    code = exc.code
+
                 if self.request is not None:
                     self.print_exception(exc)
 
                 self._set_app_timeout()
                 return {
                     'type': 'websocket.disconnect',
-                    'code': exc.code
+                    'code': code
                 }
 
         if self._scope['type'] != 'http':

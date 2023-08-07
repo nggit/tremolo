@@ -4,7 +4,7 @@ import base64
 import hashlib
 import os
 
-from .http_exception import WebSocketException
+from .http_exception import WebSocketClientClosed, WebSocketServerClosed
 
 
 class WebSocket:
@@ -42,11 +42,12 @@ class WebSocket:
                                             byteorder='big')
 
             if payload_length > self.protocol.options['client_max_body_size']:
-                raise WebSocketException(
+                raise WebSocketServerClosed(
                     '{:d} exceeds maximum payload size ({:d})'
                     .format(
                         payload_length,
-                        self.protocol.options['client_max_body_size'])
+                        self.protocol.options['client_max_body_size']),
+                    code=1009
                 )
 
         if is_masked:
@@ -80,14 +81,15 @@ class WebSocket:
             if unmasked_data != b'':
                 code = int.from_bytes(unmasked_data[:2], byteorder='big')
 
-            raise WebSocketException(
+            raise WebSocketClientClosed(
                 'connection closed ({:d})'.format(code),
                 code=code
             )
 
-        raise WebSocketException(
+        raise WebSocketServerClosed(
             'unsupported opcode {:x} with payload length {:d}'
-            .format(opcode, payload_length)
+            .format(opcode, payload_length),
+            code=1008
         )
 
     async def receive(self):
@@ -104,6 +106,8 @@ class WebSocket:
 
             try:
                 payload = await self.recv()
+            except TimeoutError:
+                raise WebSocketServerClosed('receive timeout', code=1000)
             finally:
                 timer.cancel()
 
@@ -164,3 +168,6 @@ class WebSocket:
 
     async def close(self, code=1000):
         await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
+
+        if self.response is not None:
+            self.response.close()

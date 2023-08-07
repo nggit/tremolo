@@ -6,9 +6,17 @@ import traceback
 from datetime import datetime
 
 from .h1parser import ParseHeader
-from .http_exception import HTTPException, BadRequest, InternalServerError
+from .http_exception import (
+    HTTPException,
+    BadRequest,
+    InternalServerError,
+    RequestTimeout,
+    WebSocketException,
+    WebSocketServerClosed
+)
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
+from .websocket import WebSocket
 
 
 class HTTPProtocol(asyncio.Protocol):
@@ -166,10 +174,28 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def handle_exception(self, exc):
         if (self._request is None or self._response is None or
-                self._response.headers_sent()):
+                (self._response.headers_sent() and
+                 not self._request.http_upgrade)):
             return
 
         self.print_exception(exc, self._request.path.decode('latin-1'))
+
+        if isinstance(exc, WebSocketException):
+            if isinstance(exc, WebSocketServerClosed):
+                await self._response.send(
+                    WebSocket.create_frame(
+                        exc.code.to_bytes(2, byteorder='big'),
+                        opcode=8)
+                )
+
+            if self._response is not None:
+                self._response.close()
+            return
+
+        if isinstance(exc, TimeoutError):
+            exc = RequestTimeout(cause=exc)
+        elif not isinstance(exc, HTTPException):
+            exc = InternalServerError(cause=exc)
 
         encoding = 'utf-8'
 
@@ -278,9 +304,6 @@ class HTTPProtocol(asyncio.Protocol):
 
             await self.header_received()
         except Exception as exc:
-            if not isinstance(exc, HTTPException):
-                exc = InternalServerError(cause=exc)
-
             await self.handle_exception(exc)
 
     async def _receive_data(self, data, waiter):

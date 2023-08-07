@@ -2,7 +2,7 @@
 
 from urllib.parse import parse_qs, parse_qsl
 
-from .http_exception import BadRequest, PayloadTooLarge, RequestTimeout
+from .http_exception import BadRequest, PayloadTooLarge
 from .request import Request
 
 

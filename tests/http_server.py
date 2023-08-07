@@ -207,8 +207,15 @@ async def ws_handler(websocket=None, **_):
         await websocket.send(await websocket.receive())
 
 
+@app.route('/timeouts')
+async def timeouts(request=None, **_):
+    if request.query_string == b'recv':
+        # attempt to read body on a GET request
+        # should raise a TimeoutError and ended up with a RequestTimeout
+        await request.recv(100)
+
 # test multiple ports
-app.listen(HTTP_PORT + 1, request_timeout=2)
+app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
 app.listen(HTTP_PORT + 2)
 
 if __name__ == '__main__':

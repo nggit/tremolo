@@ -15,7 +15,9 @@ from .lib.http_exception import (  # noqa: F401
     ExpectationFailed,
     InternalServerError,
     ServiceUnavailable,
-    WebSocketException
+    WebSocketException,
+    WebSocketClientClosed,
+    WebSocketServerClosed
 )
 
 

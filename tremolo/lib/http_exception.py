@@ -103,3 +103,11 @@ class ServiceUnavailable(HTTPException):
 
 class WebSocketException(HTTPException):
     code = 1011
+
+
+class WebSocketClientClosed(WebSocketException):
+    code = 1005
+
+
+class WebSocketServerClosed(WebSocketException):
+    pass
