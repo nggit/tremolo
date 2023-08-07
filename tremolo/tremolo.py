@@ -17,10 +17,11 @@ from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
+from .contexts import ServerContext as WorkerContext  # noqa: E402
+from .exceptions import BadRequest  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import QueuePool  # noqa: E402
-from .exceptions import BadRequest  # noqa: E402
 
 
 class Tremolo:
@@ -241,9 +242,12 @@ class Tremolo:
 
     async def _serve(self, host, port, **options):
         on_start = self._events['worker']['start'][-1]
+        context = WorkerContext()
 
         if on_start is not None:
-            await on_start(loop=self._loop, logger=self._logger)
+            await on_start(context=context,
+                           loop=self._loop,
+                           logger=self._logger)
 
         options['conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
@@ -347,7 +351,7 @@ class Tremolo:
                            logger=self._logger,
                            lock=lock,
                            sock=sock,
-                           connections=connections,
+                           worker=context,
                            debug=options.get('debug', False),
                            ws=options.get('ws', True),
                            download_rate=options.get('download_rate', 1048576),
@@ -361,6 +365,7 @@ class Tremolo:
                                'keepalive_timeout', 30
                            ),
                            server_name=server_name,
+                           _connections=connections,
                            _pools=pools,
                            _app=options['app'],
                            _root_path=options.get('root_path', ''),
@@ -407,7 +412,9 @@ class Tremolo:
         on_stop = self._events['worker']['stop'][-1]
 
         if on_stop is not None:
-            await on_stop(loop=self._loop, logger=self._logger)
+            await on_stop(context=context,
+                          loop=self._loop,
+                          logger=self._logger)
 
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)

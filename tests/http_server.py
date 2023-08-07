@@ -22,8 +22,19 @@ TEST_FILE = __file__
 app = Tremolo()
 
 
+@app.on_start
+async def worker_start(**server):
+    server['context'].shared = 0
+
+
+@app.on_stop
+async def worker_stop(**server):
+    assert server['context'].shared > 0
+
+
 @app.on_request
-async def my_request_middleware(**server):
+async def my_request_middleware(worker=None, **server):
+    worker.shared += 1
     request = server['request']
     response = server['response']
 
@@ -196,8 +207,10 @@ async def download(**server):
 
 
 @app.route('/ws')
-async def ws_handler(websocket=None, **_):
-    await websocket.accept()
+async def ws_handler(websocket=None, tasks=None, **_):
+    # await websocket.accept()
+    task = tasks.create(websocket.accept())
+    await task
 
     if websocket.request.query_string == b'ping':
         await websocket.ping()

@@ -6,6 +6,7 @@ from urllib.parse import parse_qs
 from .contexts import ServerContext
 from .exceptions import ExpectationFailed
 from .lib.http_protocol import HTTPProtocol
+from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket
 
 
@@ -14,14 +15,15 @@ class HTTPServer(HTTPProtocol):
                  '_middlewares',
                  '_server')
 
-    def __init__(self, **kwargs):
+    def __init__(self, lock=None, sock=None, **kwargs):
         self._route_handlers = kwargs['_handlers']
         self._middlewares = kwargs['_middlewares']
         self._server = {
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
-            'lock': kwargs['lock'],
-            'socket': kwargs['sock'],
+            'worker': kwargs['worker'],
+            'lock': lock,
+            'socket': sock,
             'context': ServerContext()
         }
 
@@ -133,6 +135,9 @@ class HTTPServer(HTTPProtocol):
 
         if self.options['ws'] and 'websocket' in options:
             self._handle_websocket()
+
+        if 'tasks' in options:
+            self._server['tasks'] = ServerTasks(self.tasks, loop=self.loop)
 
         if 'status' in options:
             self.response.set_status(*options['status'])

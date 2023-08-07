@@ -4,6 +4,7 @@ import asyncio
 import traceback
 
 from datetime import datetime
+from urllib.parse import quote, unquote
 
 from .h1parser import ParseHeader
 from .http_exception import (
@@ -23,6 +24,8 @@ class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('_context',
                  '_options',
                  '_loop',
+                 '_logger',
+                 '_worker',
                  '_transport',
                  '_queue',
                  '_request',
@@ -31,10 +34,12 @@ class HTTPProtocol(asyncio.Protocol):
                  '_data',
                  '_waiters')
 
-    def __init__(self, context, **kwargs):
+    def __init__(self, context, loop=None, logger=None, worker=None, **kwargs):
         self._context = context
         self._options = kwargs
-        self._loop = kwargs['loop']
+        self._loop = loop
+        self._logger = logger
+        self._worker = worker
         self._transport = None
         self._queue = (None, None)
         self._request = None
@@ -59,6 +64,14 @@ class HTTPProtocol(asyncio.Protocol):
     @property
     def loop(self):
         return self._loop
+
+    @property
+    def logger(self):
+        return self._logger
+
+    @property
+    def worker(self):
+        return self._worker
 
     @property
     def transport(self):
@@ -92,17 +105,17 @@ class HTTPProtocol(asyncio.Protocol):
         ])
 
     async def request_timeout(self, timeout):
-        self._options['logger'].info(
+        self._logger.info(
             'request timeout after {:g}s'.format(timeout)
         )
 
     async def keepalive_timeout(self, timeout):
-        self._options['logger'].info(
+        self._logger.info(
             'keepalive timeout after {:g}s'.format(timeout)
         )
 
     async def send_timeout(self, timeout):
-        self._options['logger'].info(
+        self._logger.info(
             'send timeout after {:g}s'.format(timeout)
         )
 
@@ -161,13 +174,13 @@ class HTTPProtocol(asyncio.Protocol):
                     self._request.http_keepalive = False
                     self._queue[1].put_nowait(None)
 
-                self._options['logger'].info('payload too large')
+                self._logger.info('payload too large')
 
     async def header_received(self):
         return
 
     def print_exception(self, exc, *args):
-        self._options['logger'].error(
+        self._logger.error(
             ': '.join((*args, exc.__class__.__name__, str(exc))),
             exc_info={True: exc, False: False}[self._options['debug']]
         )
@@ -178,7 +191,10 @@ class HTTPProtocol(asyncio.Protocol):
                  not self._request.http_upgrade)):
             return
 
-        self.print_exception(exc, self._request.path.decode('latin-1'))
+        self.print_exception(
+            exc,
+            quote(unquote(self._request.path.decode('latin-1')))
+        )
 
         if isinstance(exc, WebSocketException):
             if isinstance(exc, WebSocketServerClosed):
@@ -243,7 +259,7 @@ class HTTPProtocol(asyncio.Protocol):
             if self._queue[1] is not None:
                 self._queue[1].put_nowait(None)
 
-            self._options['logger'].info('bad request: not a request')
+            self._logger.info('bad request: not a request')
             return
 
         self._request = HTTPRequest(self, header)
@@ -333,10 +349,10 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self._data = None
             elif header_size > 8192:
-                self._options['logger'].info('request header too large')
+                self._logger.info('request header too large')
                 self._transport.abort()
             elif not (header_size == -1 and len(self._data) <= 8192):
-                self._options['logger'].info('bad request')
+                self._logger.info('bad request')
                 self._transport.abort()
 
             return
@@ -393,7 +409,7 @@ class HTTPProtocol(asyncio.Protocol):
                 write_buffer_size = self._transport.get_write_buffer_size()
 
                 if write_buffer_size > self._watermarks['high']:
-                    self._options['logger'].info(
+                    self._logger.info(
                         '{:d} exceeds the current watermark limits '
                         '(high={:d}, low={:d})'.format(
                             write_buffer_size,
@@ -422,14 +438,14 @@ class HTTPProtocol(asyncio.Protocol):
     def _handle_keepalive(self):
         if 'request' in self._waiters:
             # store this keepalive connection
-            self._options['connections'][self] = None
+            self._options['_connections'][self] = None
 
-        if self not in self._options['connections']:
+        if self not in self._options['_connections']:
             if self._transport.can_write_eof():
                 self._transport.write_eof()
 
             self._transport.close()
-            self._options['logger'].info(
+            self._logger.info(
                 'a keepalive connection is kicked out of the list'
             )
             return
@@ -467,8 +483,8 @@ class HTTPProtocol(asyncio.Protocol):
         self._transport.resume_reading()
 
     def connection_lost(self, exc):
-        if self in self._options['connections']:
-            del self._options['connections'][self]
+        if self in self._options['_connections']:
+            del self._options['_connections'][self]
 
         for task in self.tasks:
             try:

@@ -26,8 +26,8 @@ class ASGIServer(HTTPProtocol):
                  '_timeout',
                  '_websocket')
 
-    def __init__(self, **kwargs):
-        self._app = kwargs['_app']
+    def __init__(self, _app=None, **kwargs):
+        self._app = _app
         self._scope = None
         self._read = None
         self._task = None
@@ -111,7 +111,7 @@ class ASGIServer(HTTPProtocol):
             if self._timer is not None:
                 self._timer.cancel()
         except asyncio.CancelledError:
-            self.options['logger'].warning(
+            self.logger.warning(
                 'task: ASGI application is cancelled due to timeout'
             )
         except Exception as exc:
