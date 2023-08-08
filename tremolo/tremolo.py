@@ -19,6 +19,7 @@ from importlib import import_module  # noqa: E402
 
 from .contexts import ServerContext as WorkerContext  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
+from .utils import html_escape  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import QueuePool  # noqa: E402
@@ -233,12 +234,8 @@ class Tremolo:
         )
         yield (b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr />'
                b'<address>%s</address></body></html>') % (
-                  (server['request'].path
-                   .replace(b'&', b'&amp;')
-                   .replace(b'<', b'&lt;')
-                   .replace(b'>', b'&gt;')
-                   .replace(b'"', b'&quot;')),
-                  server['context'].options['server_name'])
+                   html_escape(server['request'].path),
+                   server['context'].options['server_name'])
 
     async def _serve(self, host, port, **options):
         on_start = self._events['worker']['start'][-1]
@@ -249,23 +246,26 @@ class Tremolo:
                            loop=self._loop,
                            logger=self._logger)
 
-        options['conn'].send(os.getpid())
+        options['_conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
 
         if hasattr(socket, 'fromshare'):
-            sock = socket.fromshare(options['conn'].recv())
+            # Windows
+            sock = socket.fromshare(options['_conn'].recv())
             sock.listen(backlog)
         else:
-            fd = options['conn'].recv()
+            fd = options['_conn'].recv()
 
             try:
-                sock = socket.fromfd(fd, options['sa_family'],
+                # Linux 'fork'
+                sock = socket.fromfd(fd, options['_sa_family'],
                                      socket.SOCK_STREAM)
                 sock.listen(backlog)
-                options['conn'].send(True)
-            except Exception:
-                options['conn'].send(False)
-                sock = options['conn'].recv()
+                options['_conn'].send(True)
+            except OSError:
+                # Linux 'spawn'
+                options['_conn'].send(False)
+                sock = options['_conn'].recv()
                 sock.listen(backlog)
 
         if ('ssl' in options and options['ssl'] and
@@ -287,7 +287,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode('latin-1')
 
-        lock = ServerLock(options['locks'], loop=self._loop)
+        lock = ServerLock(options['_locks'], loop=self._loop)
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
@@ -344,7 +344,7 @@ class Tremolo:
             from .http_server import HTTPServer as Server
 
             options['app'] = None
-            self.compile_handlers(options['handlers'])
+            self.compile_handlers(options['_handlers'])
 
         server = await self._loop.create_server(
             lambda: Server(loop=self._loop,
@@ -369,8 +369,8 @@ class Tremolo:
                            _pools=pools,
                            _app=options['app'],
                            _root_path=options.get('root_path', ''),
-                           _handlers=options['handlers'],
-                           _middlewares=options['middlewares']),
+                           _handlers=options['_handlers'],
+                           _middlewares=options['_middlewares']),
             sock=sock, backlog=backlog, ssl=ssl_context)
 
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
@@ -391,15 +391,15 @@ class Tremolo:
         while True:
             try:
                 # ping parent process
-                options['conn'].send(None)
+                options['_conn'].send(None)
 
                 for _ in range(2 * process_num):
                     await asyncio.sleep(1)
 
-                    if options['conn'].poll():
+                    if options['_conn'].poll():
                         break
 
-                process_num = options['conn'].recv()
+                process_num = options['_conn'].recv()
             except (BrokenPipeError, ConnectionResetError, EOFError):
                 break
 
@@ -511,11 +511,11 @@ class Tremolo:
                     target=self._worker,
                     args=args,
                     kwargs=dict(options,
-                                locks=locks,
-                                conn=child_conn,
-                                sa_family=socks[args].family,
-                                handlers=self._route_handlers,
-                                middlewares=self._middlewares)
+                                _locks=locks,
+                                _conn=child_conn,
+                                _sa_family=socks[args].family,
+                                _handlers=self._route_handlers,
+                                _middlewares=self._middlewares)
                 )
 
                 p.start()
@@ -543,11 +543,11 @@ class Tremolo:
                             target=self._worker,
                             args=args,
                             kwargs=dict(options,
-                                        locks=locks,
-                                        conn=child_conn,
-                                        sa_family=socks[args].family,
-                                        handlers=self._route_handlers,
-                                        middlewares=self._middlewares)
+                                        _locks=locks,
+                                        _conn=child_conn,
+                                        _sa_family=socks[args].family,
+                                        _handlers=self._route_handlers,
+                                        _middlewares=self._middlewares)
                         )
 
                         p.start()

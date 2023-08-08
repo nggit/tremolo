@@ -53,7 +53,7 @@ class HTTPServer(HTTPProtocol):
             self.context.ON_CONNECT = self.loop.create_task(
                 self._connection_made(func)
             )
-            self.context.tasks.append(self.context.ON_CONNECT)
+            self.tasks.append(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
         func = self._middlewares['close'][-1][0]

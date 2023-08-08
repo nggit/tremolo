@@ -13,6 +13,12 @@ class WebSocket:
         self.response = response
         self.protocol = request.protocol
 
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        return await self.receive()
+
     async def accept(self):
         magic_string = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
         sha1_hash = hashlib.sha1(self.request.headers[b'sec-websocket-key'] +
