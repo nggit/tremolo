@@ -21,8 +21,9 @@ class WebSocket:
 
     async def accept(self):
         magic_string = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
-        sha1_hash = hashlib.sha1(self.request.headers[b'sec-websocket-key'] +
-                                 magic_string).digest()
+        sha1_hash = hashlib.sha1(  # nosec B303, B324
+            self.request.headers[b'sec-websocket-key'] +
+            magic_string).digest()
         accept_key = base64.b64encode(sha1_hash)
 
         self.response.set_status(101, b'Switching Protocols')
