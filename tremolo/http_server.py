@@ -191,7 +191,7 @@ class HTTPServer(HTTPProtocol):
                 self.response.append_header(b'Connection: close\r\n\r\n')
             else:
                 if status[0] == 101:
-                    self.request.http_upgrade = True
+                    self.request.upgraded = True
                 else:
                     if not self.response.http_chunked:
                         self.request.http_keepalive = False

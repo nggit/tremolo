@@ -125,11 +125,11 @@ class ASGIServer(HTTPProtocol):
 
     async def receive(self):
         if self._scope['type'] == 'websocket':
-            # initially, the Request.http_upgrade value is False
+            # initially, the Request.upgraded value is False
             # it will become True later
             # after the response status is set to 101:
             # Response.set_status(101) in WebSocket.accept()
-            if not self.request.http_upgrade:
+            if not self.request.upgraded:
                 return {'type': 'websocket.connect'}
 
             try:

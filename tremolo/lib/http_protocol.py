@@ -156,7 +156,7 @@ class HTTPProtocol(asyncio.Protocol):
             mv = mv[buffer_size:]
 
         if transport is not None and self._request is not None:
-            if self._request.http_upgrade:
+            if self._request.upgraded:
                 transport.resume_reading()
                 return
 
@@ -188,7 +188,7 @@ class HTTPProtocol(asyncio.Protocol):
     async def handle_exception(self, exc):
         if (self._request is None or self._response is None or
                 (self._response.headers_sent() and
-                 not self._request.http_upgrade)):
+                 not self._request.upgraded)):
             return
 
         self.print_exception(
@@ -464,7 +464,7 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 pass
 
-        if not (self._request.http_continue or self._request.http_upgrade):
+        if not (self._request.http_continue or self._request.upgraded):
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
             self._data = bytearray()
