@@ -718,18 +718,8 @@ if __name__ == '__main__':
     try:
         unittest.main()
     finally:
-        TIMEOUT = 30
-        FACTOR = 10
-
-        for _ in range(TIMEOUT * FACTOR):
-            if p.is_alive():
-                os.kill(p.pid, signal.SIGINT)
-                p.join()
-            else:
-                break
-
-            time.sleep(1 / FACTOR)
-        else:
-            p.terminate()
+        if p.is_alive():
+            os.kill(p.pid, signal.SIGINT)
+            p.join()
 
 # END
