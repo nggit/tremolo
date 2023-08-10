@@ -217,7 +217,10 @@ async def ws_handler(websocket=None, tasks=None, **_):
     elif websocket.request.query_string == b'close':
         await websocket.close()
     else:
-        await websocket.send(await websocket.receive())
+        # data = await websocket.receive()
+        async for data in websocket:
+            await websocket.send(data)
+            break
 
 
 @app.route('/timeouts')
