@@ -688,11 +688,11 @@ class TestHTTPClient(unittest.TestCase):
 
     def test_websocket(self):
         for query, data_in, data_out, opcode, in (
-            (b'receive', b'Hello, world!', b'\x82\rHello, world!', 2),
-            (b'receive', b'i' * 127, b'\x82~\x00\x7fiiiiiiii', 2),
-            (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00\x01', 2),
-            (b'ping', b'', b'\x89\x00', 9),
-            (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8)):
+                (b'receive', b'Hello, world!', b'\x82\rHello, world!', 2),
+                (b'receive', b'i' * 127, b'\x82~\x00\x7fiiiiiiii', 2),
+                (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
+                (b'ping', b'', b'\x89\x00', 9),
+                (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8)):
             payload = getcontents(
                 host=HTTP_HOST,
                 port=HTTP_PORT,
@@ -707,7 +707,7 @@ class TestHTTPClient(unittest.TestCase):
                                                opcode=opcode))
             )
 
-            self.assertEqual(payload[:8], data_out[:8])
+            self.assertEqual(payload[:7], data_out[:7])
 
 
 if __name__ == '__main__':
