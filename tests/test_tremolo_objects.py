@@ -163,6 +163,13 @@ class TestTremoloObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             _ = KeepAliveConnections(maxlen=(0, 1))
 
+        conn = KeepAliveConnections(maxlen=2)
+        conn['a'] = 1
+        conn['b'] = 2
+        conn['c'] = 3
+
+        self.assertEqual(list(conn.values()), [2, 3])
+
 
 if __name__ == '__main__':
     unittest.main()
