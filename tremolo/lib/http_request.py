@@ -24,7 +24,7 @@ class HTTPRequest(Request):
                  '_body',
                  'http_continue',
                  'http_keepalive',
-                 '_http_upgrade',
+                 '_upgraded',
                  '_params',
                  '_eof',
                  '_read_instance',
@@ -65,7 +65,7 @@ class HTTPRequest(Request):
         self._body = bytearray()
         self.http_continue = False
         self.http_keepalive = False
-        self._http_upgrade = False
+        self._upgraded = False
         self._params = {}
 
         self._eof = False
@@ -207,13 +207,13 @@ class HTTPRequest(Request):
         self._eof = True
 
     @property
-    def http_upgrade(self):
-        return self._http_upgrade
+    def upgraded(self):
+        return self._upgraded
 
-    @http_upgrade.setter
-    def http_upgrade(self, value):
+    @upgraded.setter
+    def upgraded(self, value):
         self.clear_body()
-        self._http_upgrade = value
+        self._upgraded = value
 
     @property
     def params(self):
