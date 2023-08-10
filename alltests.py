@@ -3,7 +3,6 @@
 import multiprocessing as mp
 import os
 import signal
-import time
 import unittest
 
 import tremolo
@@ -32,17 +31,7 @@ if __name__ == '__main__':
         suite = unittest.TestLoader().discover('tests')
         unittest.TextTestRunner().run(suite)
     finally:
-        TIMEOUT = 30
-        FACTOR = 10
-
         for p in processes:
-            for _ in range(TIMEOUT * FACTOR):
-                if p.is_alive():
-                    os.kill(p.pid, signal.SIGINT)
-                    p.join()
-                else:
-                    break
-
-                time.sleep(1 / FACTOR)
-            else:
-                p.terminate()
+            if p.is_alive():
+                os.kill(p.pid, signal.SIGINT)
+                p.join()
