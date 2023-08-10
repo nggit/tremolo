@@ -190,7 +190,7 @@ class HTTPResponse(Response):
                         self._request.http_keepalive = False
 
                     if status[0] == 101:
-                        self._request.http_upgrade = True
+                        self._request.upgraded = True
                     else:
                         self.append_header(b'Content-Type: %s\r\n' %
                                            self.get_content_type())
@@ -224,7 +224,7 @@ class HTTPResponse(Response):
             self._request.context.set('data', ('body', data))
             await self._write_cb()
 
-        if (self.http_chunked and not self._request.http_upgrade and
+        if (self.http_chunked and not self._request.upgraded and
                 data is not None):
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
