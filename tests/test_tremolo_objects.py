@@ -14,6 +14,7 @@ from tremolo import Tremolo  # noqa: E402
 from tremolo.contexts import ServerContext  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.__queue import Queue  # noqa: E402
+from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.pools import Pool, QueuePool  # noqa: E402
 from tests import handlers, middlewares  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
@@ -151,6 +152,16 @@ class TestTremoloObjects(unittest.TestCase):
         self.assertEqual(len(queue.get()), 2)
         self.assertEqual(queue.get()[0].__class__, Queue)
         self.assertEqual(queue.get()[1].__class__, Queue)
+
+    def test_serverconnections(self):
+        with self.assertRaises(ValueError):
+            _ = KeepAliveConnections(maxlen=-10)
+
+        with self.assertRaises(ValueError):
+            _ = KeepAliveConnections(maxlen=0)
+
+        with self.assertRaises(ValueError):
+            _ = KeepAliveConnections(maxlen=(0, 1))
 
 
 if __name__ == '__main__':
