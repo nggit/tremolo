@@ -688,7 +688,7 @@ class TestHTTPClient(unittest.TestCase):
 
     def test_websocket(self):
         for query, data_in, data_out, opcode, in (
-                (b'receive', b'Hello, world!', b'\x82\rHello, world!', 2),
+                (b'receive', 'Hello, world!', b'\x81\rHello, world!', None),
                 (b'receive', b'i' * 127, b'\x82~\x00\x7fiiii', 2),
                 (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
                 (b'ping', b'', b'\x89\x00', 9),
