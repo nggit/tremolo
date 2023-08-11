@@ -235,6 +235,6 @@ app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
 app.listen(HTTP_PORT + 2)
 
 if __name__ == '__main__':
-    app.run(HTTP_HOST, port=HTTP_PORT, debug=True)
+    app.run(HTTP_HOST, port=HTTP_PORT, debug=True, client_max_body_size=73728)
 
 # END

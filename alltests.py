@@ -17,7 +17,10 @@ if __name__ == '__main__':
 
     processes.append(mp.Process(
         target=app.run,
-        kwargs=dict(host=HTTP_HOST, port=HTTP_PORT, debug=False))
+        kwargs=dict(host=HTTP_HOST,
+                    port=HTTP_PORT,
+                    debug=False,
+                    client_max_body_size=73728))
     )
     processes.append(mp.Process(
         target=tremolo.run,
