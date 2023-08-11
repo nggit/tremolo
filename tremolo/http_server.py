@@ -3,8 +3,8 @@
 from datetime import datetime
 from urllib.parse import parse_qs
 
-from .contexts import ServerContext
 from .exceptions import ExpectationFailed
+from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket

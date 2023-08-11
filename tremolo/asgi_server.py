@@ -6,13 +6,13 @@ from datetime import datetime
 from http import HTTPStatus
 from urllib.parse import unquote
 
-from .contexts import ServerContext
 from .exceptions import (
     ExpectationFailed,
     InternalServerError,
     WebSocketException,
     WebSocketClientClosed
 )
+from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 

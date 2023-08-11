@@ -17,10 +17,10 @@ from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
-from .contexts import ServerContext as WorkerContext  # noqa: E402
 from .exceptions import BadRequest  # noqa: E402
 from .utils import html_escape  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
+from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import QueuePool  # noqa: E402
 
