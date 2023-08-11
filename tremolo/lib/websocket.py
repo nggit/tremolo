@@ -75,7 +75,7 @@ class WebSocket:
 
         # ping
         if opcode == 9 and payload_length < 126:
-            await self.send(unmasked_data, opcode=10)
+            await self.pong(unmasked_data)
             return b''
 
         # pong
@@ -170,8 +170,11 @@ class WebSocket:
         if self.protocol in self.protocol.options['_connections']:
             return self.protocol.loop.create_task(self.ping())
 
-    async def ping(self):
-        await self.send(b'', opcode=9)
+    async def ping(self, data=b''):
+        await self.send(data, opcode=9)
+
+    async def pong(self, data=b''):
+        await self.send(data, opcode=10)
 
     async def close(self, code=1000):
         await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
