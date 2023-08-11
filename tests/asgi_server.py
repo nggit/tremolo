@@ -21,6 +21,9 @@ ASGI_PORT = HTTP_PORT + 10
 
 async def app(scope, receive, send):
     if scope['type'] == 'lifespan':
+        data = await receive()
+        assert data['type'][:8] == 'lifespan'
+
         await send({
             'type': 'lifespan.startup.complete'
         })
