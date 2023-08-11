@@ -693,7 +693,9 @@ class TestHTTPClient(unittest.TestCase):
                 (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
                 (b'receive', b'i' * 81920, b'\x88\x02\x03\xf1', 2),
                 (b'ping', b'', b'\x89\x00', 9),
-                (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8)):
+                (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8),
+                (b'', b'\x03\xe8CLOSE_NORMAL', b'', 8),
+                (b'', b'', b'\x88\x02\x03\xf0', 0xc)):
             payload = getcontents(
                 host=HTTP_HOST,
                 port=HTTP_PORT,
