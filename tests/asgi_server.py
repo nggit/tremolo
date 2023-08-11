@@ -20,6 +20,12 @@ ASGI_PORT = HTTP_PORT + 10
 
 
 async def app(scope, receive, send):
+    if scope['type'] == 'lifespan':
+        await send({
+            'type': 'lifespan.startup.complete'
+        })
+        return
+
     if scope['type'] == 'websocket':
         data = await receive()
 
