@@ -280,7 +280,7 @@ class TestHTTPClient(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(2 * 1048576 + 16 * 1024,
+                    HTTP_PORT, create_dummy_body(65536 + 16 * 1024,
                                                  chunk_size=16 * 1024))
         )
 
@@ -299,7 +299,7 @@ class TestHTTPClient(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Content-Length: %d\r\n\r\n\x00' % (
-                    HTTP_PORT, 2 * 1048576 + 16 * 1024)
+                    HTTP_PORT, 65536 + 16 * 1024)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
@@ -688,9 +688,10 @@ class TestHTTPClient(unittest.TestCase):
 
     def test_websocket(self):
         for query, data_in, data_out, opcode, in (
-                (b'receive', b'Hello, world!', b'\x82\rHello, world!', 2),
-                (b'receive', b'i' * 127, b'\x82~\x00\x7fiiiiiiii', 2),
+                (b'receive', 'Hello, world!', b'\x81\rHello, world!', None),
+                (b'receive', b'i' * 127, b'\x82~\x00\x7fiiii', 2),
                 (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
+                (b'receive', b'i' * 81920, b'\x88\x02\x03\xf1', 2),
                 (b'ping', b'', b'\x89\x00', 9),
                 (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8)):
             payload = getcontents(
@@ -703,7 +704,7 @@ class TestHTTPClient(unittest.TestCase):
                         query,
                         HTTP_PORT,
                         WebSocket.create_frame(data_in,
-                                               mask=True,
+                                               mask=(opcode != 8),
                                                opcode=opcode))
             )
 
@@ -715,7 +716,10 @@ if __name__ == '__main__':
 
     p = mp.Process(
         target=app.run,
-        kwargs=dict(host=HTTP_HOST, port=HTTP_PORT, debug=False)
+        kwargs=dict(host=HTTP_HOST,
+                    port=HTTP_PORT,
+                    debug=False,
+                    client_max_body_size=73728)
     )
 
     p.start()
