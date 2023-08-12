@@ -3,9 +3,9 @@
 from datetime import datetime
 from urllib.parse import parse_qs
 
-from .exceptions import ExpectationFailed
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
+from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
 from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket
 
@@ -112,15 +112,6 @@ class HTTPServer(HTTPProtocol):
 
         await self.response.end(data)
 
-    async def _handle_continue(self):
-        if self.request.http_continue:
-            if (self.request.content_length >
-                    self.options['client_max_body_size']):
-                raise ExpectationFailed
-
-            await self.response.send(b'HTTP/%s 100 Continue\r\n\r\n' %
-                                     self.request.version)
-
     def _handle_websocket(self):
         if (b'upgrade' in self.request.headers and
                 b'connection' in self.request.headers and
@@ -202,9 +193,8 @@ class HTTPServer(HTTPProtocol):
                     )
 
                 self.response.append_header(
-                    b'Connection: %s\r\n\r\n' % {
-                        False: b'keep-alive',
-                        True: b'upgrade'}[status[0] in (101, 426)]
+                    b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
+                        status[0] in (101, 426)]
                 )
 
             if self.request.method == b'HEAD' or no_content:
@@ -250,9 +240,9 @@ class HTTPServer(HTTPProtocol):
                     self.response.append_header(
                         b'Content-Type: %s\r\nContent-Length: %d\r\n'
                         b'Connection: %s\r\n\r\n' % (
-                            self.response.get_content_type(), len(data), {
-                                True: b'keep-alive',
-                                False: b'close'}[self.request.http_keepalive])
+                            self.response.get_content_type(),
+                            len(data),
+                            KEEPALIVE_OR_CLOSE[self.request.http_keepalive])
                     )
 
             if data == b'' or self.request.method == b'HEAD' or no_content:
@@ -310,7 +300,7 @@ class HTTPServer(HTTPProtocol):
                 m = pattern.search(self.request.url)
 
                 if m:
-                    await self._handle_continue()
+                    await self.response.send_continue()
 
                     matches = m.groupdict()
 
@@ -335,7 +325,7 @@ class HTTPServer(HTTPProtocol):
                     else:
                         self._route_handlers[key] = [(pattern, func, kwargs)]
 
-                    await self._handle_continue()
+                    await self.response.send_continue()
 
                     matches = m.groupdict()
 

@@ -7,9 +7,18 @@ from datetime import datetime, timedelta
 from urllib.parse import quote
 
 from .http_exception import (
-    BadRequest, InternalServerError, RangeNotSatisfiable
+    BadRequest, ExpectationFailed, InternalServerError, RangeNotSatisfiable
 )
 from .response import Response
+
+KEEPALIVE_OR_CLOSE = {
+    True: b'keep-alive',
+    False: b'close'
+}
+KEEPALIVE_OR_UPGRADE = {
+    False: b'keep-alive',
+    True: b'upgrade'
+}
 
 
 class HTTPResponse(Response):
@@ -132,6 +141,15 @@ class HTTPResponse(Response):
         self._request.http_keepalive = False
         super().close()
 
+    async def send_continue(self):
+        if self._request.http_continue:
+            if (self._request.content_length >
+                    self._request.protocol.options['client_max_body_size']):
+                raise ExpectationFailed
+
+            await self.send(b'HTTP/%s 100 Continue\r\n\r\n' %
+                            self._request.version)
+
     async def end(self, data=b'', **kwargs):
         if self.headers_sent():
             await self.write(data, throttle=False)
@@ -152,8 +170,7 @@ class HTTPResponse(Response):
                     *status,
                     self.get_content_type(),
                     content_length,
-                    {True: b'keep-alive',
-                        False: b'close'}[self._request.http_keepalive],
+                    KEEPALIVE_OR_CLOSE[self._request.http_keepalive],
                     self._header[1],
                     data), **kwargs
             )
@@ -196,9 +213,8 @@ class HTTPResponse(Response):
                                            self.get_content_type())
 
                     self.append_header(
-                        b'Connection: %s\r\n\r\n' % {
-                            False: b'keep-alive',
-                            True: b'upgrade'}[status[0] in (101, 426)]
+                        b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
+                            status[0] in (101, 426)]
                     )
 
                 if self._request.method == b'HEAD' or no_content:

@@ -7,7 +7,6 @@ from http import HTTPStatus
 from urllib.parse import unquote
 
 from .exceptions import (
-    ExpectationFailed,
     InternalServerError,
     WebSocketException,
     WebSocketClientClosed
@@ -15,6 +14,15 @@ from .exceptions import (
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
+
+_HTTP_OR_HTTPS = {
+    True: 'http',
+    False: 'https'
+}
+_WS_OR_WSS = {
+    True: 'ws',
+    False: 'wss'
+}
 
 
 class ASGIServer(HTTPProtocol):
@@ -41,29 +49,19 @@ class ASGIServer(HTTPProtocol):
         self._websocket = WebSocket(self.request, self.response)
 
         self._scope['type'] = 'websocket'
-        self._scope['scheme'] = {
-            True: 'ws',
-            False: 'wss'
-        }[self.request.transport.get_extra_info('sslcontext') is None]
+        self._scope['scheme'] = _WS_OR_WSS[
+            self.request.transport.get_extra_info('sslcontext') is None]
         self._scope['subprotocols'] = [
             value.decode('utf-8') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]
 
     async def _handle_http(self):
-        if self.request.http_continue:
-            if (self.request.content_length >
-                    self.options['client_max_body_size']):
-                raise ExpectationFailed
-
-            await self.response.send(b'HTTP/%s 100 Continue\r\n\r\n' %
-                                     self.request.version)
+        await self.response.send_continue()
 
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('utf-8')
-        self._scope['scheme'] = {
-            True: 'http',
-            False: 'https'
-        }[self.request.transport.get_extra_info('sslcontext') is None]
+        self._scope['scheme'] = _HTTP_OR_HTTPS[
+            self.request.transport.get_extra_info('sslcontext') is None]
 
         if not (b'transfer-encoding' in self.request.headers or
                 b'content-length' in self.request.headers
