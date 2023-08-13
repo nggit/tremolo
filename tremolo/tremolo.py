@@ -454,20 +454,16 @@ class Tremolo:
 
     def create_sock(self, host, port, reuse_port=True):
         try:
-            socket.getaddrinfo(host, None)
-
             try:
+                socket.getaddrinfo(host, None)
+
                 sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
                 host = '::'
-            except AttributeError:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            sock.setsockopt(socket.SOL_SOCKET,
-                            _REUSEPORT_OR_REUSEADDR[reuse_port], 1)
-        except socket.gaierror:
-            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            except socket.gaierror:
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        except AttributeError:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         sock.setblocking(False)
         sock.set_inheritable(True)
@@ -483,6 +479,9 @@ class Tremolo:
                     if os.path.exists(host) and os.stat(host).st_size == 0:
                         os.unlink(host)
         else:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.SOL_SOCKET,
+                            _REUSEPORT_OR_REUSEADDR[reuse_port], 1)
             sock.bind((host, port))
 
         return sock
