@@ -79,7 +79,7 @@ class TestHTTPClient(unittest.TestCase):
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'127.0.0.1')
+        self.assertEqual(read_chunked(body)[-9:], b'127.0.0.1')
 
     def test_get_xip_11(self):
         header, body = getcontents(host=HTTP_HOST,
@@ -106,7 +106,7 @@ class TestHTTPClient(unittest.TestCase):
                                    ])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'127.0.0.1')
+        self.assertEqual(read_chunked(body)[-9:], b'127.0.0.1')
 
     def test_get_headerline_11(self):
         header, body = getcontents(

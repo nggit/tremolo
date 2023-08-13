@@ -3,7 +3,6 @@
 __all__ = ('Tremolo',)
 
 import asyncio  # noqa: E402
-import ipaddress  # noqa: E402
 import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
@@ -23,6 +22,11 @@ from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import QueuePool  # noqa: E402
+
+_REUSEPORT_OR_REUSEADDR = {
+    True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
+    False: socket.SO_REUSEADDR
+}
 
 
 class Tremolo:
@@ -80,6 +84,9 @@ class Tremolo:
         return self._middlewares
 
     def listen(self, port, host=None, **options):
+        if isinstance(port, str):
+            host = port
+
         if (host, port) in self._ports:
             return False
 
@@ -376,9 +383,14 @@ class Tremolo:
         print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(
-            b'%s (pid %d) is started at %s port %d' % (
-                server_name, os.getpid(), host, port)
+            b'%s (pid %d) is started at ' % (server_name, os.getpid())
         )
+
+        if sock.family.name == 'AF_UNIX':
+            print(sock.getsockname(), end='')
+            sys.stdout.flush()
+        else:
+            sys.stdout.buffer.write(b'%s port %d' % (host, port))
 
         if ssl_context is not None:
             sys.stdout.buffer.write(b' (https)')
@@ -442,21 +454,36 @@ class Tremolo:
 
     def create_sock(self, host, port, reuse_port=True):
         try:
-            sock = socket.socket({
-                4: socket.AF_INET,
-                6: socket.AF_INET6
-            }[ipaddress.ip_address(host).version], socket.SOCK_STREAM)
-        except ValueError:
-            sock = socket.socket(type=socket.SOCK_STREAM)
+            socket.getaddrinfo(host, None)
 
-        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.setsockopt(socket.SOL_SOCKET, {
-            True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
-            False: socket.SO_REUSEADDR
-        }[reuse_port], 1)
+            try:
+                sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+                host = '::'
+            except AttributeError:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            sock.setsockopt(socket.SOL_SOCKET,
+                            _REUSEPORT_OR_REUSEADDR[reuse_port], 1)
+        except socket.gaierror:
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
         sock.setblocking(False)
-        sock.bind((host, port))
         sock.set_inheritable(True)
+
+        if sock.family.name == 'AF_UNIX':
+            if not host.endswith('.sock'):
+                host += '.sock'
+
+            for _ in range(2):
+                try:
+                    sock.bind(host)
+                except OSError:
+                    if os.path.exists(host) and os.stat(host).st_size == 0:
+                        os.unlink(host)
+        else:
+            sock.bind((host, port))
 
         return sock
 
@@ -483,7 +510,7 @@ class Tremolo:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
         if host is None:
-            host = ''
+            host = 'localhost'
         else:
             self.listen(port, host=host, **kwargs)
 
@@ -579,5 +606,11 @@ class Tremolo:
             print('pid {:d} terminated'.format(p.pid))
 
         for sock in socks.values():
+            try:
+                if sock.family.name == 'AF_UNIX':
+                    os.unlink(sock.getsockname())
+            except (FileNotFoundError, ValueError):
+                pass
+
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()

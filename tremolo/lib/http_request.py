@@ -33,7 +33,7 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
-        self.client = protocol.transport.get_extra_info('peername')
+        self.client = protocol.transport.get_extra_info('peername')[:2]
         self._ip = None
         self.header = header
         self.headers = header.headers

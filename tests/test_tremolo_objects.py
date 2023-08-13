@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import socket
 import sys
 import unittest
 
@@ -141,8 +142,19 @@ class TestTremoloObjects(unittest.TestCase):
                 self.assertTrue(b'<address>Tremolo</address>' in data)
 
     def test_create_sock(self):
+        # simulate unsupported IPv6
+        del socket.AF_INET6
+
         with app.create_sock('localhost', HTTP_PORT + 3) as sock:
-            self.assertEqual(sock.getsockname()[-1], HTTP_PORT + 3)
+            self.assertEqual(sock.getsockname()[:2][-1], HTTP_PORT + 3)
+
+        for sock_name, sock_file in (('tremolo_sock', 'tremolo_sock.sock'),
+                                     ('tremolo.sock', 'tremolo.sock')):
+            if os.path.exists(sock_file) and os.stat(sock_file).st_size == 0:
+                os.unlink(sock_file)
+
+            with app.create_sock(sock_name, None) as sock:
+                self.assertEqual(sock.getsockname(), sock_file)
 
     def test_queue_pool(self):
         pool = Pool(0, logger)

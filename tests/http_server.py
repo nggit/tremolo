@@ -25,16 +25,21 @@ app = Tremolo()
 @app.on_start
 async def worker_start(**server):
     server['context'].shared = 0
+    server['context'].socket_family = 'AF_UNIX'
 
 
 @app.on_stop
 async def worker_stop(**server):
-    assert server['context'].shared > 0
+    if server['context'].socket_family == 'AF_UNIX':
+        assert server['context'].shared == 0
+    else:
+        assert server['context'].shared > 0
 
 
 @app.on_request
 async def my_request_middleware(worker=None, **server):
     worker.shared += 1
+    worker.socket_family = server['socket'].family.name
     request = server['request']
     response = server['response']
 
@@ -233,6 +238,10 @@ async def timeouts(request=None, **_):
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
 app.listen(HTTP_PORT + 2)
+
+# test unix socket
+# 'tremolo-test.sock'
+app.listen('tremolo-test')
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, debug=True, client_max_body_size=73728)
