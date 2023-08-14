@@ -32,8 +32,8 @@ for i in range(len(sys.argv)):
         print('  --ssl-key                 SSL private key location')
         print('                            E.g. "/path/to/privkey.pem"')
         print('  --debug                   Enable debug mode.')
-        print('  --no-ws                   Disable built-in WebSocket support.')  # noqa: E501
         print('                            Intended for development')
+        print('  --no-ws                   Disable built-in WebSocket support.')  # noqa: E501
         print('  --log-level               Defaults to "DEBUG". See')
         print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
         print('  --download-rate           Limits the sending speed to the client')  # noqa: E501
