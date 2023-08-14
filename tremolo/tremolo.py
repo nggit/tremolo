@@ -390,12 +390,11 @@ class Tremolo:
 
         if sock.family.name == 'AF_UNIX':
             print(sock.getsockname(), end='')
-            sys.stdout.flush()
         else:
             print('%s port %d' % sock.getsockname()[:2], end='')
-            sys.stdout.flush()
 
         if ssl_context is not None:
+            sys.stdout.flush()
             sys.stdout.buffer.write(b' (https)')
 
         print()
