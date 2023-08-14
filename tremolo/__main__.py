@@ -22,7 +22,7 @@ for i in range(len(sys.argv)):
         print('  --port                    Listen port. Defaults to 8000')
         print('  --bind                    Address to bind.')
         print('                            Instead of using --host or --port')
-        print('                            E.g. "127.0.0.1:8000"')
+        print('                            E.g. "127.0.0.1:8000" or "/tmp/file.sock"')  # noqa: E501
         print('  --reuse-port              Use SO_REUSEPORT when available')
         print('  --worker-num              Number of worker processes. Defaults to 1')  # noqa: E501
         print('  --backlog                 Maximum number of pending connections')  # noqa: E501
@@ -79,8 +79,11 @@ for i in range(len(sys.argv)):
             sys.exit(1)
     elif sys.argv[i - 1] == '--bind':
         try:
-            options['host'], port = sys.argv[i].split(':', 1)
-            options['port'] = int(port)
+            if ':\\' not in sys.argv[i] and ':' in sys.argv[i]:
+                options['host'], port = sys.argv[i].split(':', 1)
+                options['port'] = int(port)
+            else:
+                options['host'] = sys.argv[i]
         except ValueError:
             print('Invalid --bind value "{:s}"'.format(sys.argv[i]))
             sys.exit(1)

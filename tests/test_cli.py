@@ -158,6 +158,40 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(self.output.getvalue(), '')
         self.assertEqual(code, 0)
 
+    def test_cli_bindsocket(self):
+        sys.argv.extend(['--bind', '/tmp/file.sock'])
+
+        code = 0
+        sys.stdout = self.output
+
+        try:
+            run()
+        except SystemExit as exc:
+            if exc.code:
+                code = exc.code
+
+        sys.stdout = STDOUT
+
+        self.assertEqual(self.output.getvalue(), '')
+        self.assertEqual(code, 0)
+
+    def test_cli_bindsocket_windows(self):
+        sys.argv.extend(['--bind', r'C:\Somewhere\Temp\file.sock'])
+
+        code = 0
+        sys.stdout = self.output
+
+        try:
+            run()
+        except SystemExit as exc:
+            if exc.code:
+                code = exc.code
+
+        sys.stdout = STDOUT
+
+        self.assertEqual(self.output.getvalue(), '')
+        self.assertEqual(code, 0)
+
     def test_cli_invalidbind(self):
         sys.argv.extend(['--bind', 'localhost:xx'])
 
