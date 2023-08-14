@@ -48,7 +48,10 @@ class HTTPResponse(Response):
     def header(self, value):
         self._header[0] = value
 
-    def headers_sent(self):
+    def headers_sent(self, sent=False):
+        if sent:
+            self._header = None
+
         return self._header is None
 
     def append_header(self, value):
@@ -175,7 +178,7 @@ class HTTPResponse(Response):
                     data), **kwargs
             )
 
-            self._header = None
+            self.headers_sent(True)
 
         await self.send(None)
 
@@ -234,7 +237,7 @@ class HTTPResponse(Response):
 
             await self.send(header, throttle=False)
 
-            self._header = None
+            self.headers_sent(True)
 
         if self._write_cb is not None:
             self._request.context.set('data', ('body', data))

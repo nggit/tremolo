@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import socket
 import sys
 import unittest
 
@@ -32,6 +33,11 @@ class TestTremoloObjects(unittest.TestCase):
 
         print('\r\033[2K{0:d}. {1:s}'.format(sys.modules['__main__'].tests_run,
                                              self.id()))
+
+    def test_000run_host_none(self):
+        with self.assertRaises(ValueError):
+            # app.run(host=None)
+            app.run()
 
     def test_listen(self):
         self.assertTrue(app.listen(8000))
@@ -141,8 +147,22 @@ class TestTremoloObjects(unittest.TestCase):
                 self.assertTrue(b'<address>Tremolo</address>' in data)
 
     def test_create_sock(self):
+        # simulate unsupported IPv6
+        del socket.AF_INET6
+
         with app.create_sock('localhost', HTTP_PORT + 3) as sock:
-            self.assertEqual(sock.getsockname()[-1], HTTP_PORT + 3)
+            self.assertEqual(sock.getsockname()[:2][-1], HTTP_PORT + 3)
+
+        for sock_name, sock_file in (('tremolo_sock', 'tremolo_sock.sock'),
+                                     ('tremolo.sock', 'tremolo.sock')):
+            if os.path.exists(sock_file) and os.stat(sock_file).st_size == 0:
+                os.unlink(sock_file)
+
+            with app.create_sock(sock_name, HTTP_PORT + 3) as sock:
+                if sock.family.name == 'AF_UNIX':
+                    self.assertEqual(sock.getsockname(), sock_file)
+                else:
+                    self.assertEqual(sock.getsockname()[1], HTTP_PORT + 3)
 
     def test_queue_pool(self):
         pool = Pool(0, logger)
