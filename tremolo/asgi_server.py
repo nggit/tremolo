@@ -9,7 +9,8 @@ from urllib.parse import unquote
 from .exceptions import (
     InternalServerError,
     WebSocketException,
-    WebSocketClientClosed
+    WebSocketClientClosed,
+    WebSocketServerClosed
 )
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
@@ -113,6 +114,9 @@ class ASGIServer(HTTPProtocol):
                 'task: ASGI application is cancelled due to timeout'
             )
         except Exception as exc:
+            if self.request.upgraded and self._websocket is not None:
+                exc = WebSocketServerClosed(cause=exc)
+
             await self.handle_exception(exc)
 
     def _set_app_timeout(self):
