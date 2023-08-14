@@ -481,6 +481,7 @@ class Tremolo:
             for _ in range(2):
                 try:
                     sock.bind(host)
+                    break
                 except OSError:
                     if os.path.exists(host) and os.stat(host).st_size == 0:
                         os.unlink(host)
