@@ -153,11 +153,12 @@ class TestTremoloObjects(unittest.TestCase):
         with app.create_sock('localhost', HTTP_PORT + 3) as sock:
             self.assertEqual(sock.getsockname()[:2][-1], HTTP_PORT + 3)
 
+        # trigger sock file already exists
+        if not os.path.exists('tremolo.sock'):
+            open('tremolo.sock', 'a').close()
+
         for sock_name, sock_file in (('tremolo_sock', 'tremolo_sock.sock'),
                                      ('tremolo.sock', 'tremolo.sock')):
-            if os.path.exists(sock_file) and os.stat(sock_file).st_size == 0:
-                os.unlink(sock_file)
-
             with app.create_sock(sock_name, HTTP_PORT + 3) as sock:
                 if sock.family.name == 'AF_UNIX':
                     self.assertEqual(sock.getsockname(), sock_file)
