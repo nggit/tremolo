@@ -20,6 +20,7 @@ You can take advantage of this to serve big files efficiently:
 ```python
 @app.route('/my/url/big.data')
 async def my_big_data(content_type='application/octet-stream', **server):
+    # buffer_size = 16384
     buffer_size = server['context'].options['buffer_size']
 
     with open('/my/folder/big.data', 'rb') as f:
@@ -31,6 +32,20 @@ async def my_big_data(content_type='application/octet-stream', **server):
 ```
 
 And other use cases…
+
+## Features
+Tremolo is only suitable for those who value [minimalism](https://en.wikipedia.org/wiki/Minimalism_%28computing%29) and stability over features.
+
+With only 2500 lines of code, with no dependencies other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
+
+* HTTP/1.x with [WebSocket support](https://nggit.github.io/tremolo-docs/websocket.html)
+* Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
+* Stream chunked uploads
+* [Stream multipart uploads](https://nggit.github.io/tremolo-docs/body.html#multipart)
+* Download/upload speed throttling
+* [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
+* Framework features; routing, middleware, etc
+* ASGI server
 
 ## Example
 Here is a complete *hello world* example in case you missed the usual `return`.
