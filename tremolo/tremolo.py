@@ -84,8 +84,10 @@ class Tremolo:
         return self._middlewares
 
     def listen(self, port, host=None, **options):
-        if isinstance(port, str):
+        if not isinstance(port, int):
+            # assume it's a UNIX socket path
             host = port
+            port = None
 
         if (host, port) in self._ports:
             return False
@@ -390,7 +392,8 @@ class Tremolo:
             print(sock.getsockname(), end='')
             sys.stdout.flush()
         else:
-            sys.stdout.buffer.write(b'%s port %d' % (host, port))
+            print('%s port %d' % sock.getsockname()[:2], end='')
+            sys.stdout.flush()
 
         if ssl_context is not None:
             sys.stdout.buffer.write(b' (https)')
@@ -461,8 +464,12 @@ class Tremolo:
                 sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
                 host = '::'
             except socket.gaierror:
+                _host = host
+                host = 'localhost'
                 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                host = _host
         except AttributeError:
+            print('either AF_INET6 or AF_UNIX is not supported')
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         sock.setblocking(False)
@@ -486,7 +493,7 @@ class Tremolo:
 
         return sock
 
-    def run(self, host=None, port=80, reuse_port=True, worker_num=1, **kwargs):
+    def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         if 'app' in kwargs:
             if not isinstance(kwargs['app'], str):
                 import __main__
@@ -509,6 +516,11 @@ class Tremolo:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
         if host is None:
+            if not self._ports:
+                raise ValueError(
+                    'with host=None, listen() must be called first'
+                )
+
             host = 'localhost'
         else:
             self.listen(port, host=host, **kwargs)
@@ -524,6 +536,9 @@ class Tremolo:
         for (_host, _port), options in self._ports.items():
             if _host is None:
                 _host = host
+
+            if _port is None:
+                _port = port
 
             args = (_host, _port)
             socks[args] = self.create_sock(

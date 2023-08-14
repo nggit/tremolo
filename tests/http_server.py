@@ -241,7 +241,7 @@ app.listen(HTTP_PORT + 2)
 
 # test unix socket
 # 'tremolo-test.sock'
-app.listen('tremolo-test')
+app.listen('tremolo-test', debug=False, client_max_body_size=73728)
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, debug=True, client_max_body_size=73728)
