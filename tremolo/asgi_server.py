@@ -17,12 +17,12 @@ from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
 _HTTP_OR_HTTPS = {
-    True: 'http',
-    False: 'https'
+    False: 'http',
+    True: 'https'
 }
 _WS_OR_WSS = {
-    True: 'ws',
-    False: 'wss'
+    False: 'ws',
+    True: 'wss'
 }
 
 
@@ -50,8 +50,7 @@ class ASGIServer(HTTPProtocol):
         self._websocket = WebSocket(self.request, self.response)
 
         self._scope['type'] = 'websocket'
-        self._scope['scheme'] = _WS_OR_WSS[
-            self.request.transport.get_extra_info('sslcontext') is None]
+        self._scope['scheme'] = _WS_OR_WSS[self.request.is_secure]
         self._scope['subprotocols'] = [
             value.decode('utf-8') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]
@@ -61,12 +60,9 @@ class ASGIServer(HTTPProtocol):
 
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('utf-8')
-        self._scope['scheme'] = _HTTP_OR_HTTPS[
-            self.request.transport.get_extra_info('sslcontext') is None]
+        self._scope['scheme'] = _HTTP_OR_HTTPS[self.request.is_secure]
 
-        if not (b'transfer-encoding' in self.request.headers or
-                b'content-length' in self.request.headers
-                ) and self.queue[0] is not None:
+        if not self.request.has_body and self.queue[0] is not None:
             # avoid blocking on initial receive() due to empty Queue
             # in the case of bodyless requests, e.g. GET
             self.queue[0].put_nowait(b'')
@@ -259,7 +255,7 @@ class ASGIServer(HTTPProtocol):
 
                 if 'more_body' not in data or data['more_body'] is False:
                     await self.response.write(b'', throttle=False)
-                    await self.response.send(None)
+                    self.response.close(keepalive=True)
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
                     await self._websocket.send(data['bytes'])
