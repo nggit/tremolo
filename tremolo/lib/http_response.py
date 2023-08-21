@@ -140,8 +140,10 @@ class HTTPResponse(Response):
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
-    def close(self):
-        self._request.http_keepalive = False
+    def close(self, keepalive=False):
+        if not keepalive:
+            self._request.http_keepalive = False
+
         super().close()
 
     async def send_continue(self):
@@ -180,7 +182,7 @@ class HTTPResponse(Response):
 
             self.headers_sent(True)
 
-        await self.send(None)
+        self.close(keepalive=True)
 
     async def write(self, data, buffer_size=16 * 1024, **kwargs):
         kwargs['buffer_size'] = buffer_size
@@ -286,7 +288,7 @@ class HTTPResponse(Response):
 
                     await self.write(data, chunked=False)
 
-                await self.send(None)
+                self.close(keepalive=True)
                 return
 
             _range = self._request.headers[b'range']
@@ -395,4 +397,4 @@ class HTTPResponse(Response):
 
                 await self.write(data, chunked=False)
 
-        await self.send(None)
+        self.close(keepalive=True)

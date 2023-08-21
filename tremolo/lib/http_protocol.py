@@ -31,7 +31,7 @@ class HTTPProtocol(asyncio.Protocol):
                  '_request',
                  '_response',
                  '_watermarks',
-                 '_data',
+                 '_header_buf',
                  '_waiters')
 
     def __init__(self, context, loop=None, logger=None, worker=None, **kwargs):
@@ -46,7 +46,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._response = None
         self._watermarks = {'high': 65536, 'low': 8192}
 
-        self._data = None
+        self._header_buf = None
         self._waiters = {}
 
     @property
@@ -93,7 +93,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._transport = transport
         self._queue = self._options['_pools']['queue'].get()
 
-        self._data = bytearray()
+        self._header_buf = bytearray()
         self._waiters['request'] = self._loop.create_future()
 
         self.tasks.extend([
@@ -273,8 +273,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif self._request.version == b'1.1':
                 self._request.http_keepalive = True
 
-            if (b'transfer-encoding' in self._request.headers or
-                    b'content-length' in self._request.headers):
+            if self._request.has_body:
                 # assuming a request with a body, such as POST
                 if b'content-type' in self._request.headers:
                     # don't lower() content-type, as it may contain a boundary
@@ -336,22 +335,26 @@ class HTTPProtocol(asyncio.Protocol):
         if not data:
             return
 
-        if self._data is not None:
-            self._data.extend(data)
-            header_size = self._data.find(b'\r\n\r\n')
+        if self._header_buf is not None:
+            self._header_buf.extend(data)
+            header_size = self._header_buf.find(b'\r\n\r\n')
 
             if -1 < header_size <= 8192:
+                # this will keep blocking on bodyless requests forever, unless
+                # _handle_keepalive is called; indirectly via Response.close
                 self._transport.pause_reading()
+
                 self.tasks.append(
                     self._loop.create_task(
-                        self._handle_request_header(self._data, header_size))
+                        self._handle_request_header(self._header_buf,
+                                                    header_size))
                 )
 
-                self._data = None
+                self._header_buf = None
             elif header_size > 8192:
                 self._logger.info('request header too large')
                 self._transport.abort()
-            elif not (header_size == -1 and len(self._data) <= 8192):
+            elif not (header_size == -1 and len(self._header_buf) <= 8192):
                 self._logger.info('bad request')
                 self._transport.abort()
 
@@ -393,7 +396,8 @@ class HTTPProtocol(asyncio.Protocol):
                 if data is None:
                     # close the transport, unless keepalive is enabled
                     if self._request is not None:
-                        if self._request.http_keepalive and self._data is None:
+                        if (self._request.http_keepalive and
+                                self._header_buf is None):
                             self._handle_keepalive()
                             continue
 
@@ -467,7 +471,7 @@ class HTTPProtocol(asyncio.Protocol):
         if not (self._request.http_continue or self._request.upgraded):
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
-            self._data = bytearray()
+            self._header_buf = bytearray()
             self._request.clear_body()
             self._waiters.clear()
 
@@ -515,4 +519,4 @@ class HTTPProtocol(asyncio.Protocol):
         self._queue = (None, None)
         self._request = None
         self._response = None
-        self._data = None
+        self._header_buf = None

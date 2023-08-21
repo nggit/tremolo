@@ -7,8 +7,9 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('client',
+    __slots__ = ('_client',
                  '_ip',
+                 '_is_secure',
                  'header',
                  'headers',
                  'is_valid',
@@ -33,8 +34,9 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
-        self.client = protocol.transport.get_extra_info('peername')[:2]
+        self._client = None
         self._ip = None
+        self._is_secure = None
         self.header = header
         self.headers = header.headers
         self.is_valid = header.is_valid_request
@@ -73,23 +75,40 @@ class HTTPRequest(Request):
         self._read_buf = bytearray()
 
     @property
+    def client(self):
+        if not self._client:
+            self._client = self.transport.get_extra_info('peername')[:2]
+
+        return self._client
+
+    @property
     def ip(self):
-        if self._ip:
-            return self._ip
+        if not self._ip:
+            ip = self.headers.get(b'x-forwarded-for', b'')
 
-        ip = self.headers.get(b'x-forwarded-for', b'')
+            if isinstance(ip, list):
+                ip = ip[0]
 
-        if isinstance(ip, list):
-            ip = ip[0]
+            ip = ip.strip()
 
-        ip = ip.strip()
-
-        if ip == b'' and isinstance(self.client, tuple):
-            self._ip = self.client[0].encode('utf-8')
-        else:
-            self._ip = ip[:(ip + b',').find(b',')]
+            if ip == b'' and isinstance(self.client, tuple):
+                self._ip = self.client[0].encode('utf-8')
+            else:
+                self._ip = ip[:(ip + b',').find(b',')]
 
         return self._ip
+
+    @property
+    def is_secure(self):
+        if self._is_secure is None:
+            self._is_secure = self.transport.get_extra_info('sslcontext') is not None  # noqa: E501
+
+        return self._is_secure
+
+    @property
+    def has_body(self):
+        return (b'content-length' in self.headers or
+                b'transfer-encoding' in self.headers)
 
     def clear_body(self):
         del self._body[:]
@@ -142,12 +161,12 @@ class HTTPRequest(Request):
             paused = False
             unread_bytes = 0
 
-            while buf != b'0\r\n\r\n':
+            while not buf.startswith(b'0\r\n'):
                 if not paused:
                     try:
                         buf.extend(await agen.__anext__())
                     except StopAsyncIteration:
-                        if not buf.endswith(b'0\r\n\r\n'):
+                        if b'0\r\n' not in buf:
                             del buf[:]
                             raise BadRequest(
                                 'bad chunked encoding: incomplete read'

@@ -256,7 +256,7 @@ class HTTPServer(HTTPProtocol):
                                       buffer_size=options['buffer_size'])
             await self.response.write(b'', throttle=False)
 
-        await self.response.send(None)
+        self.response.close(keepalive=True)
 
     async def header_received(self):
         if self.context.ON_CONNECT is not None:
