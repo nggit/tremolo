@@ -8,8 +8,7 @@ class Response:
         self._protocol = request.protocol
 
     def close(self):
-        if self._protocol.queue[1] is not None:
-            self._protocol.queue[1].put_nowait(None)
+        self.send_nowait(None)
 
     async def send(
             self,
@@ -23,7 +22,7 @@ class Response:
             return
 
         if not isinstance(data, (bytes, bytearray)):
-            raise TypeError('expected bytes-like or None object')
+            raise TypeError('expected None or bytes-like object')
 
         if throttle:
             await self._protocol.put_to_queue(
@@ -34,5 +33,8 @@ class Response:
                 buffer_size=buffer_size
             )
         else:
-            if self._protocol.queue[1] is not None:
-                self._protocol.queue[1].put_nowait(data)
+            self.send_nowait(data)
+
+    def send_nowait(self, data):
+        if self._protocol.queue[1] is not None:
+            self._protocol.queue[1].put_nowait(data)
