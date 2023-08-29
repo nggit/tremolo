@@ -158,7 +158,7 @@ class HTTPServer(HTTPProtocol):
             is_agen = False
 
         status = self.response.get_status()
-        no_content = status[0] in (204, 304) or 100 <= status[0] < 200
+        no_content = status[0] in (204, 205, 304) or 100 <= status[0] < 200
         self.response.http_chunked = options.get(
             'chunked', self.request.version == b'1.1' and
             self.request.http_keepalive and not no_content
@@ -187,10 +187,11 @@ class HTTPServer(HTTPProtocol):
                     if not self.response.http_chunked:
                         self.request.http_keepalive = False
 
-                    self.response.append_header(
-                        b'Content-Type: %s\r\n' %
-                        self.response.get_content_type()
-                    )
+                    if not no_content:
+                        self.response.append_header(
+                            b'Content-Type: %s\r\n' %
+                            self.response.get_content_type()
+                        )
 
                 self.response.append_header(
                     b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
