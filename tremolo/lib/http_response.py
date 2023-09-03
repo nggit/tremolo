@@ -140,11 +140,17 @@ class HTTPResponse(Response):
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
-    def close(self, keepalive=False):
+    def close(self, keepalive=False, delay=None):
         if not keepalive:
             self._request.http_keepalive = False
 
-        super().close()
+        if delay is None or delay < 1:
+            super().close()
+        else:
+            self._request.protocol.loop.call_at(
+                self._request.protocol.loop.time() + delay,
+                super().close
+            )
 
     async def send_continue(self):
         if self._request.http_continue:

@@ -540,6 +540,8 @@ class Tremolo:
             if _port is None:
                 _port = port
 
+            options = {**kwargs, **options}
+
             args = (_host, _port)
             socks[args] = self.create_sock(
                 _host, _port, options.get('reuse_port', reuse_port)
