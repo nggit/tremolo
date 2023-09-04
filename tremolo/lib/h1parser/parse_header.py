@@ -177,8 +177,16 @@ class ParseHeader:
     def getmessage(self):
         return self.headers.get(b'_message')
 
-    def save(self):
+    def save(self, body=False):
+        if self._header_size in (None, -1):
+            return self._data
+
+        if body:
+            data = self._data[self._header_size:]
+        else:
+            data = self._data[self._header_size:self._header_size + 4]
+
         return bytearray(b'\r\n').join(
             [self.headers.get(b'_line', b'')] +
             [bytearray(b': ').join(v) for v in self._headers]
-        ) + self._data[self._header_size:]
+        ) + data

@@ -210,6 +210,9 @@ async def upload_multipart(**server):
 async def download(**server):
     await server['response'].sendfile(TEST_FILE, content_type=b'text/plain')
 
+    # test close with delay
+    server['response'].close(keepalive=True, delay=1)
+
 
 @app.route('/ws')
 async def ws_handler(websocket=None, tasks=None, **_):
