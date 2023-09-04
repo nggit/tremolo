@@ -144,7 +144,7 @@ class TestTremoloObjects(unittest.TestCase):
                 self.assertTrue(data[:15] == b'<!DOCTYPE html>')
                 self.assertTrue(data[-7:] == b'</html>')
                 self.assertTrue(b'/invalid&quot;&gt;url' in data)
-                self.assertTrue(b'<address>Tremolo</address>' in data)
+                self.assertTrue(b'>Tremolo</address>' in data)
 
     def test_create_sock(self):
         # simulate unsupported IPv6

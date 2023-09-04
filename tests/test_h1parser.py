@@ -186,7 +186,6 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(
             self.obj.save(),
             b'HTTP/1.0 404 Not Found\r\ncontent-type: text/plain\r\n\r\n'
-            b'404 Not Found\r\n'
         )
         self.assertEqual(self.obj.getheaders(),
                          [(b'content-type', b'text/plain')])
@@ -196,7 +195,7 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(self.obj.getheaders(),
                          [(b'Content-Type', b'text/html')])
         self.assertEqual(
-            self.obj.save(),
+            self.obj.save(body=True),
             b'HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n'
             b'404 Not Found\r\n'
         )

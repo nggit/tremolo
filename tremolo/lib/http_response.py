@@ -140,11 +140,17 @@ class HTTPResponse(Response):
     def set_write_callback(self, write_cb):
         self._write_cb = write_cb
 
-    def close(self, keepalive=False):
+    def close(self, keepalive=False, delay=None):
         if not keepalive:
             self._request.http_keepalive = False
 
-        super().close()
+        if delay is None or delay < 1:
+            super().close()
+        else:
+            self._request.protocol.loop.call_at(
+                self._request.protocol.loop.time() + delay,
+                super().close
+            )
 
     async def send_continue(self):
         if self._request.http_continue:
@@ -164,7 +170,7 @@ class HTTPResponse(Response):
 
             if content_length > 0 and (
                         self._request.method == b'HEAD' or
-                        status[0] in (204, 304) or 100 <= status[0] < 200
+                        status[0] in (204, 205, 304) or 100 <= status[0] < 200
                     ):
                 data = b''
 
@@ -190,7 +196,8 @@ class HTTPResponse(Response):
         if not self.headers_sent():
             if self._header[0] == b'':
                 status = self.get_status()
-                no_content = status[0] in (204, 304) or 100 <= status[0] < 200
+                no_content = (status[0] in (204, 205, 304) or
+                              100 <= status[0] < 200)
                 self.http_chunked = kwargs.get(
                     'chunked', self._request.version == b'1.1' and
                     self._request.http_keepalive and not no_content
@@ -213,7 +220,7 @@ class HTTPResponse(Response):
 
                     if status[0] == 101:
                         self._request.upgraded = True
-                    else:
+                    elif not no_content:
                         self.append_header(b'Content-Type: %s\r\n' %
                                            self.get_content_type())
 
