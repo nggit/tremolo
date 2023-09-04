@@ -239,12 +239,15 @@ class Tremolo:
             b'content="width=device-width, initial-scale=1.0" />'
             b'<title>404 Not Found</title>'
             b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; '
-            b'font-family: sans-serif; }</style></head><body>'
+            b'font-family: sans-serif; line-height: 1.5em; }</style></head>'
+            b'<body><h1>Not Found</h1>'
         )
-        yield (b'<h1>Not Found</h1><p>Unable to find handler for %s.</p><hr />'
-               b'<address>%s</address></body></html>') % (
-                   html_escape(server['request'].path),
-                   server['context'].options['server_name'])
+        yield (b'<p>Unable to find handler for %s.</p><hr />' %
+               html_escape(server['request'].path))
+        yield (
+            b'<address title="Powered by Tremolo">%s</address>'
+            b'</body></html>' % server['context'].options['server_name']
+        )
 
     async def _serve(self, host, port, **options):
         on_start = self._events['worker']['start'][-1]
