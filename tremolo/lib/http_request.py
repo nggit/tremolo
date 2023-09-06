@@ -7,7 +7,8 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('_client',
+    __slots__ = ('_socket',
+                 '_client',
                  '_ip',
                  '_is_secure',
                  'header',
@@ -34,6 +35,7 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
+        self._socket = None
         self._client = None
         self._ip = None
         self._is_secure = None
@@ -75,9 +77,16 @@ class HTTPRequest(Request):
         self._read_buf = bytearray()
 
     @property
+    def socket(self):
+        if not self._socket:
+            self._socket = self.transport.get_extra_info('socket')
+
+        return self._socket
+
+    @property
     def client(self):
         if not self._client:
-            self._client = self.transport.get_extra_info('peername')[:2]
+            self._client = self.socket.getpeername()[:2]
 
         return self._client
 
@@ -91,7 +100,7 @@ class HTTPRequest(Request):
 
             ip = ip.strip()
 
-            if ip == b'' and isinstance(self.client, tuple):
+            if ip == b'' and self.client is not None:
                 self._ip = self.client[0].encode('utf-8')
             else:
                 self._ip = ip[:(ip + b',').find(b',')]
