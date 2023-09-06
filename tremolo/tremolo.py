@@ -362,7 +362,6 @@ class Tremolo:
             lambda: Server(loop=self._loop,
                            logger=self._logger,
                            lock=lock,
-                           sock=sock,
                            worker=context,
                            debug=options.get('debug', False),
                            ws=options.get('ws', True),

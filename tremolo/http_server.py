@@ -15,7 +15,7 @@ class HTTPServer(HTTPProtocol):
                  '_middlewares',
                  '_server')
 
-    def __init__(self, lock=None, sock=None, **kwargs):
+    def __init__(self, lock=None, **kwargs):
         self._route_handlers = kwargs['_handlers']
         self._middlewares = kwargs['_middlewares']
         self._server = {
@@ -23,7 +23,6 @@ class HTTPServer(HTTPProtocol):
             'logger': kwargs['logger'],
             'worker': kwargs['worker'],
             'lock': lock,
-            'socket': sock,
             'context': ServerContext()
         }
 
