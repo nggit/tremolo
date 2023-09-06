@@ -80,7 +80,7 @@ class TestParseHeader(unittest.TestCase):
         self.assertTrue(self.obj.is_valid_request)
         self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid_response)
-        self.assertEqual(self.obj.gethost(), None)
+        self.assertEqual(self.obj.gethost(), b'')
         self.assertEqual(self.obj.getmethod(), b'GET')
         self.assertEqual(self.obj.geturl(), b'/')
         self.assertEqual(self.obj.getversion(), b'1.0')

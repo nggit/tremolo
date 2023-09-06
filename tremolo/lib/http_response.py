@@ -347,7 +347,7 @@ class HTTPResponse(Response):
 
                         ranges.append((start, end, end - start + 1))
             except ValueError as exc:
-                raise BadRequest('bad range', cause=exc)
+                raise BadRequest('bad range') from exc
 
             self.set_status(206, b'Partial Content')
 
@@ -364,8 +364,19 @@ class HTTPResponse(Response):
                 handle.seek(start)
                 await self.write(handle.read(size), chunked=False)
             else:
-                ip, port = self._request.client
-                boundary = b'----Boundary%x%x' % (hash(ip), port)
+                client = self._request.client
+
+                if client is None:
+                    fileno = self._request.socket.fileno()
+                    client = (str(fileno), fileno)
+
+                ip, port = client
+                boundary = b'----Boundary%x%x%x%x' % (hash(ip),
+                                                      port,
+                                                      os.getpid(),
+                                                      int.from_bytes(
+                                                          os.urandom(4),
+                                                          byteorder='big'))
 
                 self.set_content_type(
                     b'multipart/byteranges; boundary=%s' % boundary

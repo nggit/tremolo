@@ -38,10 +38,10 @@ async def worker_stop(**server):
 
 @app.on_request
 async def my_request_middleware(worker=None, **server):
-    worker.shared += 1
-    worker.socket_family = server['socket'].family.name
     request = server['request']
     response = server['response']
+    worker.shared += 1
+    worker.socket_family = request.socket.family.name
 
     if not request.is_valid:
         raise BadRequest

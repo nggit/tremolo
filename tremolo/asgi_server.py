@@ -77,7 +77,7 @@ class ASGIServer(HTTPProtocol):
             'root_path': self.options['_root_path'],
             'headers': self.request.header.getheaders(),
             'client': self.request.client,
-            'server': self.request.transport.get_extra_info('sockname')
+            'server': self.request.socket.getsockname()
         }
 
         if (self.options['ws'] and b'upgrade' in self.request.headers and

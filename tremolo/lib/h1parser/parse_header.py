@@ -132,10 +132,11 @@ class ParseHeader:
 
             start = end + 2
 
-        if (self.is_valid_request and self.headers[b'_version'] == b'1.1' and
-                b'host' not in self.headers):
+        if self.is_request and b'host' not in self.headers:
             self.headers[b'host'] = b''
-            self.is_valid_request = False
+
+            if self.is_valid_request and self.headers[b'_version'] == b'1.1':
+                self.is_valid_request = False
 
         return self
 
