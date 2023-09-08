@@ -48,8 +48,14 @@ async def ws_handler(websocket=None, request=None, **_):
         <ul id="messages"></ul>
         <script>
     """
+    ws_scheme = b'ws'
+
+    if (b'x-forwarded-proto' in request.headers and
+            request.headers[b'x-forwarded-proto']) == b'https':
+        ws_scheme = b'wss'
+
     yield b"\
-        var socket = new WebSocket('ws://%s/');" % request.host
+        var socket = new WebSocket('%s://%s/');" % (ws_scheme, request.host)
     yield b"""
             var messages = document.getElementById('messages');
             var sendButton = document.getElementById('send');
