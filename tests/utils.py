@@ -81,13 +81,15 @@ def getcontents(
             response_header = response_data[:header_size]
 
             if header_size > -1:
-                if response_header.lower().startswith(
+                _response_header = response_header.lower()
+
+                if _response_header.startswith(
                         'http/{:s} 100 continue'
                         .format(version).encode('latin-1')):
                     del response_data[:]
                     continue
 
-                if response_header.lower().startswith(
+                if _response_header.startswith(
                         'http/{:s} 101 '
                         .format(version).encode('latin-1')):
                     del response_data[:]
@@ -99,7 +101,7 @@ def getcontents(
 
                 if (
                         b'\r\ntransfer-encoding: chunked' in
-                        response_header.lower() and
+                        _response_header and
                         response_data.endswith(b'\r\n0\r\n\r\n')
                         ):
                     break
@@ -107,7 +109,7 @@ def getcontents(
                 if (
                         (b'\r\ncontent-length: %d\r\n' %
                             (len(response_data) - header_size - 4)) in
-                        response_header.lower()
+                        _response_header
                         ):
                     break
 
