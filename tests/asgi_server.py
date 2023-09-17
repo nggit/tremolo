@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__all__ = ('app', 'ASGI_PORT',)
+__all__ = ('app', 'ASGI_HOST', 'ASGI_PORT')
 
 import asyncio  # noqa: E402
 import os  # noqa: E402
@@ -14,8 +14,9 @@ sys.path.insert(
 
 import tremolo  # noqa: E402
 
-from tests.http_server import HTTP_HOST, HTTP_PORT, TEST_FILE  # noqa: E402
+from tests.http_server import HTTP_PORT, TEST_FILE  # noqa: E402
 
+ASGI_HOST = '::1'
 ASGI_PORT = HTTP_PORT + 10
 
 
@@ -112,4 +113,4 @@ if __name__ == '__main__':
     except ImportError:
         print('INFO: uvloop is not installed')
 
-    tremolo.run(app, host=HTTP_HOST, port=ASGI_PORT, debug=True, worker_num=2)
+    tremolo.run(app, host=ASGI_HOST, port=ASGI_PORT, debug=True, worker_num=2)

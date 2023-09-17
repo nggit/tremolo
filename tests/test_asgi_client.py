@@ -16,7 +16,7 @@ import tremolo  # noqa: E402
 
 from tremolo.lib.websocket import WebSocket  # noqa: E402
 from tests.http_server import HTTP_HOST, TEST_FILE  # noqa: E402
-from tests.asgi_server import app, ASGI_PORT  # noqa: E402
+from tests.asgi_server import app, ASGI_HOST, ASGI_PORT  # noqa: E402
 from tests.utils import (  # noqa: E402
     getcontents,
     chunked_detected,
@@ -157,7 +157,7 @@ if __name__ == '__main__':
 
     p = mp.Process(
         target=tremolo.run,
-        kwargs=dict(app=app, host=HTTP_HOST, port=ASGI_PORT, debug=False)
+        kwargs=dict(app=app, host=ASGI_HOST, port=ASGI_PORT, debug=False)
     )
 
     p.start()
