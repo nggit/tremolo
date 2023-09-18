@@ -16,7 +16,7 @@ import tremolo  # noqa: E402
 
 from tests.http_server import HTTP_PORT, TEST_FILE  # noqa: E402
 
-ASGI_HOST = '::1'
+ASGI_HOST = '::'
 ASGI_PORT = HTTP_PORT + 10
 
 

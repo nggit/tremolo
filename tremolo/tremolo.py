@@ -463,8 +463,10 @@ class Tremolo:
 
                 if ':' in host:
                     sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-                    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-                    host = '::'
+
+                    if host == '::':
+                        sock.setsockopt(socket.IPPROTO_IPV6,
+                                        socket.IPV6_V6ONLY, 0)
                 else:
                     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             except socket.gaierror:
