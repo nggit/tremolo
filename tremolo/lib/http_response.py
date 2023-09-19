@@ -198,10 +198,14 @@ class HTTPResponse(Response):
                 status = self.get_status()
                 no_content = (status[0] in (204, 205, 304) or
                               100 <= status[0] < 200)
-                self.http_chunked = kwargs.get(
-                    'chunked', self._request.version == b'1.1' and
-                    self._request.http_keepalive and not no_content
-                )
+                chunked = kwargs.get('chunked')
+
+                if chunked is None:
+                    self.http_chunked = (self._request.version == b'1.1' and
+                                         self._request.http_keepalive and
+                                         not no_content)
+                else:
+                    self.http_chunked = chunked
 
                 if self.http_chunked:
                     self.append_header(b'Transfer-Encoding: chunked\r\n')
@@ -212,7 +216,7 @@ class HTTPResponse(Response):
                 if no_content and status[0] not in (101, 426):
                     self.append_header(b'Connection: close\r\n\r\n')
                 else:
-                    if not self.http_chunked and not (
+                    if chunked is None and not self.http_chunked and not (
                             self._request.version == b'1.1' and (
                                 status[0] in (101, 426) or
                                 b'range' in self._request.headers)):
