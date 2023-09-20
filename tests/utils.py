@@ -54,7 +54,15 @@ def getcontents(
                               '\r\n'.join(headers),
                               data).encode('latin-1')
 
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+    if ':' in host:
+        if host == '::':
+            host = 'localhost'
+
+        family = socket.AF_INET6
+    else:
+        family = socket.AF_INET
+
+    with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         sock.settimeout(5)
 

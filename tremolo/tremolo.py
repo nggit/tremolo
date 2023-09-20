@@ -461,9 +461,14 @@ class Tremolo:
             try:
                 socket.getaddrinfo(host, None)
 
-                sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
-                sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
-                host = '::'
+                if ':' in host:
+                    sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+
+                    if host == '::' and hasattr(socket, 'IPPROTO_IPV6'):
+                        sock.setsockopt(socket.IPPROTO_IPV6,
+                                        socket.IPV6_V6ONLY, 0)
+                else:
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             except socket.gaierror:
                 _host = host
                 host = 'localhost'
