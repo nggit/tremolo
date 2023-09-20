@@ -15,7 +15,7 @@ sys.path.insert(
 import tremolo  # noqa: E402
 
 from tremolo.lib.websocket import WebSocket  # noqa: E402
-from tests.http_server import HTTP_HOST, TEST_FILE  # noqa: E402
+from tests.http_server import TEST_FILE  # noqa: E402
 from tests.asgi_server import app, ASGI_HOST, ASGI_PORT  # noqa: E402
 from tests.utils import (  # noqa: E402
     getcontents,
@@ -35,7 +35,7 @@ class TestASGIClient(unittest.TestCase):
                                              self.id()))
 
     def test_get_ok_10(self):
-        header, body = getcontents(host=HTTP_HOST,
+        header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
                                    url='/',
@@ -50,7 +50,7 @@ class TestASGIClient(unittest.TestCase):
         self.assertTrue(b'Hello world!' in body)
 
     def test_get_ok_11(self):
-        header, body = getcontents(host=HTTP_HOST,
+        header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
                                    url='/page/101?a=111&a=xyz&b=222',
@@ -64,7 +64,7 @@ class TestASGIClient(unittest.TestCase):
 
     def test_post_upload_ok_10(self):
         header, body = getcontents(
-            host=HTTP_HOST,
+            host=ASGI_HOST,
             port=ASGI_PORT,
             raw=b'POST /upload HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 8192\r\n\r\n%s' % (
@@ -76,7 +76,7 @@ class TestASGIClient(unittest.TestCase):
 
     def test_post_upload2_ok_10(self):
         header, body = getcontents(
-            host=HTTP_HOST,
+            host=ASGI_HOST,
             port=ASGI_PORT,
             raw=b'POST /upload2 HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 65536\r\n\r\n%s' % (
@@ -88,7 +88,7 @@ class TestASGIClient(unittest.TestCase):
 
     def test_post_upload_ok_11(self):
         header, body = getcontents(
-            host=HTTP_HOST,
+            host=ASGI_HOST,
             port=ASGI_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
@@ -98,7 +98,7 @@ class TestASGIClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
 
     def test_download_10(self):
-        header, body = getcontents(host=HTTP_HOST,
+        header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
                                    url='/download',
@@ -112,7 +112,7 @@ class TestASGIClient(unittest.TestCase):
         )
 
     def test_download_11(self):
-        header, body = getcontents(host=HTTP_HOST,
+        header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
                                    url='/download',
@@ -125,7 +125,7 @@ class TestASGIClient(unittest.TestCase):
         )
 
     def test_response_splitting(self):
-        header, body = getcontents(host=HTTP_HOST,
+        header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
                                    url='/foo%0D%0Abar%3A%20baz',
@@ -140,7 +140,7 @@ class TestASGIClient(unittest.TestCase):
 
     def test_websocket(self):
         payload = getcontents(
-            host=HTTP_HOST,
+            host=ASGI_HOST,
             port=ASGI_PORT,
             raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Upgrade: websocket\r\n'
