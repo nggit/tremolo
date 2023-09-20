@@ -9,7 +9,7 @@ import tremolo
 
 from tests.http_server import app, HTTP_HOST, HTTP_PORT
 from tests.asgi_server import app as asgi_app
-from tests.asgi_server import ASGI_PORT
+from tests.asgi_server import ASGI_HOST, ASGI_PORT
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
@@ -24,7 +24,7 @@ if __name__ == '__main__':
     )
     processes.append(mp.Process(
         target=tremolo.run,
-        kwargs=dict(app=asgi_app, host=HTTP_HOST, port=ASGI_PORT, debug=False))
+        kwargs=dict(app=asgi_app, host=ASGI_HOST, port=ASGI_PORT, debug=False))
     )
 
     for p in processes:

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__all__ = ('app', 'HTTP_PORT', 'HTTP_HOST', 'TEST_FILE')
+__all__ = ('app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE')
 
 import asyncio  # noqa: E402
 import os  # noqa: E402
@@ -15,7 +15,7 @@ sys.path.insert(
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 
-HTTP_HOST = 'localhost'
+HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
 TEST_FILE = __file__
 

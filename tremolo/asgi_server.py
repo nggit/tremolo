@@ -33,7 +33,8 @@ class ASGIServer(HTTPProtocol):
                  '_task',
                  '_timer',
                  '_timeout',
-                 '_websocket')
+                 '_websocket',
+                 '_http_chunked')
 
     def __init__(self, _app=None, **kwargs):
         self._app = _app
@@ -43,6 +44,7 @@ class ASGIServer(HTTPProtocol):
         self._timer = None
         self._timeout = 30
         self._websocket = None
+        self._http_chunked = None
 
         super().__init__(ServerContext(), **kwargs)
 
@@ -110,7 +112,8 @@ class ASGIServer(HTTPProtocol):
                 'task: ASGI application is cancelled due to timeout'
             )
         except Exception as exc:
-            if self.request.upgraded and self._websocket is not None:
+            if (self.request is not None and self.request.upgraded and
+                    self._websocket is not None):
                 exc = WebSocketServerClosed(cause=exc)
 
             await self.handle_exception(exc)
@@ -227,7 +230,7 @@ class ASGIServer(HTTPProtocol):
                         if name == b'content-length':
                             # will disable http chunked in the
                             # self.response.write()
-                            self.request.http_keepalive = False
+                            self._http_chunked = False
 
                         if isinstance(header, list):
                             header = tuple(header)
@@ -251,7 +254,8 @@ class ASGIServer(HTTPProtocol):
 
             if data['type'] == 'http.response.body':
                 if 'body' in data:
-                    await self.response.write(data['body'])
+                    await self.response.write(data['body'],
+                                              chunked=self._http_chunked)
 
                 if 'more_body' not in data or data['more_body'] is False:
                     await self.response.write(b'', throttle=False)
