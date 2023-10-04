@@ -300,8 +300,6 @@ class HTTPServer(HTTPProtocol):
                 m = pattern.search(self.request.url)
 
                 if m:
-                    await self.response.send_continue()
-
                     matches = m.groupdict()
 
                     if not matches:
@@ -324,8 +322,6 @@ class HTTPServer(HTTPProtocol):
                         )
                     else:
                         self._route_handlers[key] = [(pattern, func, kwargs)]
-
-                    await self.response.send_continue()
 
                     matches = m.groupdict()
 

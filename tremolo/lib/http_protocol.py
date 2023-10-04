@@ -468,7 +468,9 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.InvalidStateError:
                 pass
 
-        if not (self._request.http_continue or self._request.upgraded):
+        if self._request.http_continue:
+            self._request.http_continue = False
+        elif not self._request.upgraded:
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
             self._header_buf = bytearray()

@@ -58,8 +58,6 @@ class ASGIServer(HTTPProtocol):
             self.request.headers.getlist(b'sec-websocket-protocol')]
 
     async def _handle_http(self):
-        await self.response.send_continue()
-
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('utf-8')
         self._scope['scheme'] = _HTTP_OR_HTTPS[self.request.is_secure]

@@ -154,6 +154,7 @@ class HTTPResponse(Response):
 
             await self.send(b'HTTP/%s 100 Continue\r\n\r\n' %
                             self._request.version)
+            self.close(keepalive=True)
 
     async def end(self, data=b'', **kwargs):
         if self.headers_sent():
