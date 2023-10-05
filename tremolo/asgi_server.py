@@ -2,7 +2,6 @@
 
 import asyncio
 
-from datetime import datetime
 from http import HTTPStatus
 from urllib.parse import unquote
 
@@ -195,9 +194,8 @@ class ASGIServer(HTTPProtocol):
 
                 self.response.append_header(
                     b'Date: %s\r\nServer: %s\r\n' % (
-                        datetime.utcnow().strftime(
-                            '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1'),
-                        self.options['server_name'])
+                        self.options['server_info']['date'],
+                        self.options['server_info']['name'])
                 )
 
                 if 'headers' in data:

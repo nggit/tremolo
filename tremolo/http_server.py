@@ -1,6 +1,5 @@
 # Copyright (c) 2023 nggit
 
-from datetime import datetime
 from urllib.parse import parse_qs
 
 from .lib.contexts import ServerContext
@@ -67,16 +66,17 @@ class HTTPServer(HTTPProtocol):
         if self.response.headers_sent() or self.response.header[1] != b'':
             return
 
-        options['server_name'] = options.get('server_name',
-                                             self.options['server_name'])
+        options['server_name'] = options.get(
+                                     'server_name',
+                                     self.options['server_info']['name']
+                                 )
 
         if isinstance(options['server_name'], str):
             options['server_name'] = options['server_name'].encode('latin-1')
 
         self.response.append_header(
             b'Date: %s\r\nServer: %s\r\n' % (
-                datetime.utcnow().strftime(
-                    '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1'),
+                self.options['server_info']['date'],
                 options['server_name'])
         )
 

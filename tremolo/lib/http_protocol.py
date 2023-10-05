@@ -3,7 +3,6 @@
 import asyncio
 import traceback
 
-from datetime import datetime
 from urllib.parse import quote, unquote
 
 from .h1parser import ParseHeader
@@ -242,9 +241,8 @@ class HTTPProtocol(asyncio.Protocol):
                 exc.message.encode('latin-1'),
                 exc.content_type.encode('latin-1'),
                 len(data),
-                datetime.utcnow().strftime(
-                    '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1'),
-                self._options['server_name'],
+                self._options['server_info']['date'],
+                self._options['server_info']['name'],
                 data)
         )
 
