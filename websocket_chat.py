@@ -18,7 +18,7 @@ async def middleware_handler(**server):
 
 
 @app.route('/')
-async def ws_handler(websocket=None, request=None, **_):
+async def ws_handler(websocket=None, request=None, stream=False, **_):
     """A hybrid handler.
 
     Normally, you should separate http:// and ws:// respectively.
