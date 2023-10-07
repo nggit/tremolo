@@ -199,7 +199,11 @@ class HTTPServer(HTTPProtocol):
                 await self.response.write(None)
                 return
 
-            buffer_min_size = options['buffer_size'] // 2
+            if options.get('stream', True):
+                buffer_min_size = None
+            else:
+                buffer_min_size = options['buffer_size'] // 2
+
             self.set_watermarks(high=options['buffer_size'] * 4,
                                 low=buffer_min_size)
             await self.response.write(data,

@@ -33,8 +33,7 @@ class ASGIServer(HTTPProtocol):
                  '_timer',
                  '_timeout',
                  '_websocket',
-                 '_http_chunked',
-                 '_buffer_min_size')
+                 '_http_chunked')
 
     def __init__(self, _app=None, **kwargs):
         self._app = _app
@@ -45,7 +44,6 @@ class ASGIServer(HTTPProtocol):
         self._timeout = 30
         self._websocket = None
         self._http_chunked = None
-        self._buffer_min_size = None
 
         super().__init__(ServerContext(), **kwargs)
 
@@ -193,7 +191,6 @@ class ASGIServer(HTTPProtocol):
                 if 'status' in data:
                     self.response.set_status(data['status'],
                                              HTTPStatus(data['status']).phrase)
-                    self._buffer_min_size = self.options['buffer_size'] // 2
 
                 self.response.append_header(
                     b'Date: %s\r\nServer: %s\r\n' % (
@@ -256,16 +253,12 @@ class ASGIServer(HTTPProtocol):
                     await self.response.write(
                         data['body'],
                         chunked=self._http_chunked,
-                        buffer_size=self.options['buffer_size'],
-                        buffer_min_size=self._buffer_min_size
+                        throttle=self.response.headers_sent(),
+                        buffer_size=self.options['buffer_size']
                     )
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self.response.write(
-                        b'',
-                        throttle=False,
-                        buffer_min_size=self._buffer_min_size
-                    )
+                    await self.response.write(b'', throttle=False)
                     self.response.close(keepalive=True)
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
