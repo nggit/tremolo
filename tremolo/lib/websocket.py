@@ -161,7 +161,8 @@ class WebSocket:
 
     async def send(self, payload_data, fin=1, opcode=None):
         await self.response.send(
-            __class__.create_frame(payload_data, fin=fin, opcode=opcode)
+            __class__.create_frame(payload_data, fin=fin, opcode=opcode),
+            throttle=False
         )
 
     def _ping(self):
