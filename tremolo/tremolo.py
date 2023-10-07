@@ -12,12 +12,11 @@ import ssl  # noqa: E402
 import sys  # noqa: E402
 import time  # noqa: E402
 
-from datetime import datetime  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
 from .exceptions import BadRequest  # noqa: E402
-from .utils import html_escape  # noqa: E402
+from .utils import html_escape, log_date, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
@@ -331,7 +330,7 @@ class Tremolo:
 
             options['app'] = getattr(import_module(module_name), attr_name)
 
-            print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+            print(log_date(), end=' ')
             sys.stdout.flush()
             sys.stdout.buffer.write(
                 b'Starting %s as an ASGI server for: ' % server_name
@@ -358,6 +357,10 @@ class Tremolo:
             options['app'] = None
             self.compile_handlers(options['_handlers'])
 
+        server_info = {
+            'date': server_date(),
+            'name': server_name
+        }
         server = await self._loop.create_server(
             lambda: Server(loop=self._loop,
                            logger=self._logger,
@@ -375,7 +378,7 @@ class Tremolo:
                            keepalive_timeout=options.get(
                                'keepalive_timeout', 30
                            ),
-                           server_name=server_name,
+                           server_info=server_info,
                            _connections=connections,
                            _pools=pools,
                            _app=options['app'],
@@ -384,7 +387,7 @@ class Tremolo:
                            _middlewares=options['_middlewares']),
             sock=sock, backlog=backlog, ssl=ssl_context)
 
-        print(datetime.now().strftime('[%Y-%m-%d %H:%M:%S]'), end=' ')
+        print(log_date(), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(
             b'%s (pid %d) is started at ' % (server_name, os.getpid())
@@ -411,6 +414,9 @@ class Tremolo:
 
                 for _ in range(2 * process_num):
                     await asyncio.sleep(1)
+
+                    # update server date
+                    server_info['date'] = server_date()
 
                     if options['_conn'].poll():
                         break

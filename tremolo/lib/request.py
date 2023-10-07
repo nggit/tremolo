@@ -4,8 +4,7 @@ import asyncio
 
 
 class Request:
-    __slots__ = ('_protocol',
-                 'body_size')
+    __slots__ = ('_protocol', 'body_size')
 
     def __init__(self, protocol):
         self._protocol = protocol

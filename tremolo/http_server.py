@@ -1,6 +1,5 @@
 # Copyright (c) 2023 nggit
 
-from datetime import datetime
 from urllib.parse import parse_qs
 
 from .lib.contexts import ServerContext
@@ -11,9 +10,7 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_route_handlers',
-                 '_middlewares',
-                 '_server')
+    __slots__ = ('_route_handlers', '_middlewares', '_server')
 
     def __init__(self, lock=None, **kwargs):
         self._route_handlers = kwargs['_handlers']
@@ -67,16 +64,17 @@ class HTTPServer(HTTPProtocol):
         if self.response.headers_sent() or self.response.header[1] != b'':
             return
 
-        options['server_name'] = options.get('server_name',
-                                             self.options['server_name'])
+        options['server_name'] = options.get(
+                                     'server_name',
+                                     self.options['server_info']['name']
+                                 )
 
         if isinstance(options['server_name'], str):
             options['server_name'] = options['server_name'].encode('latin-1')
 
         self.response.append_header(
             b'Date: %s\r\nServer: %s\r\n' % (
-                datetime.utcnow().strftime(
-                    '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1'),
+                self.options['server_info']['date'],
                 options['server_name'])
         )
 
@@ -201,11 +199,13 @@ class HTTPServer(HTTPProtocol):
                 await self.response.write(None)
                 return
 
+            buffer_min_size = options['buffer_size'] // 2
             self.set_watermarks(high=options['buffer_size'] * 4,
-                                low=options['buffer_size'] // 2)
-            await self.response.write(
-                data, rate=options['rate'], buffer_size=options['buffer_size']
-            )
+                                low=buffer_min_size)
+            await self.response.write(data,
+                                      rate=options['rate'],
+                                      buffer_size=options['buffer_size'],
+                                      buffer_min_size=buffer_min_size)
 
             while True:
                 try:
@@ -214,10 +214,13 @@ class HTTPServer(HTTPProtocol):
                     await self.response.write(
                         data,
                         rate=options['rate'],
-                        buffer_size=options['buffer_size']
+                        buffer_size=options['buffer_size'],
+                        buffer_min_size=buffer_min_size
                     )
                 except StopAsyncIteration:
-                    await self.response.write(b'', throttle=False)
+                    await self.response.write(
+                        b'', throttle=False, buffer_min_size=buffer_min_size
+                    )
                     break
         else:
             encoding = ('utf-8',)
@@ -300,8 +303,6 @@ class HTTPServer(HTTPProtocol):
                 m = pattern.search(self.request.url)
 
                 if m:
-                    await self.response.send_continue()
-
                     matches = m.groupdict()
 
                     if not matches:
@@ -324,8 +325,6 @@ class HTTPServer(HTTPProtocol):
                         )
                     else:
                         self._route_handlers[key] = [(pattern, func, kwargs)]
-
-                    await self.response.send_continue()
 
                     matches = m.groupdict()
 

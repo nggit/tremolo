@@ -2,7 +2,6 @@
 
 import asyncio
 
-from datetime import datetime
 from http import HTTPStatus
 from urllib.parse import unquote
 
@@ -34,7 +33,8 @@ class ASGIServer(HTTPProtocol):
                  '_timer',
                  '_timeout',
                  '_websocket',
-                 '_http_chunked')
+                 '_http_chunked',
+                 '_buffer_min_size')
 
     def __init__(self, _app=None, **kwargs):
         self._app = _app
@@ -45,6 +45,7 @@ class ASGIServer(HTTPProtocol):
         self._timeout = 30
         self._websocket = None
         self._http_chunked = None
+        self._buffer_min_size = None
 
         super().__init__(ServerContext(), **kwargs)
 
@@ -58,8 +59,6 @@ class ASGIServer(HTTPProtocol):
             self.request.headers.getlist(b'sec-websocket-protocol')]
 
     async def _handle_http(self):
-        await self.response.send_continue()
-
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('utf-8')
         self._scope['scheme'] = _HTTP_OR_HTTPS[self.request.is_secure]
@@ -194,12 +193,12 @@ class ASGIServer(HTTPProtocol):
                 if 'status' in data:
                     self.response.set_status(data['status'],
                                              HTTPStatus(data['status']).phrase)
+                    self._buffer_min_size = self.options['buffer_size'] // 2
 
                 self.response.append_header(
                     b'Date: %s\r\nServer: %s\r\n' % (
-                        datetime.utcnow().strftime(
-                            '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1'),
-                        self.options['server_name'])
+                        self.options['server_info']['date'],
+                        self.options['server_info']['name'])
                 )
 
                 if 'headers' in data:
@@ -254,11 +253,19 @@ class ASGIServer(HTTPProtocol):
 
             if data['type'] == 'http.response.body':
                 if 'body' in data:
-                    await self.response.write(data['body'],
-                                              chunked=self._http_chunked)
+                    await self.response.write(
+                        data['body'],
+                        chunked=self._http_chunked,
+                        buffer_size=self.options['buffer_size'],
+                        buffer_min_size=self._buffer_min_size
+                    )
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self.response.write(b'', throttle=False)
+                    await self.response.write(
+                        b'',
+                        throttle=False,
+                        buffer_min_size=self._buffer_min_size
+                    )
                     self.response.close(keepalive=True)
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:

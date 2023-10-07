@@ -154,6 +154,7 @@ class HTTPResponse(Response):
 
             await self.send(b'HTTP/%s 100 Continue\r\n\r\n' %
                             self._request.version)
+            self.close(keepalive=True)
 
     async def end(self, data=b'', **kwargs):
         if self.headers_sent():
@@ -233,8 +234,10 @@ class HTTPResponse(Response):
 
                     data = None
                 else:
-                    self._request.protocol.set_watermarks(high=buffer_size * 4,
-                                                          low=buffer_size // 2)
+                    self._request.protocol.set_watermarks(
+                        high=buffer_size * 4,
+                        low=kwargs.get('buffer_min_size', buffer_size // 2)
+                    )
 
             header = b''.join(self._header)
 

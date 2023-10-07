@@ -164,6 +164,9 @@ class HTTPRequest(Request):
         if self._eof:
             return
 
+        if self.http_continue:
+            await self.protocol.response.send_continue()
+
         if not raw and b'chunked' in self.transfer_encoding:
             buf = bytearray()
             agen = super().recv()
