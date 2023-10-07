@@ -35,7 +35,8 @@ class Tremolo:
         self._route_handlers = {
             0: [
                 (400, self.error_400, {}),
-                (404, self.error_404, dict(status=(404, b'Not Found')))
+                (404, self.error_404, dict(status=(404, b'Not Found'),
+                                           stream=False))
             ],
             1: [
                 (
