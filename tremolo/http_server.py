@@ -10,9 +10,7 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_route_handlers',
-                 '_middlewares',
-                 '_server')
+    __slots__ = ('_route_handlers', '_middlewares', '_server')
 
     def __init__(self, lock=None, **kwargs):
         self._route_handlers = kwargs['_handlers']
@@ -201,11 +199,13 @@ class HTTPServer(HTTPProtocol):
                 await self.response.write(None)
                 return
 
+            buffer_min_size = options['buffer_size'] // 2
             self.set_watermarks(high=options['buffer_size'] * 4,
-                                low=options['buffer_size'] // 2)
-            await self.response.write(
-                data, rate=options['rate'], buffer_size=options['buffer_size']
-            )
+                                low=buffer_min_size)
+            await self.response.write(data,
+                                      rate=options['rate'],
+                                      buffer_size=options['buffer_size'],
+                                      buffer_min_size=buffer_min_size)
 
             while True:
                 try:
@@ -214,10 +214,13 @@ class HTTPServer(HTTPProtocol):
                     await self.response.write(
                         data,
                         rate=options['rate'],
-                        buffer_size=options['buffer_size']
+                        buffer_size=options['buffer_size'],
+                        buffer_min_size=buffer_min_size
                     )
                 except StopAsyncIteration:
-                    await self.response.write(b'', throttle=False)
+                    await self.response.write(
+                        b'', throttle=False, buffer_min_size=buffer_min_size
+                    )
                     break
         else:
             encoding = ('utf-8',)

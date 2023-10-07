@@ -234,8 +234,10 @@ class HTTPResponse(Response):
 
                     data = None
                 else:
-                    self._request.protocol.set_watermarks(high=buffer_size * 4,
-                                                          low=buffer_size // 2)
+                    self._request.protocol.set_watermarks(
+                        high=buffer_size * 4,
+                        low=kwargs.get('buffer_min_size', buffer_size // 2)
+                    )
 
             header = b''.join(self._header)
 
