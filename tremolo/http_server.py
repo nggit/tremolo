@@ -164,11 +164,11 @@ class HTTPServer(HTTPProtocol):
         if self.response.http_chunked:
             self.response.append_header(b'Transfer-Encoding: chunked\r\n')
 
-        if self._middlewares['send'][-1][0] is not None:
+        for middleware in self._middlewares['send']:
             self.response.set_write_callback(
                 lambda: self._handle_middleware(
-                    self._middlewares['send'][-1][0],
-                    {**self._middlewares['send'][-1][1], **options})
+                    middleware[0],
+                    {**middleware[1], **options})
             )
 
         self.response.header = b'HTTP/%s %d %s\r\n' % (self.request.version,

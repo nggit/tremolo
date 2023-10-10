@@ -51,13 +51,11 @@ class Tremolo:
             'connect': [
                 (None, {})
             ],
-            'send': [
-                (None, {})
-            ],
             'close': [
                 (None, {})
             ],
-            'request': []
+            'request': [],
+            'send': []
         }
 
         self._events = {
