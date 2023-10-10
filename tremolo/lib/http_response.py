@@ -152,8 +152,10 @@ class HTTPResponse(Response):
                     self._request.protocol.options['client_max_body_size']):
                 raise ExpectationFailed
 
-            await self.send(b'HTTP/%s 100 Continue\r\n\r\n' %
-                            self._request.version)
+            await self.send(
+                b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version,
+                throttle=False
+            )
             self.close(keepalive=True)
 
     async def end(self, data=b'', **kwargs):
@@ -178,7 +180,7 @@ class HTTPResponse(Response):
                     content_length,
                     KEEPALIVE_OR_CLOSE[self._request.http_keepalive],
                     self._header[1],
-                    data), **kwargs
+                    data), throttle=False, **kwargs
             )
 
             self.headers_sent(True)
