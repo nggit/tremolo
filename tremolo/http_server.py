@@ -171,8 +171,8 @@ class HTTPServer(HTTPProtocol):
                     {**middleware[1], **options})
             )
 
-        self.response.header = b'HTTP/%s %d %s\r\n' % (self.request.version,
-                                                       *status)
+        self.response.header[0] = b'HTTP/%s %d %s\r\n' % (self.request.version,
+                                                          *status)
 
         if is_agen:
             if no_content and status[0] not in (101, 426):
