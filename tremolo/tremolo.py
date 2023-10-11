@@ -51,13 +51,11 @@ class Tremolo:
             'connect': [
                 (None, {})
             ],
-            'send': [
-                (None, {})
-            ],
             'close': [
                 (None, {})
             ],
-            'request': []
+            'request': [],
+            'response': []
         }
 
         self._events = {
@@ -166,12 +164,6 @@ class Tremolo:
 
         return self.middleware('connect')
 
-    def on_send(self, *args):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('send')(args[0])
-
-        return self.middleware('send')
-
     def on_close(self, *args):
         if len(args) == 1 and callable(args[0]):
             return self.middleware('close')(args[0])
@@ -183,6 +175,12 @@ class Tremolo:
             return self.middleware('request')(args[0])
 
         return self.middleware('request')
+
+    def on_response(self, *args):
+        if len(args) == 1 and callable(args[0]):
+            return self.middleware('response')(args[0])
+
+        return self.middleware('response')
 
     def getoptions(self, func):
         options = {}
