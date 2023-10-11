@@ -57,19 +57,11 @@ async def my_request_middleware(worker=None, **server):
     response.set_cookie('sess', 'www')
 
 
-@app.on_send
-async def my_send_middleware(**server):
+@app.on_response
+async def my_response_middleware(**server):
     response = server['response']
-    name, data = server['context'].data
 
-    if name == 'header':
-        # test append_header()
-        response.append_header(b'------------------')
-
-        assert data + b'------------------' == b''.join(response.header)
-
-        # sys.stdout.buffer.write(b''.join(response.header))
-        # print()
+    assert b'\r\nX-Foo: bar\r\nSet-Cookie: sess=www' in response.header[1]
 
 
 @app.route('/getheaderline')

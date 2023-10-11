@@ -20,9 +20,5 @@ class ServerContext:
     def tasks(self):
         return self.__dict__['tasks']
 
-    @property
-    def data(self):
-        return self.__dict__['data']
-
     def set(self, name, value):
         self.__dict__[name] = value

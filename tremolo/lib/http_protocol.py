@@ -243,7 +243,7 @@ class HTTPProtocol(asyncio.Protocol):
                 len(data),
                 self._options['server_info']['date'],
                 self._options['server_info']['name'],
-                data)
+                data), throttle=False
         )
 
         if self._response is not None:
