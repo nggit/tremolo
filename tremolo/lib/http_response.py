@@ -26,8 +26,7 @@ class HTTPResponse(Response):
                  'http_chunked',
                  '_request',
                  '_status',
-                 '_content_type',
-                 '_write_cb')
+                 '_content_type')
 
     def __init__(self, request):
         super().__init__(request)
@@ -38,7 +37,6 @@ class HTTPResponse(Response):
         self._request = request
         self._status = []
         self._content_type = []
-        self._write_cb = []
 
     def headers_sent(self, sent=False):
         if sent:
@@ -128,9 +126,6 @@ class HTTPResponse(Response):
             return self._content_type.pop()
         except IndexError:
             return b'text/html; charset=utf-8'
-
-    def set_write_callback(self, write_cb):
-        self._write_cb.append(write_cb)
 
     def close(self, keepalive=False):
         if not keepalive:
@@ -235,21 +230,8 @@ class HTTPResponse(Response):
 
             header = b''.join(self.header)
 
-            if self._write_cb:
-                self._request.context.set('data', ('header', header))
-
-                for write_cb in self._write_cb:
-                    await write_cb()
-
             await self.send(header, throttle=False)
-
             self.headers_sent(True)
-
-        if self._write_cb:
-            self._request.context.set('data', ('body', data))
-
-            for write_cb in self._write_cb:
-                await write_cb()
 
         if (self.http_chunked and not self._request.upgraded and
                 data is not None):

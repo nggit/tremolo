@@ -164,13 +164,6 @@ class HTTPServer(HTTPProtocol):
         if self.response.http_chunked:
             self.response.append_header(b'Transfer-Encoding: chunked\r\n')
 
-        for middleware in self._middlewares['send']:
-            self.response.set_write_callback(
-                lambda: self._handle_middleware(
-                    middleware[0],
-                    {**middleware[1], **options})
-            )
-
         self.response.header[0] = b'HTTP/%s %d %s\r\n' % (self.request.version,
                                                           *status)
 
@@ -194,6 +187,15 @@ class HTTPServer(HTTPProtocol):
                     b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
                         status[0] in (101, 426)]
                 )
+
+            for middleware in self._middlewares['response']:
+                options = await self._handle_middleware(
+                    middleware[0],
+                    {**middleware[1], **options}
+                )
+
+                if not isinstance(options, dict):
+                    return
 
             if self.request.method == b'HEAD' or no_content:
                 await self.response.write(None)
@@ -251,6 +253,15 @@ class HTTPServer(HTTPProtocol):
                             len(data),
                             KEEPALIVE_OR_CLOSE[self.request.http_keepalive])
                     )
+
+            for middleware in self._middlewares['response']:
+                options = await self._handle_middleware(
+                    middleware[0],
+                    {**middleware[1], **options}
+                )
+
+                if not isinstance(options, dict):
+                    return
 
             if data == b'' or self.request.method == b'HEAD' or no_content:
                 await self.response.write(None)
