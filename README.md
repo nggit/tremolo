@@ -46,6 +46,7 @@ With only 2500 lines of code, with no dependencies other than the [Python Standa
 * [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
 * Framework features; routing, middleware, etc
 * ASGI server
+* PyPy compatible
 
 ## Example
 Here is a complete *hello world* example in case you missed the usual `return`.
