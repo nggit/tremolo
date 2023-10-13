@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/nggit/tremolo/branch/master/graph/badge.svg?token=SC8NVWN0F1)](https://codecov.io/gh/nggit/tremolo)
 
-Tremolo is a stream-oriented, asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
+Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
 
 Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
 
