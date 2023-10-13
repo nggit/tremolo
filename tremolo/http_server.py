@@ -175,6 +175,8 @@ class HTTPServer(HTTPProtocol):
                     self.request.upgraded = True
                 else:
                     if not self.response.http_chunked:
+                        # no chunk, no close, no size.
+                        # Assume close to signal end
                         self.request.http_keepalive = False
 
                     if not no_content:
@@ -201,13 +203,14 @@ class HTTPServer(HTTPProtocol):
                 await self.response.write(None)
                 return
 
-            if options.get('stream', True):
-                buffer_min_size = None
-            else:
-                buffer_min_size = options['buffer_size'] // 2
+            buffer_min_size = options['buffer_size'] // 2
 
             self.set_watermarks(high=options['buffer_size'] * 4,
                                 low=buffer_min_size)
+
+            if options.get('stream', True):
+                buffer_min_size = None
+
             await self.response.write(data,
                                       rate=options['rate'],
                                       buffer_size=options['buffer_size'],
