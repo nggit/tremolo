@@ -165,6 +165,32 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'a=123, a=xxx, yyy')
 
+    def test_head_10(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='HEAD',
+                                   url='/',
+                                   version='1.0')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 503 Service Unavailable')
+        self.assertTrue(b'\r\nContent-Length: ' in header)
+        self.assertFalse(b'\r\nTransfer-Encoding: chunked\r\n' in header)
+        self.assertEqual(body, b'')
+
+    def test_head_11(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='HEAD',
+                                   url='/invalid',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 404 Not Found')
+        self.assertFalse(b'\r\nContent-Length: ' in header)
+        self.assertTrue(b'\r\nTransfer-Encoding: chunked\r\n' in header)
+        self.assertEqual(body, b'')
+
     def test_get_lock_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
