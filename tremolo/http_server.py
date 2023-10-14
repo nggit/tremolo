@@ -257,10 +257,13 @@ class HTTPServer(HTTPProtocol):
                             KEEPALIVE_OR_CLOSE[self.request.http_keepalive])
                     )
 
-            for middleware in self._middlewares['response']:
+            i = len(self._middlewares['response'])
+
+            while i > 0:
+                i -= 1
                 options = await self._handle_middleware(
-                    middleware[0],
-                    {**middleware[1], **options}
+                    self._middlewares['response'][i][0],
+                    {**self._middlewares['response'][i][1], **options}
                 )
 
                 if not isinstance(options, dict):
