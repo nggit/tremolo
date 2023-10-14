@@ -129,6 +129,7 @@ class HTTPResponse(Response):
 
     def close(self, keepalive=False):
         if not keepalive:
+            # this will force the TCP connection to be terminated
             self._request.http_keepalive = False
 
         super().close()
