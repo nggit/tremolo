@@ -22,13 +22,13 @@ TEST_FILE = __file__
 app = Tremolo()
 
 
-@app.on_start
+@app.on_worker_start
 async def worker_start(**server):
     server['context'].shared = 0
     server['context'].socket_family = 'AF_UNIX'
 
 
-@app.on_stop
+@app.on_worker_stop
 async def worker_stop(**server):
     if server['context'].socket_family == 'AF_UNIX':
         assert server['context'].shared == 0

@@ -15,8 +15,8 @@ import time  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
-from .exceptions import BadRequest  # noqa: E402
-from .utils import html_escape, log_date, server_date  # noqa: E402
+from . import handlers  # noqa: E402
+from .utils import log_date, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
@@ -32,54 +32,35 @@ class Tremolo:
     def __init__(self):
         self._ports = {}
 
-        self._route_handlers = {
+        self.routes = {
             0: [
-                (400, self.error_400, {}),
-                (404, self.error_404, dict(status=(404, b'Not Found'),
-                                           stream=False))
+                (400, handlers.error_400, {}),
+                (404, handlers.error_404, dict(status=(404, b'Not Found'),
+                                               stream=False))
             ],
             1: [
                 (
                     b'^/+(?:\\?.*)?$',
-                    self.index, dict(status=(503, b'Service Unavailable'))
+                    handlers.index, dict(status=(503, b'Service Unavailable'))
                 )
             ],
             -1: []
         }
 
-        self._middlewares = {
-            'connect': [
-                (None, {})
-            ],
-            'close': [
-                (None, {})
-            ],
+        self.middlewares = {
+            'connect': [],
+            'close': [],
             'request': [],
             'response': []
         }
 
-        self._events = {
-            'request': self._middlewares,
-            'worker': {
-                'start': [
-                    None
-                ],
-                'stop': [
-                    None
-                ]
-            }
+        self.events = {
+            'worker_start': [],
+            'worker_stop': []
         }
 
         self._loop = None
         self._logger = None
-
-    @property
-    def handlers(self):
-        return self._route_handlers
-
-    @property
-    def middlewares(self):
-        return self._middlewares
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -102,7 +83,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._add_handler(path, wrapper, self.getoptions(func))
+            self.add_route(path, wrapper, self.getoptions(func))
             return wrapper
 
         return decorator
@@ -113,9 +94,9 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            for i, h in enumerate(self._route_handlers[0]):
+            for i, h in enumerate(self.routes[0]):
                 if code == h[0]:
-                    self._route_handlers[0][i] = (
+                    self.routes[0][i] = (
                         h[0], wrapper, dict(h[2], **self.getoptions(func))
                     )
                     break
@@ -124,28 +105,28 @@ class Tremolo:
 
         return decorator
 
-    def worker(self, name):
+    def event(self, name):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._events['worker'][name].append(wrapper)
+            self.events[name].append(wrapper)
             return wrapper
 
         return decorator
 
-    def on_start(self, *args):
+    def on_worker_start(self, *args):
         if len(args) == 1 and callable(args[0]):
-            return self.worker('start')(args[0])
+            return self.event('worker_start')(args[0])
 
-        return self.worker('start')
+        return self.event('worker_start')
 
-    def on_stop(self, *args):
+    def on_worker_stop(self, *args):
         if len(args) == 1 and callable(args[0]):
-            return self.worker('stop')(args[0])
+            return self.event('worker_stop')(args[0])
 
-        return self.worker('stop')
+        return self.event('worker_stop')
 
     def middleware(self, name):
         def decorator(func):
@@ -153,7 +134,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self._middlewares[name].append((wrapper, self.getoptions(func)))
+            self.middlewares[name].append((wrapper, self.getoptions(func)))
             return wrapper
 
         return decorator
@@ -193,17 +174,17 @@ class Tremolo:
 
         return options
 
-    def _add_handler(self, path='/', func=None, kwargs={}):
+    def add_route(self, path, func, kwargs={}):
         if path.startswith('^') or path.endswith('$'):
             pattern = path.encode('latin-1')
-            self._route_handlers[-1].append((pattern, func, kwargs))
+            self.routes[-1].append((pattern, func, kwargs))
         else:
             _path = path.split('?', 1)[0].strip('/')
 
             if _path == '':
                 key = 1
-                pattern = self._route_handlers[1][0][0]
-                self._route_handlers[key] = [(pattern, func, kwargs)]
+                pattern = self.routes[1][0][0]
+                self.routes[key] = [(pattern, func, kwargs)]
             else:
                 key = '{:d}#{:s}'.format(
                     _path.count('/') + 2, _path[:(_path + '/').find('/')]
@@ -212,49 +193,27 @@ class Tremolo:
                     _path
                 ).encode('latin-1')
 
-                if key in self._route_handlers:
-                    self._route_handlers[key].append((pattern, func, kwargs))
+                if key in self.routes:
+                    self.routes[key].append((pattern, func, kwargs))
                 else:
-                    self._route_handlers[key] = [(pattern, func, kwargs)]
+                    self.routes[key] = [(pattern, func, kwargs)]
 
-    def compile_handlers(self, handlers={}):
-        for key in handlers:
-            for i, h in enumerate(handlers[key]):
+    def compile_routes(self, routes={}):
+        for key in routes:
+            for i, h in enumerate(routes[key]):
                 pattern, *handler = h
 
                 if isinstance(pattern, bytes):
-                    handlers[key][i] = (re.compile(pattern), *handler)
-
-    async def index(self, **_):
-        return b'Service Unavailable'
-
-    async def error_400(self, **_):
-        raise BadRequest
-
-    async def error_404(self, **server):
-        yield (
-            b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
-            b'content="width=device-width, initial-scale=1.0" />'
-            b'<title>404 Not Found</title>'
-            b'<style>body { max-width: 600px; margin: 0 auto; padding: 1%; '
-            b'font-family: sans-serif; line-height: 1.5em; }</style></head>'
-            b'<body><h1>Not Found</h1>'
-        )
-        yield (b'<p>Unable to find handler for %s.</p><hr />' %
-               html_escape(server['request'].path))
-        yield (
-            b'<address title="Powered by Tremolo">%s</address>'
-            b'</body></html>' % server['context'].options['server_name']
-        )
+                    routes[key][i] = (re.compile(pattern), *handler)
 
     async def _serve(self, host, port, **options):
-        on_start = self._events['worker']['start'][-1]
         context = WorkerContext()
 
-        if on_start is not None:
-            await on_start(context=context,
+        for func in self.events['worker_start']:
+            if (await func(context=context,
                            loop=self._loop,
-                           logger=self._logger)
+                           logger=self._logger)):
+                break
 
         options['_conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
@@ -354,7 +313,7 @@ class Tremolo:
             from .http_server import HTTPServer as Server
 
             options['app'] = None
-            self.compile_handlers(options['_handlers'])
+            self.compile_routes(options['_routes'])
 
         server_info = {
             'date': server_date(),
@@ -382,7 +341,7 @@ class Tremolo:
                            _pools=pools,
                            _app=options['app'],
                            _root_path=options.get('root_path', ''),
-                           _handlers=options['_handlers'],
+                           _routes=options['_routes'],
                            _middlewares=options['_middlewares']),
             sock=sock, backlog=backlog, ssl=ssl_context)
 
@@ -430,12 +389,16 @@ class Tremolo:
             lifespan.shutdown()
             await lifespan.exception()
 
-        on_stop = self._events['worker']['stop'][-1]
+        i = len(self.events['worker_stop'])
 
-        if on_stop is not None:
-            await on_stop(context=context,
-                          loop=self._loop,
-                          logger=self._logger)
+        while i > 0:
+            i -= 1
+
+            if (await self.events['worker_stop'][i](
+                    context=context,
+                    loop=self._loop,
+                    logger=self._logger)):
+                break
 
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
@@ -569,8 +532,8 @@ class Tremolo:
                                 _locks=locks,
                                 _conn=child_conn,
                                 _sa_family=socks[args].family,
-                                _handlers=self._route_handlers,
-                                _middlewares=self._middlewares)
+                                _routes=self.routes,
+                                _middlewares=self.middlewares)
                 )
 
                 p.start()
@@ -601,8 +564,8 @@ class Tremolo:
                                         _locks=locks,
                                         _conn=child_conn,
                                         _sa_family=socks[args].family,
-                                        _handlers=self._route_handlers,
-                                        _middlewares=self._middlewares)
+                                        _routes=self.routes,
+                                        _middlewares=self.middlewares)
                         )
 
                         p.start()
