@@ -497,15 +497,14 @@ class Tremolo:
 
                 for routes in self.routes.values():
                     for route in routes:
-                        pattern, func, _kwargs = route
+                        pattern, func, kwds = route
 
                         print(
                             '  %s -> %s(%s)' % (
                                 pattern,
                                 func.__name__,
                                 ', '.join(
-                                    ['%s=%s' %
-                                     item for item in _kwargs.items()]))
+                                    '%s=%s' % item for item in kwds.items()))
                         )
 
         if host is None:
@@ -543,7 +542,7 @@ class Tremolo:
                     _port,
                     reuse_port,
                     worker_num,
-                    ', '.join(['%s=%s' % item for item in options.items()]))
+                    ', '.join('%s=%s' % item for item in options.items()))
             )
 
             args = (_host, _port)
