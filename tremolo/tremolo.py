@@ -403,7 +403,7 @@ class Tremolo:
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
         self._logger.setLevel(
-            getattr(logging, kwargs.get('log_level', 'DEBUG'), logging.DEBUG)
+            getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
 
         handler = logging.StreamHandler()
@@ -469,6 +469,8 @@ class Tremolo:
         return sock
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
+        kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+
         if 'app' in kwargs:
             if not isinstance(kwargs['app'], str):
                 import __main__
@@ -490,6 +492,22 @@ class Tremolo:
         else:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
+            if kwargs['log_level'] in ('DEBUG', 'INFO'):
+                print('Routes:')
+
+                for routes in self.routes.values():
+                    for route in routes:
+                        pattern, func, _kwargs = route
+
+                        print(
+                            '  %s -> %s(%s)' % (
+                                pattern,
+                                func.__name__,
+                                ', '.join(
+                                    ['%s=%s' %
+                                     item for item in _kwargs.items()]))
+                        )
+
         if host is None:
             if not self._ports:
                 raise ValueError(
@@ -508,6 +526,8 @@ class Tremolo:
         processes = []
         socks = {}
 
+        print('Options:')
+
         for (_host, _port), options in self._ports.items():
             if _host is None:
                 _host = host
@@ -516,6 +536,15 @@ class Tremolo:
                 _port = port
 
             options = {**kwargs, **options}
+
+            print(
+                '  run(host=%s, port=%d, reuse_port=%s, worker_num=%d, %s)' % (
+                    _host,
+                    _port,
+                    reuse_port,
+                    worker_num,
+                    ', '.join(['%s=%s' % item for item in options.items()]))
+            )
 
             args = (_host, _port)
             socks[args] = self.create_sock(
