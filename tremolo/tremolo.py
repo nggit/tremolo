@@ -15,7 +15,7 @@ import time  # noqa: E402
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
 
-from . import handlers  # noqa: E402
+from . import __version__, handlers  # noqa: E402
 from .utils import log_date, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
@@ -470,6 +470,8 @@ class Tremolo:
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+
+        print('Starting Tremolo', __version__)
 
         if 'app' in kwargs:
             if not isinstance(kwargs['app'], str):
