@@ -22,18 +22,45 @@ TEST_FILE = __file__
 app = Tremolo()
 
 
-@app.on_start
+@app.on_worker_start
 async def worker_start(**server):
-    server['context'].shared = 0
-    server['context'].socket_family = 'AF_UNIX'
+    worker = server['context']
+    worker.shared = 0
+    worker.socket_family = 'AF_UNIX'
 
 
-@app.on_stop
+@app.on_worker_start()
+async def worker_start2(**server):
+    pass
+
+
+@app.on_worker_stop()
+async def worker_stop2(**server):
+    pass
+
+
+@app.on_worker_stop
 async def worker_stop(**server):
-    if server['context'].socket_family == 'AF_UNIX':
-        assert server['context'].shared == 0
+    worker = server['context']
+
+    if worker.socket_family == 'AF_UNIX':
+        assert worker.shared == 0
     else:
-        assert server['context'].shared > 0
+        assert worker.shared > 0
+
+
+@app.on_connect
+async def on_connect(**server):
+    server['context'].foo = 'bar'
+
+    return True
+
+
+@app.on_close
+async def on_close(**server):
+    assert server['context'].foo == 'bar'
+
+    return True
 
 
 @app.on_request
@@ -43,10 +70,12 @@ async def my_request_middleware(worker=None, **server):
     worker.shared += 1
     worker.socket_family = request.socket.family.name
 
+    assert request.ctx.foo == 'bar'
+
     if not request.is_valid:
         raise BadRequest
 
-    if request.method not in (b'GET', b'POST'):
+    if request.method not in (b'GET', b'POST', b'HEAD'):
         response.set_status(405, 'Method Not Allowed')
         response.set_content_type('text/plain')
 

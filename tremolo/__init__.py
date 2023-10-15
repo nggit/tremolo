@@ -1,5 +1,7 @@
-from .tremolo import Tremolo
-from . import exceptions  # noqa: F401
+__version__ = '0.0.200'
+
+from .tremolo import Tremolo  # noqa: E402
+from . import exceptions  # noqa: E402,F401
 
 
 def run(app, **options):

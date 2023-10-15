@@ -71,6 +71,7 @@ async def app(scope, receive, send):
 
     if scope['path'].startswith('/download'):
         headers.append((b'content-length', b'%d' % os.stat(TEST_FILE).st_size))
+        headers.append((b'connection', b'cLoSe'))
 
         await send({
             'type': 'http.response.start',

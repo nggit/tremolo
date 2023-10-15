@@ -20,6 +20,10 @@ class Request:
         return self._protocol.context
 
     @property
+    def ctx(self):
+        return self._protocol.context
+
+    @property
     def transport(self):
         return self._protocol.transport
 

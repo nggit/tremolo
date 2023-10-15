@@ -13,9 +13,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='tremolo',
-    packages=['tremolo'],
-    package_data={'': ['lib/*', 'lib/h1parser/*']},
-    version='0.0.118',
+    version='0.0.200',
     license='MIT',
     author='nggit',
     author_email='contact@anggit.com',
@@ -25,6 +23,8 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/nggit/tremolo',
+    packages=['tremolo'],
+    package_data={'': ['lib/*', 'lib/h1parser/*']},
     classifiers=[
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: MIT License',
