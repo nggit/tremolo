@@ -2,7 +2,7 @@
 
 [![codecov](https://codecov.io/gh/nggit/tremolo/branch/master/graph/badge.svg?token=SC8NVWN0F1)](https://codecov.io/gh/nggit/tremolo)
 
-Tremolo is a stream-oriented, asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
+Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
 
 Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
 
@@ -46,6 +46,7 @@ With only 2500 lines of code, with no dependencies other than the [Python Standa
 * [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
 * Framework features; routing, middleware, etc
 * ASGI server
+* PyPy compatible
 
 ## Example
 Here is a complete *hello world* example in case you missed the usual `return`.
@@ -164,8 +165,6 @@ asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 ```
 
 ## Installing
-Tremolo is still in the early stages of development. But you can try installing it if you like.
-
 ```
 python3 -m pip install --upgrade tremolo
 ```

@@ -214,13 +214,21 @@ class ASGIServer(HTTPProtocol):
                             self.response.set_content_type(header[1])
                             continue
 
-                        if name in (b'connection',
-                                    b'date',
+                        if name in (b'date',
                                     b'server',
                                     b'transfer-encoding',
                                     b'sec-websocket-protocol'):
                             # disallow apps from changing them,
                             # as they are managed by Tremolo
+                            continue
+
+                        if name == b'connection':
+                            if header[1].lower() == b'close':
+                                # this does not necessarily set
+                                # "Connection: close" in the response header.
+                                # but it guarantees that the TCP connection
+                                # will be terminated.
+                                self.request.http_keepalive = False
                             continue
 
                         if name == b'content-length':

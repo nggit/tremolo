@@ -129,6 +129,7 @@ class HTTPResponse(Response):
 
     def close(self, keepalive=False):
         if not keepalive:
+            # this will force the TCP connection to be terminated
             self._request.http_keepalive = False
 
         super().close()
@@ -242,7 +243,7 @@ class HTTPResponse(Response):
     async def sendfile(
             self,
             path,
-            buffer_size=16384,
+            buffer_size=16 * 1024,
             content_type=b'application/octet-stream'
             ):
         try:
@@ -341,9 +342,12 @@ class HTTPResponse(Response):
                     b'Content-Range', b'bytes %d-%d/%d' % (
                         start, end, file_size)
                 )
-
                 handle.seek(start)
-                await self.write(handle.read(size), chunked=False)
+
+                while size > 0:
+                    await self.write(handle.read(min(size, buffer_size)),
+                                     chunked=False)
+                    size -= buffer_size
             else:
                 client = self._request.client
 
@@ -369,9 +373,13 @@ class HTTPResponse(Response):
                         b'Content-Range: bytes %d-%d/%d\r\n\r\n' % (
                             boundary, content_type, start, end, file_size)
                     )
-
                     handle.seek(start)
-                    await self.write(b'%s\r\n' % handle.read(size))
+
+                    while size > 0:
+                        await self.write(handle.read(min(size, buffer_size)))
+                        size -= buffer_size
+
+                    await self.write(b'\r\n')
 
                 await self.write(b'--%s--\r\n' % boundary)
                 await self.write(b'')

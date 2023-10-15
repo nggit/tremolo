@@ -10,10 +10,10 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_route_handlers', '_middlewares', '_server')
+    __slots__ = ('_routes', '_middlewares', '_server')
 
     def __init__(self, lock=None, **kwargs):
-        self._route_handlers = kwargs['_handlers']
+        self._routes = kwargs['_routes']
         self._middlewares = kwargs['_middlewares']
         self._server = {
             'loop': kwargs['loop'],
@@ -25,40 +25,39 @@ class HTTPServer(HTTPProtocol):
 
         super().__init__(self._server['context'], **kwargs)
 
-    async def _connection_made(self, func):
-        await func(**self._server)
+    async def _connection_made(self):
+        for func, _ in self._middlewares['connect']:
+            if (await func(**self._server)):
+                break
 
-    async def _connection_lost(self, func, exc):
+    async def _connection_lost(self, exc):
         try:
-            await func(**self._server)
+            i = len(self._middlewares['close'])
+
+            while i > 0:
+                i -= 1
+
+                if (await self._middlewares['close'][i][0](**self._server)):
+                    break
         finally:
             super().connection_lost(exc)
 
     def connection_made(self, transport):
         super().connection_made(transport)
 
-        func = self._middlewares['connect'][-1][0]
-        self.context.set(
-            'options',
-            self._middlewares['connect'][-1][1]
-        )
-
-        if func is None:
-            self.context.ON_CONNECT = None
-        else:
+        if self._middlewares['connect']:
             self.context.ON_CONNECT = self.loop.create_task(
-                self._connection_made(func)
+                self._connection_made()
             )
             self.tasks.append(self.context.ON_CONNECT)
+        else:
+            self.context.ON_CONNECT = None
 
     def connection_lost(self, exc):
-        func = self._middlewares['close'][-1][0]
-
-        if func is None:
+        if self._middlewares['close']:
+            self.loop.create_task(self._connection_lost(exc))
+        else:
             super().connection_lost(exc)
-            return
-
-        self.loop.create_task(self._connection_lost(func, exc))
 
     def _set_base_header(self, options={}):
         if self.response.headers_sent() or self.response.header[1] != b'':
@@ -175,6 +174,8 @@ class HTTPServer(HTTPProtocol):
                     self.request.upgraded = True
                 else:
                     if not self.response.http_chunked:
+                        # no chunk, no close, no size.
+                        # Assume close to signal end
                         self.request.http_keepalive = False
 
                     if not no_content:
@@ -201,13 +202,14 @@ class HTTPServer(HTTPProtocol):
                 await self.response.write(None)
                 return
 
-            if options.get('stream', True):
-                buffer_min_size = None
-            else:
-                buffer_min_size = options['buffer_size'] // 2
+            buffer_min_size = options['buffer_size'] // 2
 
             self.set_watermarks(high=options['buffer_size'] * 4,
                                 low=buffer_min_size)
+
+            if options.get('stream', True):
+                buffer_min_size = None
+
             await self.response.write(data,
                                       rate=options['rate'],
                                       buffer_size=options['buffer_size'],
@@ -254,10 +256,13 @@ class HTTPServer(HTTPProtocol):
                             KEEPALIVE_OR_CLOSE[self.request.http_keepalive])
                     )
 
-            for middleware in self._middlewares['response']:
+            i = len(self._middlewares['response'])
+
+            while i > 0:
+                i -= 1
                 options = await self._handle_middleware(
-                    middleware[0],
-                    {**middleware[1], **options}
+                    self._middlewares['response'][i][0],
+                    {**self._middlewares['response'][i][1], **options}
                 )
 
                 if not isinstance(options, dict):
@@ -294,8 +299,8 @@ class HTTPServer(HTTPProtocol):
         if not self.request.is_valid:
             # bad request
             await self._handle_response(
-                self._route_handlers[0][0][1],
-                {**self._route_handlers[0][0][2], **options}
+                self._routes[0][0][1],
+                {**self._routes[0][0][2], **options}
             )
             return
 
@@ -313,8 +318,8 @@ class HTTPServer(HTTPProtocol):
                 _path.count(b'/') + 2, _path[:(_path + b'/').find(b'/')]
             )
 
-        if key in self._route_handlers:
-            for (pattern, func, kwargs) in self._route_handlers[key]:
+        if key in self._routes:
+            for (pattern, func, kwargs) in self._routes[key]:
                 m = pattern.search(self.request.url)
 
                 if m:
@@ -330,16 +335,16 @@ class HTTPServer(HTTPProtocol):
         else:
             for i, (pattern,
                     func,
-                    kwargs) in enumerate(self._route_handlers[-1]):
+                    kwargs) in enumerate(self._routes[-1]):
                 m = pattern.search(self.request.url)
 
                 if m:
-                    if key in self._route_handlers:
-                        self._route_handlers[key].append(
+                    if key in self._routes:
+                        self._routes[key].append(
                             (pattern, func, kwargs)
                         )
                     else:
-                        self._route_handlers[key] = [(pattern, func, kwargs)]
+                        self._routes[key] = [(pattern, func, kwargs)]
 
                     matches = m.groupdict()
 
@@ -349,11 +354,11 @@ class HTTPServer(HTTPProtocol):
                     self.request.params['path'] = matches
 
                     await self._handle_response(func, {**kwargs, **options})
-                    del self._route_handlers[-1][i]
+                    del self._routes[-1][i]
                     return
 
         # not found
         await self._handle_response(
-            self._route_handlers[0][1][1],
-            {**self._route_handlers[0][1][2], **options}
+            self._routes[0][1][1],
+            {**self._routes[0][1][2], **options}
         )
