@@ -14,6 +14,7 @@ import time  # noqa: E402
 
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
+from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
 from .utils import log_date, server_date  # noqa: E402
@@ -365,7 +366,7 @@ class Tremolo:
         process_num = 1
 
         # serve forever
-        while True:
+        while process_num:
             try:
                 # ping parent process
                 options['_conn'].send(None)
@@ -384,21 +385,29 @@ class Tremolo:
                 break
 
         server.close()
+        await server.wait_closed()
 
-        if lifespan is not None:
+        if lifespan is None:
+            i = len(self.events['worker_stop'])
+
+            while i > 0:
+                i -= 1
+
+                if (await self.events['worker_stop'][i](
+                        context=context,
+                        loop=self._loop,
+                        logger=self._logger)):
+                    break
+        else:
             lifespan.shutdown()
-            await lifespan.exception()
+            exc = await lifespan.exception()
 
-        i = len(self.events['worker_stop'])
+            if exc:
+                self._logger.error(exc)
 
-        while i > 0:
-            i -= 1
-
-            if (await self.events['worker_stop'][i](
-                    context=context,
-                    loop=self._loop,
-                    logger=self._logger)):
-                break
+    async def _stop(self, task):
+        await task
+        self._loop.stop()
 
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
@@ -416,11 +425,14 @@ class Tremolo:
 
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        task = self._loop.create_task(self._serve(host, port, **kwargs))
 
         try:
-            self._loop.run_until_complete(self._serve(host, port, **kwargs))
+            self._loop.run_until_complete(task)
         except KeyboardInterrupt:
-            pass
+            self._logger.info('Shutting down')
+            self._loop.create_task(self._stop(task))
+            self._loop.run_forever()
         finally:
             self._loop.close()
 
@@ -470,8 +482,16 @@ class Tremolo:
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        terminal_width = min(get_terminal_size()[0], 72)
 
-        print('Starting Tremolo', __version__)
+        print(
+            'Starting Tremolo v%s (%s %d.%d.%d, %s)' %
+            (__version__,
+             sys.implementation.name,
+             *sys.version_info[:3],
+             sys.platform)
+        )
+        print('-' * terminal_width)
 
         if 'app' in kwargs:
             if not isinstance(kwargs['app'], str):
@@ -508,6 +528,8 @@ class Tremolo:
                                 ', '.join(
                                     '%s=%s' % item for item in kwds.items()))
                         )
+
+                print()
 
         if host is None:
             if not self._ports:
@@ -579,6 +601,8 @@ class Tremolo:
 
                 processes.append((parent_conn, p, args, options))
 
+        print('-' * terminal_width)
+
         while True:
             try:
                 for i, (parent_conn, p, args, options) in enumerate(processes):
@@ -621,6 +645,8 @@ class Tremolo:
                 break
 
         for parent_conn, p, *_ in processes:
+            # stopping serve forever
+            parent_conn.send(0)
             parent_conn.close()
             p.join()
 
@@ -628,10 +654,12 @@ class Tremolo:
 
         for sock in socks.values():
             try:
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+
                 if sock.family.name == 'AF_UNIX':
                     os.unlink(sock.getsockname())
-            except (FileNotFoundError, ValueError):
+            except FileNotFoundError:
                 pass
-
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
+            except OSError:
+                sock.close()
