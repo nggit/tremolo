@@ -384,6 +384,7 @@ class Tremolo:
                 break
 
         server.close()
+        await server.wait_closed()
 
         if lifespan is None:
             i = len(self.events['worker_stop'])
@@ -403,6 +404,8 @@ class Tremolo:
             if exc:
                 self._logger.error(exc)
 
+    async def _stop(self, task):
+        await task
         self._loop.stop()
 
     def _worker(self, host, port, **kwargs):
@@ -421,11 +424,13 @@ class Tremolo:
 
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
+        task = self._loop.create_task(self._serve(host, port, **kwargs))
 
         try:
-            self._loop.run_until_complete(self._serve(host, port, **kwargs))
+            self._loop.run_until_complete(task)
         except KeyboardInterrupt:
             self._logger.info('Shutting down')
+            self._loop.create_task(self._stop(task))
             self._loop.run_forever()
         finally:
             self._loop.close()
@@ -636,10 +641,12 @@ class Tremolo:
 
         for sock in socks.values():
             try:
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+
                 if sock.family.name == 'AF_UNIX':
                     os.unlink(sock.getsockname())
-            except (FileNotFoundError, ValueError):
+            except FileNotFoundError:
                 pass
-
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
+            except OSError:
+                sock.close()
