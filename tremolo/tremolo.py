@@ -14,6 +14,7 @@ import time  # noqa: E402
 
 from functools import wraps  # noqa: E402
 from importlib import import_module  # noqa: E402
+from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
 from .utils import log_date, server_date  # noqa: E402
@@ -481,8 +482,13 @@ class Tremolo:
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        terminal_width = min(get_terminal_size()[0], 72)
 
-        print('Starting Tremolo', __version__)
+        print(
+            'Starting Tremolo v%s (%s %d.%d.%d)' %
+            (__version__, sys.implementation.name, *sys.version_info[:3])
+        )
+        print('-' * terminal_width)
 
         if 'app' in kwargs:
             if not isinstance(kwargs['app'], str):
@@ -519,6 +525,8 @@ class Tremolo:
                                 ', '.join(
                                     '%s=%s' % item for item in kwds.items()))
                         )
+
+                print()
 
         if host is None:
             if not self._ports:
@@ -589,6 +597,8 @@ class Tremolo:
                         parent_conn.send(socks[args])
 
                 processes.append((parent_conn, p, args, options))
+
+        print('-' * terminal_width)
 
         while True:
             try:
