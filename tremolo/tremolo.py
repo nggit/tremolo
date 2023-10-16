@@ -485,8 +485,11 @@ class Tremolo:
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting Tremolo v%s (%s %d.%d.%d)' %
-            (__version__, sys.implementation.name, *sys.version_info[:3])
+            'Starting Tremolo v%s (%s %d.%d.%d, %s)' %
+            (__version__,
+             sys.implementation.name,
+             *sys.version_info[:3],
+             sys.platform)
         )
         print('-' * terminal_width)
 
