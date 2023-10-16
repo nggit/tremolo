@@ -68,7 +68,7 @@ class ASGILifespan:
                         return exc
 
                     if isinstance(exc, LifespanProtocolUnsupported):
-                        self._logger.info(str(exc))
+                        self._logger.info(exc)
                     else:
                         self._logger.info(
                             '%s: %s' % (LifespanProtocolUnsupported.message,
