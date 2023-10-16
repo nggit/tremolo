@@ -365,7 +365,7 @@ class Tremolo:
         process_num = 1
 
         # serve forever
-        while True:
+        while process_num:
             try:
                 # ping parent process
                 options['_conn'].send(None)
@@ -385,20 +385,25 @@ class Tremolo:
 
         server.close()
 
-        if lifespan is not None:
+        if lifespan is None:
+            i = len(self.events['worker_stop'])
+
+            while i > 0:
+                i -= 1
+
+                if (await self.events['worker_stop'][i](
+                        context=context,
+                        loop=self._loop,
+                        logger=self._logger)):
+                    break
+        else:
             lifespan.shutdown()
-            await lifespan.exception()
+            exc = await lifespan.exception()
 
-        i = len(self.events['worker_stop'])
+            if exc:
+                self._logger.error(exc)
 
-        while i > 0:
-            i -= 1
-
-            if (await self.events['worker_stop'][i](
-                    context=context,
-                    loop=self._loop,
-                    logger=self._logger)):
-                break
+        self._loop.stop()
 
     def _worker(self, host, port, **kwargs):
         self._logger = logging.getLogger(mp.current_process().name)
@@ -420,7 +425,8 @@ class Tremolo:
         try:
             self._loop.run_until_complete(self._serve(host, port, **kwargs))
         except KeyboardInterrupt:
-            pass
+            self._logger.info('Shutting down')
+            self._loop.run_forever()
         finally:
             self._loop.close()
 
@@ -621,6 +627,8 @@ class Tremolo:
                 break
 
         for parent_conn, p, *_ in processes:
+            # stopping serve forever
+            parent_conn.send(0)
             parent_conn.close()
             p.join()
 
