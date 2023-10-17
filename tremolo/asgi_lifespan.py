@@ -80,6 +80,4 @@ class ASGILifespan:
                 await asyncio.sleep(1)
 
         if not self._complete:
-            self._logger.warning(
-                'lifespan: timeout after {:g}s'.format(timeout)
-            )
+            self._logger.warning('lifespan: timeout after %gs' % timeout)

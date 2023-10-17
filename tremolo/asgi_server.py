@@ -160,8 +160,8 @@ class ASGIServer(HTTPProtocol):
 
         if self._scope['type'] != 'http':
             await self.handle_exception(
-                InternalServerError('unsupported scope type {:s}'
-                                    .format(self._scope['type']))
+                InternalServerError('unsupported scope type %s' %
+                                    self._scope['type'])
             )
             return
 

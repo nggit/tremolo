@@ -73,7 +73,7 @@ for i in range(len(sys.argv)):
             options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = int(sys.argv[i])  # noqa: E501
         except ValueError:
             print(
-                'Invalid {:s} value "{:s}". It must be a number'.format(
+                'Invalid %s value "%s". It must be a number' % (
                     sys.argv[i - 1], sys.argv[i])
             )
             sys.exit(1)
@@ -85,14 +85,14 @@ for i in range(len(sys.argv)):
             else:
                 options['host'] = sys.argv[i]
         except ValueError:
-            print('Invalid --bind value "{:s}"'.format(sys.argv[i]))
+            print('Invalid --bind value "%s"' % sys.argv[i])
             sys.exit(1)
     elif sys.argv[i - 1] == '--ssl-cert':
         options['ssl']['cert'] = sys.argv[i]
     elif sys.argv[i - 1] == '--ssl-key':
         options['ssl']['key'] = sys.argv[i]
     elif sys.argv[i - 1].startswith('-'):
-        print('Unrecognized option "{:s}"'.format(sys.argv[i - 1]))
+        print('Unrecognized option "%s"' % sys.argv[i - 1])
         sys.exit(1)
 
 if sys.argv[-1] != sys.argv[0] and not sys.argv[-1].startswith('-'):

@@ -4,8 +4,8 @@
 class KeepAliveConnections(dict):
     def __init__(self, *args, maxlen=512, **kwargs):
         if not isinstance(maxlen, int):
-            raise ValueError('expected type int, got {:s}'
-                             .format(type(maxlen).__name__))
+            raise ValueError('expected type int, got %s' %
+                             type(maxlen).__name__)
 
         if maxlen < 1:
             raise ValueError('maxlen must be greater or equal to 1')
