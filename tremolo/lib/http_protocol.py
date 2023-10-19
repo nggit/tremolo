@@ -175,7 +175,7 @@ class HTTPProtocol(asyncio.Protocol):
     def print_exception(self, exc, *args):
         self._logger.error(
             ': '.join((*args, exc.__class__.__name__, str(exc))),
-            exc_info={True: exc, False: False}[self._options['debug']]
+            exc_info=self._options['debug'] and exc
         )
 
     async def handle_exception(self, exc):
@@ -226,22 +226,10 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             data = str(exc).encode(encoding)
 
-        await self._response.send(
-            b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n'
-            b'Connection: close\r\n'
-            b'Date: %s\r\nServer: %s\r\n\r\n%s' % (
-                self._request.version,
-                exc.code,
-                exc.message.encode('latin-1'),
-                exc.content_type.encode('latin-1'),
-                len(data),
-                self._options['server_info']['date'],
-                self._options['server_info']['name'],
-                data), throttle=False
-        )
-
         if self._response is not None:
-            self._response.close()
+            self._response.set_status(exc.code, exc.message)
+            self._response.set_content_type(exc.message)
+            await self._response.end(data, keepalive=False)
 
     async def _handle_request_header(self, data, header_size):
         header = ParseHeader(data,
@@ -315,6 +303,12 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def _receive_data(self, data, waiter):
         await waiter
+
+        try:
+            self.tasks.remove(waiter)
+        except ValueError:
+            pass
+
         await self.put_to_queue(
             data,
             queue=self._queue[0],
@@ -364,6 +358,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._waiters['receive'] = self._loop.create_task(
             self._receive_data(data, waiter)
         )
+        self.tasks.append(self._waiters['receive'])
 
     def eof_received(self):
         self._queue[0].put_nowait(None)
@@ -501,7 +496,8 @@ class HTTPProtocol(asyncio.Protocol):
                 task.cancel()
             except Exception as exc:
                 self.print_exception(exc)
-                continue
+
+        self.tasks.clear()
 
         for queue in self._queue:
             if not queue.clear():

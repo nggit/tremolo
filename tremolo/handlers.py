@@ -12,7 +12,7 @@ async def error_400(**_):
     raise BadRequest
 
 
-async def error_404(**server):
+async def error_404(request=None, **_):
     yield (
         b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
         b'content="width=device-width, initial-scale=1.0" />'
@@ -22,8 +22,8 @@ async def error_404(**server):
         b'<body><h1>Not Found</h1>'
     )
     yield (b'<p>Unable to find handler for %s.</p><hr />' %
-           html_escape(server['request'].path))
+           html_escape(request.path))
     yield (
         b'<address title="Powered by Tremolo">%s</address>'
-        b'</body></html>' % server['context'].options['server_name']
+        b'</body></html>' % request.protocol.options['server_info']['name']
     )

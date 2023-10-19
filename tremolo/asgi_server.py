@@ -192,11 +192,7 @@ class ASGIServer(HTTPProtocol):
                     self.response.set_status(data['status'],
                                              HTTPStatus(data['status']).phrase)
 
-                self.response.append_header(
-                    b'Date: %s\r\nServer: %s\r\n' % (
-                        self.options['server_info']['date'],
-                        self.options['server_info']['name'])
-                )
+                self.response.set_base_header()
 
                 if 'headers' in data:
                     for header in data['headers']:
