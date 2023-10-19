@@ -59,27 +59,9 @@ class HTTPServer(HTTPProtocol):
         else:
             super().connection_lost(exc)
 
-    def _set_base_header(self, options={}):
-        if self.response.headers_sent() or self.response.header[1] != b'':
-            return
-
-        options['server_name'] = options.get(
-                                     'server_name',
-                                     self.options['server_info']['name']
-                                 )
-
-        if isinstance(options['server_name'], str):
-            options['server_name'] = options['server_name'].encode('latin-1')
-
-        self.response.append_header(
-            b'Date: %s\r\nServer: %s\r\n' % (
-                self.options['server_info']['date'],
-                options['server_name'])
-        )
-
     async def _handle_middleware(self, func, options={}):
         if not self.response.headers_sent():
-            self._set_base_header(options)
+            self.response.set_base_header()
             self.context.set('options', options)
 
         data = await func(**self._server,
@@ -132,16 +114,16 @@ class HTTPServer(HTTPProtocol):
         if 'content_type' in options:
             self.response.set_content_type(options['content_type'])
 
-        self._set_base_header(options)
-
+        self.response.set_base_header()
         self.context.set('options', options)
+
         agen = func(**self._server,
                     request=self.request, response=self.response)
+        next_data = getattr(agen, '__anext__', False)
 
-        try:
-            data = await agen.__anext__()
-            is_agen = True
-        except AttributeError:
+        if next_data:
+            data = await next_data()
+        else:
             data = await agen
 
             if data is None:
@@ -150,8 +132,6 @@ class HTTPServer(HTTPProtocol):
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
                 return
-
-            is_agen = False
 
         status = self.response.get_status()
         no_content = status[0] in (204, 205, 304) or 100 <= status[0] < 200
@@ -166,7 +146,7 @@ class HTTPServer(HTTPProtocol):
         self.response.header[0] = b'HTTP/%s %d %s\r\n' % (self.request.version,
                                                           *status)
 
-        if is_agen:
+        if next_data:
             if no_content and status[0] not in (101, 426):
                 self.response.append_header(b'Connection: close\r\n\r\n')
             else:

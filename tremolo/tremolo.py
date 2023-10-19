@@ -31,8 +31,6 @@ _REUSEPORT_OR_REUSEADDR = {
 
 class Tremolo:
     def __init__(self):
-        self._ports = {}
-
         self.routes = {
             0: [
                 (400, handlers.error_400, {}),
@@ -47,19 +45,18 @@ class Tremolo:
             ],
             -1: []
         }
-
         self.middlewares = {
             'connect': [],
             'close': [],
             'request': [],
             'response': []
         }
-
         self.events = {
             'worker_start': [],
             'worker_stop': []
         }
 
+        self._ports = {}
         self._loop = None
         self._logger = None
 
@@ -485,11 +482,11 @@ class Tremolo:
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting Tremolo v%s (%s %d.%d.%d, %s)' %
-            (__version__,
-             sys.implementation.name,
-             *sys.version_info[:3],
-             sys.platform)
+            'Starting Tremolo v%s (%s %d.%d.%d, %s)' % (
+                __version__,
+                sys.implementation.name,
+                *sys.version_info[:3],
+                sys.platform)
         )
         print('-' * terminal_width)
 
@@ -507,8 +504,7 @@ class Tremolo:
                     else:
                         attr_name = 'app'
 
-                    kwargs['app'] = '{:s}:{:s}'.format(__main__.__file__,
-                                                       attr_name)
+                    kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
 
             locks = []
         else:
@@ -650,7 +646,7 @@ class Tremolo:
             parent_conn.close()
             p.join()
 
-            print('pid {:d} terminated'.format(p.pid))
+            print('pid %d terminated' % p.pid)
 
         for sock in socks.values():
             try:

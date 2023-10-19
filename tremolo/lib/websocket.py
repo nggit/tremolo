@@ -50,8 +50,7 @@ class WebSocket:
 
             if payload_length > self.protocol.options['client_max_body_size']:
                 raise WebSocketServerClosed(
-                    '{:d} exceeds maximum payload size ({:d})'
-                    .format(
+                    '%d exceeds maximum payload size (%d)' % (
                         payload_length,
                         self.protocol.options['client_max_body_size']),
                     code=1009
@@ -89,13 +88,13 @@ class WebSocket:
                 code = int.from_bytes(unmasked_data[:2], byteorder='big')
 
             raise WebSocketClientClosed(
-                'connection closed ({:d})'.format(code),
+                'connection closed (%d)' % code,
                 code=code
             )
 
         raise WebSocketServerClosed(
-            'unsupported opcode {:x} with payload length {:d}'
-            .format(opcode, payload_length),
+            'unsupported opcode %x with payload length %d' % (
+                opcode, payload_length),
             code=1008
         )
 
