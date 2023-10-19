@@ -5,8 +5,7 @@ class ServerContext:
     def __init__(self):
         self.__dict__ = {
             'options': {},
-            'tasks': [],
-            'data': {}
+            'tasks': []
         }
 
     def __repr__(self):

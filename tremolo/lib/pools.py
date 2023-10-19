@@ -24,8 +24,8 @@ class Pool:
             self._pool = deque(self._pool, maxlen=pool_size)
 
             self._logger.info(
-                '{:s}: limit exceeded. pool size has been adjusted to {:d}'
-                .format(self.__class__.__name__, pool_size)
+                '%s: limit exceeded. pool size has been adjusted to %d' % (
+                    self.__class__.__name__, pool_size)
             )
             return self.create()
 

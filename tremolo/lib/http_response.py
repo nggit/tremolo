@@ -47,6 +47,16 @@ class HTTPResponse(Response):
     def append_header(self, value):
         self.header[1].extend(value)
 
+    def set_base_header(self):
+        if self.headers_sent() or self.header[1] != b'':
+            return
+
+        self.append_header(
+            b'Date: %s\r\nServer: %s\r\n' % (
+                self._request.protocol.options['server_info']['date'],
+                self._request.protocol.options['server_info']['name'])
+        )
+
     def set_cookie(
             self,
             name,
@@ -146,10 +156,12 @@ class HTTPResponse(Response):
             )
             self.close(keepalive=True)
 
-    async def end(self, data=b'', **kwargs):
+    async def end(self, data=b'', keepalive=True, **kwargs):
         if self.headers_sent():
             await self.write(data, throttle=False)
         else:
+            self.set_base_header()
+
             status = self.get_status()
             content_length = len(data)
 
@@ -166,20 +178,23 @@ class HTTPResponse(Response):
                     *status,
                     self.get_content_type(),
                     content_length,
-                    KEEPALIVE_OR_CLOSE[self._request.http_keepalive],
+                    KEEPALIVE_OR_CLOSE[
+                        keepalive and self._request.http_keepalive],
                     self.header[1],
                     data), throttle=False, **kwargs
             )
 
             self.headers_sent(True)
 
-        self.close(keepalive=True)
+        self.close(keepalive=keepalive)
 
     async def write(self, data, buffer_size=16 * 1024, **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
             if self.header[0] == b'':
+                self.set_base_header()
+
                 status = self.get_status()
                 no_content = (status[0] in (204, 205, 304) or
                               100 <= status[0] < 200)

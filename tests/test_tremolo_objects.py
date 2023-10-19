@@ -133,12 +133,13 @@ class TestTremoloObjects(unittest.TestCase):
 
                 self.assertEqual(repr(context), repr(context.__dict__))
 
-                context.set('options', {'server_name': b'Tremolo'})
+                context.set('options', {'server_info': {'name': b'Tremolo'}})
+                context.protocol = context
                 context.path = b'/invalid">url'
 
                 data = bytearray()
 
-                async for buf in handler[1](context=context, request=context):
+                async for buf in handler[1](request=context):
                     data.extend(buf)
 
                 self.assertTrue(data[:15] == b'<!DOCTYPE html>')

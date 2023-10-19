@@ -160,8 +160,8 @@ class ASGIServer(HTTPProtocol):
 
         if self._scope['type'] != 'http':
             await self.handle_exception(
-                InternalServerError('unsupported scope type {:s}'
-                                    .format(self._scope['type']))
+                InternalServerError('unsupported scope type %s' %
+                                    self._scope['type'])
             )
             return
 
@@ -192,11 +192,7 @@ class ASGIServer(HTTPProtocol):
                     self.response.set_status(data['status'],
                                              HTTPStatus(data['status']).phrase)
 
-                self.response.append_header(
-                    b'Date: %s\r\nServer: %s\r\n' % (
-                        self.options['server_info']['date'],
-                        self.options['server_info']['name'])
-                )
+                self.response.set_base_header()
 
                 if 'headers' in data:
                     for header in data['headers']:
