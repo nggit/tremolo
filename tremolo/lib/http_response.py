@@ -193,6 +193,8 @@ class HTTPResponse(Response):
 
         if not self.headers_sent():
             if self.header[0] == b'':
+                # this block is executed when write() is called outside the
+                # handler/middleware. e.g. ASGI server
                 self.set_base_header()
 
                 status = self.get_status()
