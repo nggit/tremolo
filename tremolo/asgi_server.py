@@ -223,7 +223,7 @@ class ASGIServer(HTTPProtocol):
                                 # this does not necessarily set
                                 # "Connection: close" in the response header.
                                 # but it guarantees that the TCP connection
-                                # will be terminated.
+                                # will be terminated
                                 self.request.http_keepalive = False
                             continue
 
