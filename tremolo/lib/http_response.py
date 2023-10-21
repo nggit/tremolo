@@ -246,9 +246,7 @@ class HTTPResponse(Response):
                         low=kwargs.get('buffer_min_size', buffer_size // 2)
                     )
 
-            header = b''.join(self.header)
-
-            await self.send(header, throttle=False)
+            await self.send(b''.join(self.header), throttle=False)
             self.headers_sent(True)
 
         if (self.http_chunked and not self._request.upgraded and
