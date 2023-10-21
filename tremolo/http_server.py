@@ -197,7 +197,7 @@ class HTTPServer(HTTPProtocol):
 
             while True:
                 try:
-                    data = await agen.__anext__()
+                    data = await next_data()
 
                     await self.response.write(
                         data,

@@ -193,6 +193,8 @@ class HTTPResponse(Response):
 
         if not self.headers_sent():
             if self.header[0] == b'':
+                # this block is executed when write() is called outside the
+                # handler/middleware. e.g. ASGI server
                 self.set_base_header()
 
                 status = self.get_status()
@@ -244,9 +246,7 @@ class HTTPResponse(Response):
                         low=kwargs.get('buffer_min_size', buffer_size // 2)
                     )
 
-            header = b''.join(self.header)
-
-            await self.send(header, throttle=False)
+            await self.send(b''.join(self.header), throttle=False)
             self.headers_sent(True)
 
         if (self.http_chunked and not self._request.upgraded and
