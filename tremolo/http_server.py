@@ -141,14 +141,14 @@ class HTTPServer(HTTPProtocol):
         )
 
         if self.response.http_chunked:
-            self.response.append_header(b'Transfer-Encoding: chunked\r\n')
+            self.response.set_header(b'Transfer-Encoding', b'chunked')
 
-        self.response.header[0] = b'HTTP/%s %d %s\r\n' % (self.request.version,
-                                                          *status)
+        self.response.headers[b'_line'] = b'HTTP/%s %d %s' % (
+                                              self.request.version, *status)
 
         if next_data:
             if no_content and status[0] not in (101, 426):
-                self.response.append_header(b'Connection: close\r\n\r\n')
+                self.response.set_header(b'Connection', b'close')
             else:
                 if status[0] == 101:
                     self.request.upgraded = True
@@ -159,14 +159,14 @@ class HTTPServer(HTTPProtocol):
                         self.request.http_keepalive = False
 
                     if not no_content:
-                        self.response.append_header(
-                            b'Content-Type: %s\r\n' %
+                        self.response.set_header(
+                            b'Content-Type',
                             self.response.get_content_type()
                         )
 
-                self.response.append_header(
-                    b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
-                        status[0] in (101, 426)]
+                self.response.set_header(
+                    b'Connection',
+                    KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
                 )
 
             for middleware in self._middlewares['response']:
@@ -220,20 +220,24 @@ class HTTPServer(HTTPProtocol):
                 data = data.encode(encoding[0])
 
             if no_content or data == b'':
-                self.response.append_header(b'Connection: close\r\n\r\n')
+                self.response.set_header(b'Connection', b'close')
             else:
                 if self.response.http_chunked:
-                    self.response.append_header(
-                        b'Content-Type: %s\r\nConnection: keep-alive\r\n\r\n' %
+                    self.response.set_header(
+                        b'Content-Type',
                         self.response.get_content_type()
                     )
+                    self.response.set_header(b'Connection', b'keep-alive')
                 else:
-                    self.response.append_header(
-                        b'Content-Type: %s\r\nContent-Length: %d\r\n'
-                        b'Connection: %s\r\n\r\n' % (
-                            self.response.get_content_type(),
-                            len(data),
-                            KEEPALIVE_OR_CLOSE[self.request.http_keepalive])
+                    self.response.set_header(
+                        b'Content-Type',
+                        self.response.get_content_type()
+                    )
+                    self.response.set_header(b'Content-Length',
+                                             b'%d' % len(data))
+                    self.response.set_header(
+                        b'Connection',
+                        KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
                     )
 
             i = len(self._middlewares['response'])

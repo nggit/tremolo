@@ -67,8 +67,8 @@ class TestHTTPClient(unittest.TestCase):
         )
         self.assertFalse(chunked_detected(header))
 
-        # these values are set by the request middleware
-        self.assertTrue(b'\r\nX-Foo: bar' in header and
+        # these values are set by the request and response middleware
+        self.assertTrue(b'\r\nX-Foo: baz' in header and
                         b'Set-Cookie: sess=www' in header)
 
     def test_get_ip_11(self):
