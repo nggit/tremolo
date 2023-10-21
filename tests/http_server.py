@@ -95,6 +95,10 @@ async def my_response_middleware(**server):
 
     response.set_header(b'X-Foo', b'baz')
 
+    if response.headers[b'_line'][1] == b'503':
+        response.set_status(503, b'Under Maintenance')
+        response.set_content_type(b'text/plain')
+
 
 @app.route('/getheaderline')
 async def get_headerline(**server):

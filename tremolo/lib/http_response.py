@@ -128,7 +128,11 @@ class HTTPResponse(Response):
         if not isinstance(status, int) or b'\n' in message:
             raise InternalServerError
 
-        self._status.append((status, message))
+        if b'_line' in self.headers:
+            self.headers[b'_line'][1] = b'%d' % status
+            self.headers[b'_line'][2] = message
+        else:
+            self._status.append((status, message))
 
     def get_status(self):
         try:
@@ -143,7 +147,10 @@ class HTTPResponse(Response):
         if b'\n' in content_type:
             raise InternalServerError
 
-        self._content_type.append(content_type)
+        if b'content-type' in self.headers:
+            self.headers[b'content-type'] = [b'Content-Type: ' + content_type]
+        else:
+            self._content_type.append(content_type)
 
     def get_content_type(self):
         try:
@@ -227,8 +234,9 @@ class HTTPResponse(Response):
                 if self.http_chunked:
                     self.set_header(b'Transfer-Encoding', b'chunked')
 
-                self.headers[b'_line'] = b'HTTP/%s %d %s' % (
-                    self._request.version, *status)
+                self.headers[b'_line'] = [b'HTTP/%s' % self._request.version,
+                                          b'%d' % status[0],
+                                          status[1]]
 
                 if no_content and status[0] not in (101, 426):
                     self.set_header(b'Connection', b'close')
@@ -262,7 +270,7 @@ class HTTPResponse(Response):
                     )
 
             await self.send(
-                self.headers.pop(b'_line') + b'\r\n' +
+                b' '.join(self.headers.pop(b'_line')) + b'\r\n' +
                 b'\r\n'.join(b'\r\n'.join(v) for v in self.headers.values()) +
                 b'\r\n\r\n', throttle=False
             )

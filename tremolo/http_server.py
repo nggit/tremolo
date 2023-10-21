@@ -143,8 +143,9 @@ class HTTPServer(HTTPProtocol):
         if self.response.http_chunked:
             self.response.set_header(b'Transfer-Encoding', b'chunked')
 
-        self.response.headers[b'_line'] = b'HTTP/%s %d %s' % (
-                                              self.request.version, *status)
+        self.response.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
+                                           b'%d' % status[0],
+                                           status[1]]
 
         if next_data:
             if no_content and status[0] not in (101, 426):
