@@ -42,6 +42,7 @@ for i in range(len(sys.argv)):
         print('                            Defaults to 1048576, which means 1MiB/s')  # noqa: E501
         print('  --buffer-size             Defaults to 16384, or 16KiB')
         print('  --client-max-body-size    Defaults to 2 * 1048576, or 2MiB')
+        print('  --client-max-header-size  Defaults to 8192, or 8KiB')
         print('  --request-timeout         Defaults to 30 (seconds)')
         print('  --keepalive-timeout       Defaults to 30 (seconds)')
         print('  --keepalive-connections   Maximum number of keep-alive connections')  # noqa: E501
@@ -66,6 +67,7 @@ for i in range(len(sys.argv)):
                              '--upload-rate',
                              '--buffer-size',
                              '--client-max-body-size',
+                             '--client-max-header-size',
                              '--request-timeout',
                              '--keepalive-timeout',
                              '--keepalive-connections'):

@@ -22,7 +22,7 @@ KEEPALIVE_OR_UPGRADE = {
 
 
 class HTTPResponse(Response):
-    __slots__ = ('header',
+    __slots__ = ('headers',
                  'http_chunked',
                  '_request',
                  '_status',
@@ -31,7 +31,7 @@ class HTTPResponse(Response):
     def __init__(self, request):
         super().__init__(request)
 
-        self.header = [b'', bytearray()]
+        self.headers = {}
         self.http_chunked = False
 
         self._request = request
@@ -40,21 +40,35 @@ class HTTPResponse(Response):
 
     def headers_sent(self, sent=False):
         if sent:
-            self.header = None
+            self.headers = None
 
-        return self.header is None
+        return self.headers is None
 
-    def append_header(self, value):
-        self.header[1].extend(value)
+    def append_header(self, name, value):
+        if isinstance(name, str):
+            name = name.encode('latin-1')
+
+        if isinstance(value, str):
+            value = value.encode('latin-1')
+
+        _name = name.lower()
+
+        if _name in self.headers:
+            self.headers[_name].append(name + b': ' + value)
+        else:
+            self.headers[_name] = [name + b': ' + value]
 
     def set_base_header(self):
-        if self.headers_sent() or self.header[1] != b'':
+        if self.headers_sent() or self.headers:
             return
 
-        self.append_header(
-            b'Date: %s\r\nServer: %s\r\n' % (
-                self._request.protocol.options['server_info']['date'],
-                self._request.protocol.options['server_info']['name'])
+        self.set_header(
+            b'Date',
+            self._request.protocol.options['server_info']['date']
+        )
+        self.set_header(
+            b'Server',
+            self._request.protocol.options['server_info']['name']
         )
 
     def set_cookie(
@@ -78,7 +92,7 @@ class HTTPResponse(Response):
         path = quote(path).encode('latin-1')
 
         cookie = bytearray(
-            b'Set-Cookie: %s=%s; expires=%s; max-age=%d; path=%s' % (
+            b'%s=%s; expires=%s; max-age=%d; path=%s' % (
                 name, value, date_expired, expires, path)
         )
 
@@ -93,7 +107,7 @@ class HTTPResponse(Response):
         if b'\n' in cookie:
             raise InternalServerError
 
-        self.header[1].extend(cookie + b'\r\n')
+        self.append_header(b'Set-Cookie', cookie)
 
     def set_header(self, name, value=''):
         if isinstance(name, str):
@@ -105,7 +119,7 @@ class HTTPResponse(Response):
         if b'\n' in name or b'\n' in value:
             raise InternalServerError
 
-        self.header[1].extend(b'%s: %s\r\n' % (name, value))
+        self.headers[name.lower()] = [name + b': ' + value]
 
     def set_status(self, status=200, message=b'OK'):
         if isinstance(message, str):
@@ -114,7 +128,11 @@ class HTTPResponse(Response):
         if not isinstance(status, int) or b'\n' in message:
             raise InternalServerError
 
-        self._status.append((status, message))
+        if b'_line' in self.headers:
+            self.headers[b'_line'][1] = b'%d' % status
+            self.headers[b'_line'][2] = message
+        else:
+            self._status.append((status, message))
 
     def get_status(self):
         try:
@@ -129,7 +147,10 @@ class HTTPResponse(Response):
         if b'\n' in content_type:
             raise InternalServerError
 
-        self._content_type.append(content_type)
+        if b'content-type' in self.headers:
+            self.headers[b'content-type'] = [b'Content-Type: ' + content_type]
+        else:
+            self._content_type.append(content_type)
 
     def get_content_type(self):
         try:
@@ -173,14 +194,15 @@ class HTTPResponse(Response):
 
             await self.send(
                 b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n'
-                b'Connection: %s\r\n%s\r\n%s' % (
+                b'Connection: %s\r\n%s\r\n\r\n%s' % (
                     self._request.version,
                     *status,
                     self.get_content_type(),
                     content_length,
                     KEEPALIVE_OR_CLOSE[
                         keepalive and self._request.http_keepalive],
-                    self.header[1],
+                    b'\r\n'.join(
+                        b'\r\n'.join(v) for v in self.headers.values()),
                     data), throttle=False, **kwargs
             )
 
@@ -192,7 +214,7 @@ class HTTPResponse(Response):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
-            if self.header[0] == b'':
+            if b'_line' not in self.headers:
                 # this block is executed when write() is called outside the
                 # handler/middleware. e.g. ASGI server
                 self.set_base_header()
@@ -210,13 +232,14 @@ class HTTPResponse(Response):
                     self.http_chunked = chunked
 
                 if self.http_chunked:
-                    self.append_header(b'Transfer-Encoding: chunked\r\n')
+                    self.set_header(b'Transfer-Encoding', b'chunked')
 
-                self.header[0] = b'HTTP/%s %d %s\r\n' % (
-                    self._request.version, *status)
+                self.headers[b'_line'] = [b'HTTP/%s' % self._request.version,
+                                          b'%d' % status[0],
+                                          status[1]]
 
                 if no_content and status[0] not in (101, 426):
-                    self.append_header(b'Connection: close\r\n\r\n')
+                    self.set_header(b'Connection', b'close')
                 else:
                     if chunked is None and not self.http_chunked and not (
                             self._request.version == b'1.1' and (
@@ -227,12 +250,12 @@ class HTTPResponse(Response):
                     if status[0] == 101:
                         self._request.upgraded = True
                     elif not no_content:
-                        self.append_header(b'Content-Type: %s\r\n' %
-                                           self.get_content_type())
+                        self.set_header(b'Content-Type',
+                                        self.get_content_type())
 
-                    self.append_header(
-                        b'Connection: %s\r\n\r\n' % KEEPALIVE_OR_UPGRADE[
-                            status[0] in (101, 426)]
+                    self.set_header(
+                        b'Connection',
+                        KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
                     )
 
                 if self._request.method == b'HEAD' or no_content:
@@ -246,7 +269,11 @@ class HTTPResponse(Response):
                         low=kwargs.get('buffer_min_size', buffer_size // 2)
                     )
 
-            await self.send(b''.join(self.header), throttle=False)
+            await self.send(
+                b' '.join(self.headers.pop(b'_line')) + b'\r\n' +
+                b'\r\n'.join(b'\r\n'.join(v) for v in self.headers.values()) +
+                b'\r\n\r\n', throttle=False
+            )
             self.headers_sent(True)
 
         if (self.http_chunked and not self._request.upgraded and

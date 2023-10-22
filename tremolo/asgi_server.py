@@ -235,7 +235,7 @@ class ASGIServer(HTTPProtocol):
                         if isinstance(header, list):
                             header = tuple(header)
 
-                        self.response.append_header(b'%s: %s\r\n' % header)
+                        self.response.append_header(*header)
 
                 # websocket has this
                 if 'subprotocol' in data and data['subprotocol']:
@@ -247,8 +247,8 @@ class ASGIServer(HTTPProtocol):
                         )
                         return
 
-                    self.response.append_header(
-                        b'Sec-WebSocket-Protocol: %s\r\n' %
+                    self.response.set_header(
+                        b'Sec-WebSocket-Protocol',
                         data['subprotocol'].encode('utf-8')
                     )
 
