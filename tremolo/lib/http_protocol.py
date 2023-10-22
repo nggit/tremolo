@@ -442,17 +442,21 @@ class HTTPProtocol(asyncio.Protocol):
             )
             return
 
-        for task in self.tasks[:]:
-            if callable(task):
+        i = len(self.tasks)
+
+        while i > 0:
+            i -= 1
+
+            if callable(self.tasks[i]):
                 continue
 
             try:
-                exc = task.exception()
+                exc = self.tasks[i].exception()
 
                 if exc:
                     self.print_exception(exc)
 
-                self.tasks.remove(task)
+                del self.tasks[i]
             except asyncio.InvalidStateError:
                 pass
 
@@ -480,25 +484,29 @@ class HTTPProtocol(asyncio.Protocol):
         if self in self._options['_connections']:
             del self._options['_connections'][self]
 
-        for task in self.tasks:
+        i = len(self.tasks)
+
+        while i > 0:
+            i -= 1
+
             try:
-                if callable(task):
+                if callable(self.tasks[i]):
                     # even if you put callable objects in self.tasks,
                     # they will be executed when the client is disconnected.
                     # this is useful for the cleanup mechanism.
-                    task()
+                    self.tasks[i]()
                     continue
 
-                exc = task.exception()
+                exc = self.tasks[i].exception()
 
                 if exc:
                     self.print_exception(exc)
             except asyncio.InvalidStateError:
-                task.cancel()
+                self.tasks[i].cancel()
             except Exception as exc:
                 self.print_exception(exc)
-
-        self.tasks.clear()
+            finally:
+                del self.tasks[i]
 
         for queue in self._queue:
             if not queue.clear():
