@@ -29,7 +29,8 @@ class ParseHeader:
     def __init__(self, data=bytearray(), **kwargs):
         self.parse(data, **kwargs)
 
-    def parse(self, data, header_size=None, excludes=[]):
+    def parse(self, data, header_size=None, excludes=[],
+              max_lines=100, max_line_size=8190):
         self.is_request = False
         self.is_response = False
         self.is_valid_request = False
@@ -65,6 +66,14 @@ class ParseHeader:
 
             if end == -1:
                 break
+
+            max_lines -= 1
+
+            if max_lines < 0 or end - start > max_line_size:
+                self.is_valid_request = False
+                self.is_valid_response = False
+
+                return self
 
             line = header[start:end]
             colon_pos = line.find(b':', 1)
