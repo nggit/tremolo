@@ -27,10 +27,8 @@ class WebSocket:
         accept_key = base64.b64encode(sha1_hash)
 
         self.response.set_status(101, b'Switching Protocols')
-        self.response.append_header(
-            b'Upgrade: websocket\r\n'
-            b'Sec-WebSocket-Accept: %s\r\n' % accept_key
-        )
+        self.response.set_header(b'Upgrade', b'websocket')
+        self.response.set_header(b'Sec-WebSocket-Accept', accept_key)
         await self.response.write(None)
 
     async def recv(self):

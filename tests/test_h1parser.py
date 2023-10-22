@@ -74,6 +74,40 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(self.obj.getmessage(), None)
         self.assertEqual(self.obj.save(), b'\r\n\r\n')
 
+    def test_max_lines(self):
+        self.obj.parse(
+            b'GET / HTTP/1.0\r\n'
+            b'Host: localhost\r\n'
+            b'Accept: */*\r\n\r\n', max_lines=2
+        )
+        self.assertTrue(self.obj.is_request)
+        self.assertFalse(self.obj.is_valid_request)
+        self.assertFalse(self.obj.is_response)
+        self.assertFalse(self.obj.is_valid_response)
+        self.assertEqual(self.obj.gethost(), b'localhost')
+        self.assertEqual(self.obj.getmethod(), b'GET')
+        self.assertEqual(self.obj.geturl(), b'/')
+        self.assertEqual(self.obj.getversion(), b'1.0')
+        self.assertEqual(self.obj.getstatus(), None)
+        self.assertEqual(self.obj.getmessage(), None)
+
+    def test_max_line_size(self):
+        self.obj.parse(
+            b'GET / HTTP/1.0\r\n'
+            b'Host: localhost\r\n'
+            b'Accept: */*\r\n\r\n', max_line_size=14
+        )
+        self.assertTrue(self.obj.is_request)
+        self.assertFalse(self.obj.is_valid_request)
+        self.assertFalse(self.obj.is_response)
+        self.assertFalse(self.obj.is_valid_response)
+        self.assertEqual(self.obj.gethost(), None)
+        self.assertEqual(self.obj.getmethod(), b'GET')
+        self.assertEqual(self.obj.geturl(), b'/')
+        self.assertEqual(self.obj.getversion(), b'1.0')
+        self.assertEqual(self.obj.getstatus(), None)
+        self.assertEqual(self.obj.getmessage(), None)
+
     def test_request_no_host_10(self):
         self.obj.parse(b'GET / HTTP/1.0\r\n\r\n')
         self.assertTrue(self.obj.is_request)

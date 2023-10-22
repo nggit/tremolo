@@ -163,12 +163,14 @@ class Tremolo:
 
     def getoptions(self, func):
         options = {}
+        arg_count = func.__code__.co_argcount
 
         if func.__defaults__ is not None:
-            options = dict(zip(
-                func.__code__.co_varnames[:len(func.__defaults__)],
-                func.__defaults__
-            ))
+            arg_count -= len(func.__defaults__)
+
+        for i, name in enumerate(func.__code__.co_varnames[
+                                     arg_count:func.__code__.co_argcount]):
+            options[name] = func.__defaults__[i]
 
         return options
 
@@ -329,6 +331,9 @@ class Tremolo:
                            buffer_size=options.get('buffer_size', 16 * 1024),
                            client_max_body_size=options.get(
                                'client_max_body_size', 2 * 1048576
+                           ),
+                           client_max_header_size=options.get(
+                               'client_max_header_size', 8192
                            ),
                            request_timeout=options.get('request_timeout', 30),
                            keepalive_timeout=options.get(

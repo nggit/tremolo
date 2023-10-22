@@ -325,7 +325,7 @@ class HTTPProtocol(asyncio.Protocol):
             self._header_buf.extend(data)
             header_size = self._header_buf.find(b'\r\n\r\n')
 
-            if -1 < header_size <= 8192:
+            if -1 < header_size <= self._options['client_max_header_size']:
                 # this will keep blocking on bodyless requests forever, unless
                 # _handle_keepalive is called; indirectly via Response.close
                 self._transport.pause_reading()
@@ -337,10 +337,11 @@ class HTTPProtocol(asyncio.Protocol):
                 )
 
                 self._header_buf = None
-            elif header_size > 8192:
+            elif header_size > self._options['client_max_header_size']:
                 self._logger.info('request header too large')
                 self._transport.abort()
-            elif not (header_size == -1 and len(self._header_buf) <= 8192):
+            elif not (header_size == -1 and len(self._header_buf) <=
+                      self._options['client_max_header_size']):
                 self._logger.info('bad request')
                 self._transport.abort()
 
