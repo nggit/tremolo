@@ -253,7 +253,7 @@ class ASGIServer(HTTPProtocol):
                     )
 
             if data['type'] == 'http.response.body':
-                if 'body' in data:
+                if 'body' in data and data['body'] != b'':
                     await self.response.write(
                         data['body'],
                         chunked=self._http_chunked,
