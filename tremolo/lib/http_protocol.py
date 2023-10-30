@@ -95,13 +95,12 @@ class HTTPProtocol(asyncio.Protocol):
         self._header_buf = bytearray()
         self._waiters['request'] = self._loop.create_future()
 
-        self.tasks.extend([
-            self._loop.create_task(self._send_data()).cancel,
-            self._loop.create_task(self.set_timeout(
-                self._waiters['request'],
-                timeout=self._options['request_timeout'],
-                timeout_cb=self.request_timeout))
-        ])
+        self.tasks.append(self._loop.create_task(self._send_data()).cancel)
+        self.tasks.append(self._loop.create_task(self.set_timeout(
+            self._waiters['request'],
+            timeout=self._options['request_timeout'],
+            timeout_cb=self.request_timeout))
+        )
 
     async def request_timeout(self, timeout):
         self._logger.info('request timeout after %gs' % timeout)
@@ -484,29 +483,25 @@ class HTTPProtocol(asyncio.Protocol):
         if self in self._options['_connections']:
             del self._options['_connections'][self]
 
-        i = len(self.tasks)
-
-        while i > 0:
-            i -= 1
+        while self.tasks:
+            task = self.tasks.pop()
 
             try:
-                if callable(self.tasks[i]):
+                if callable(task):
                     # even if you put callable objects in self.tasks,
                     # they will be executed when the client is disconnected.
                     # this is useful for the cleanup mechanism.
-                    self.tasks[i]()
+                    task()
                     continue
 
-                exc = self.tasks[i].exception()
+                exc = task.exception()
 
                 if exc:
                     self.print_exception(exc)
             except asyncio.InvalidStateError:
-                self.tasks[i].cancel()
+                task.cancel()
             except Exception as exc:
                 self.print_exception(exc)
-            finally:
-                del self.tasks[i]
 
         for queue in self._queue:
             if not queue.clear():
