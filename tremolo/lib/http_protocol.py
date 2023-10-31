@@ -95,13 +95,12 @@ class HTTPProtocol(asyncio.Protocol):
         self._header_buf = bytearray()
         self._waiters['request'] = self._loop.create_future()
 
-        self.tasks.extend([
-            self._loop.create_task(self._send_data()).cancel,
-            self._loop.create_task(self.set_timeout(
-                self._waiters['request'],
-                timeout=self._options['request_timeout'],
-                timeout_cb=self.request_timeout))
-        ])
+        self.tasks.append(self._loop.create_task(self._send_data()).cancel)
+        self.tasks.append(self._loop.create_task(self.set_timeout(
+            self._waiters['request'],
+            timeout=self._options['request_timeout'],
+            timeout_cb=self.request_timeout))
+        )
 
     async def request_timeout(self, timeout):
         self._logger.info('request timeout after %gs' % timeout)
@@ -442,17 +441,21 @@ class HTTPProtocol(asyncio.Protocol):
             )
             return
 
-        for task in self.tasks[:]:
-            if callable(task):
+        i = len(self.tasks)
+
+        while i > 0:
+            i -= 1
+
+            if callable(self.tasks[i]):
                 continue
 
             try:
-                exc = task.exception()
+                exc = self.tasks[i].exception()
 
                 if exc:
                     self.print_exception(exc)
 
-                self.tasks.remove(task)
+                del self.tasks[i]
             except asyncio.InvalidStateError:
                 pass
 
@@ -480,7 +483,9 @@ class HTTPProtocol(asyncio.Protocol):
         if self in self._options['_connections']:
             del self._options['_connections'][self]
 
-        for task in self.tasks:
+        while self.tasks:
+            task = self.tasks.pop()
+
             try:
                 if callable(task):
                     # even if you put callable objects in self.tasks,
@@ -497,8 +502,6 @@ class HTTPProtocol(asyncio.Protocol):
                 task.cancel()
             except Exception as exc:
                 self.print_exception(exc)
-
-        self.tasks.clear()
 
         for queue in self._queue:
             if not queue.clear():
