@@ -224,7 +224,14 @@ async def upload(content_type=b'application/octet-stream', **server):
 @app.route('/upload/multipart')
 async def upload_multipart(stream=False, **server):
     server['response'].set_content_type(b'text/csv')
+
+    # should be ignored
+    yield b''
+
     yield b'name,length,type,data\r\n'
+
+    # should be ignored
+    yield b''
 
     # stream multipart file upload then send it back as csv
     async for info, data in server['request'].files():

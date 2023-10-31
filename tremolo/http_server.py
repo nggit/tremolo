@@ -194,14 +194,18 @@ class HTTPServer(HTTPProtocol):
             if options.get('stream', True):
                 buffer_min_size = None
 
-            await self.response.write(data,
-                                      rate=options['rate'],
-                                      buffer_size=options['buffer_size'],
-                                      buffer_min_size=buffer_min_size)
+            if data != b'':
+                await self.response.write(data,
+                                          rate=options['rate'],
+                                          buffer_size=options['buffer_size'],
+                                          buffer_min_size=buffer_min_size)
 
             while True:
                 try:
                     data = await next_data()
+
+                    if data == b'':
+                        continue
 
                     await self.response.write(
                         data,

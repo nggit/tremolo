@@ -153,8 +153,12 @@ class ParseHeader:
         if not args:
             return self
 
-        for i, v in enumerate(self._headers):
-            if v[0] in args:
+        i = len(self._headers)
+
+        while i > 0:
+            i -= 1
+
+            if self._headers[i][0] in args:
                 del self._headers[i]
 
         return self
