@@ -13,11 +13,11 @@ import sys  # noqa: E402
 import time  # noqa: E402
 
 from functools import wraps  # noqa: E402
-from importlib import import_module  # noqa: E402
+from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
-from .utils import log_date, server_date  # noqa: E402
+from .utils import file_signature, log_date, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
@@ -263,7 +263,6 @@ class Tremolo:
         pools = {
             'queue': QueuePool(1024, self._logger)
         }
-        lifespan = None
 
         if 'app' in options and isinstance(options['app'], str):
             from .asgi_lifespan import ASGILifespan
@@ -278,13 +277,14 @@ class Tremolo:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
-            dir_name, base_name = os.path.split(path)
+            options['app_dir'], base_name = os.path.split(
+                os.path.abspath(path))
             module_name = os.path.splitext(base_name)[0]
 
-            if dir_name == '':
-                dir_name = os.getcwd()
+            if options['app_dir'] == '':
+                options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, dir_name)
+            sys.path.insert(0, options['app_dir'])
 
             options['app'] = getattr(import_module(module_name), attr_name)
 
@@ -365,6 +365,9 @@ class Tremolo:
 
         print()
 
+        paths = [path for path in sys.path
+                 if not options['app_dir'].startswith(path)]
+        modules = {}
         process_num = 1
 
         # serve forever
@@ -379,6 +382,36 @@ class Tremolo:
                     # update server date
                     server_info['date'] = server_date()
 
+                    # detect code changes
+                    if options.get('reload', False):
+                        for module in (modules or sys.modules.values()):
+                            if hasattr(module, '__file__'):
+                                for path in paths:
+                                    if (module.__file__ is None or
+                                            module.__file__.startswith(path)):
+                                        break
+                                else:
+                                    _sign = file_signature(module.__file__)
+
+                                    if module in modules:
+                                        if modules[module] == _sign:
+                                            # file not modified
+                                            continue
+
+                                        modules[module] = _sign
+                                    else:
+                                        modules[module] = _sign
+                                        continue
+
+                                    self._logger.info('reload: %s',
+                                                      module.__file__)
+                                    server.close()
+                                    await server.wait_closed()
+
+                                    # essentially means sys.exit(0)
+                                    # to trigger a reload
+                                    return
+
                     if options['_conn'].poll():
                         break
 
@@ -389,7 +422,7 @@ class Tremolo:
         server.close()
         await server.wait_closed()
 
-        if lifespan is None:
+        if options['app'] is None:
             i = len(self.events['worker_stop'])
 
             while i > 0:
@@ -436,6 +469,12 @@ class Tremolo:
             self._loop.create_task(self._stop(task))
             self._loop.run_forever()
         finally:
+            exc = task.exception()
+
+            # to avoid None, SystemExit, etc.
+            if isinstance(exc, Exception):
+                self._logger.error(exc)
+
             self._loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
@@ -495,25 +534,30 @@ class Tremolo:
         )
         print('-' * terminal_width)
 
+        import __main__
+
         if 'app' in kwargs:
-            if not isinstance(kwargs['app'], str):
-                import __main__
+            if (not isinstance(kwargs['app'], str) and
+                    hasattr(__main__, '__file__')):
+                for attr_name in dir(__main__):
+                    if attr_name.startswith('__'):
+                        continue
 
-                if hasattr(__main__, '__file__'):
-                    for attr_name in dir(__main__):
-                        if attr_name.startswith('__'):
-                            continue
+                    if getattr(__main__, attr_name) == kwargs['app']:
+                        break
+                else:
+                    attr_name = 'app'
 
-                        if getattr(__main__, attr_name) == kwargs['app']:
-                            break
-                    else:
-                        attr_name = 'app'
-
-                    kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
+                kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
 
             locks = []
         else:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
+
+            if hasattr(__main__, '__file__'):
+                kwargs['app_dir'], base_name = os.path.split(
+                    os.path.abspath(__main__.__file__))
+                module_name = os.path.splitext(base_name)[0]
 
             if kwargs['log_level'] in ('DEBUG', 'INFO'):
                 print('Routes:')
@@ -608,7 +652,28 @@ class Tremolo:
             try:
                 for i, (parent_conn, p, args, options) in enumerate(processes):
                     if not p.is_alive():
-                        print('A worker process died. Restarting...')
+                        if p.exitcode == 0:
+                            print('Reloading...')
+
+                            if 'app' not in kwargs:
+                                if module_name in sys.modules:
+                                    module = reload_module(
+                                        sys.modules[module_name])
+                                else:
+                                    module = import_module(module_name)
+
+                                # we need to update/rebind objects like
+                                # routes, middleware, etc.
+                                for attr_name in dir(module):
+                                    if attr_name.startswith('__'):
+                                        continue
+
+                                    attr = getattr(module, attr_name)
+
+                                    if isinstance(attr, self.__class__):
+                                        self.__dict__.update(attr.__dict__)
+                        else:
+                            print('A worker process died. Restarting...')
 
                         parent_conn.close()
                         parent_conn, child_conn = mp.Pipe()

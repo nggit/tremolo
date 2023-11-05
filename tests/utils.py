@@ -64,7 +64,7 @@ def getcontents(
 
     with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.settimeout(5)
+        sock.settimeout(10)
 
         while sock.connect_ex((host, port)) != 0:
             time.sleep(1)

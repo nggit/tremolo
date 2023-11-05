@@ -33,7 +33,9 @@ for i in range(len(sys.argv)):
         print('                            E.g. "/path/to/privkey.pem"')
         print('  --debug                   Enable debug mode.')
         print('                            Intended for development')
-        print('  --no-ws                   Disable built-in WebSocket support.')  # noqa: E501
+        print('  --reload                  Enable auto reload on code changes.')  # noqa: E501
+        print('                            Intended for development')
+        print('  --no-ws                   Disable built-in WebSocket support')  # noqa: E501
         print('  --log-level               Defaults to "DEBUG". See')
         print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
         print('  --download-rate           Limits the sending speed to the client')  # noqa: E501
@@ -53,7 +55,7 @@ for i in range(len(sys.argv)):
         sys.exit()
     elif sys.argv[i - 1] == '--no-ws':
         options['ws'] = False
-    elif sys.argv[i - 1] in ('--debug', '--reuse-port'):
+    elif sys.argv[i - 1] in ('--debug', '--reload', '--reuse-port'):
         options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = True
     elif sys.argv[i - 1] in ('--host',
                              '--log-level',

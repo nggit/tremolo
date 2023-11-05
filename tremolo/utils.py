@@ -1,9 +1,18 @@
 # Copyright (c) 2023 nggit
 
-__all__ = ('html_escape', 'log_date', 'server_date')
+__all__ = ('file_signature', 'html_escape', 'log_date', 'server_date')
+
+import os  # noqa: E402
+import stat  # noqa: E402
 
 from datetime import datetime  # noqa: E402
 from html import escape  # noqa: E402
+
+
+def file_signature(path):
+    st = os.stat(path)
+
+    return (stat.S_IFMT(st.st_mode), st.st_size, st.st_mtime)
 
 
 def html_escape(data):

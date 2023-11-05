@@ -740,6 +740,31 @@ class TestHTTPClient(unittest.TestCase):
 
             self.assertEqual(payload[:7], data_out[:7])
 
+    def test_reload(self):
+        header, body1 = getcontents(host=HTTP_HOST,
+                                    port=HTTP_PORT,
+                                    method='GET',
+                                    url='/reload?%f' % time.time(),
+                                    version='1.0')
+
+        self.assertFalse(body1 == b'')
+
+        for _ in range(10):
+            time.sleep(1)
+
+            header, body2 = getcontents(host=HTTP_HOST,
+                                        port=HTTP_PORT,
+                                        method='GET',
+                                        url='/reload',
+                                        version='1.0')
+
+            self.assertFalse(body2 == b'')
+
+            if body2 != body1:
+                break
+
+        self.assertFalse(body2 == body1)
+
 
 if __name__ == '__main__':
     mp.set_start_method('spawn')
@@ -749,6 +774,7 @@ if __name__ == '__main__':
         kwargs=dict(host=HTTP_HOST,
                     port=HTTP_PORT,
                     debug=False,
+                    reload=True,
                     client_max_body_size=73728)
     )
 
