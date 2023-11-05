@@ -586,6 +586,9 @@ class Tremolo:
         else:
             self.listen(port, host=host, **kwargs)
 
+        if worker_num < 1:
+            raise ValueError('worker_num must be greater than 0')
+
         try:
             worker_num = min(worker_num, len(os.sched_getaffinity(0)))
         except AttributeError:
