@@ -471,7 +471,7 @@ class Tremolo:
         finally:
             exc = task.exception()
 
-            # to avoid None, SystemExit, etc.
+            # to avoid None, SystemExit, etc. for being printed
             if isinstance(exc, Exception):
                 self._logger.error(exc)
 
@@ -520,6 +520,18 @@ class Tremolo:
             sock.bind((host, port))
 
         return sock
+
+    def close_sock(self, sock):
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+
+            if sock.family.name == 'AF_UNIX':
+                os.unlink(sock.getsockname())
+        except FileNotFoundError:
+            pass
+        except OSError:
+            sock.close()
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
@@ -678,6 +690,14 @@ class Tremolo:
                         else:
                             print('A worker process died. Restarting...')
 
+                        if p.exitcode != 0 or hasattr(socks[args], 'share'):
+                            # renew socket
+                            # this is a workaround, especially on Windows
+                            self.close_sock(socks[args])
+                            socks[args] = self.create_sock(
+                                *args, options.get('reuse_port', reuse_port)
+                            )
+
                         parent_conn.close()
                         parent_conn, child_conn = mp.Pipe()
                         p = mp.Process(
@@ -705,9 +725,15 @@ class Tremolo:
                         processes[i] = (parent_conn, p, args, options)
 
                     # response ping from child
-                    while parent_conn.poll():
-                        parent_conn.recv()
-                        parent_conn.send(len(processes))
+                    while True:
+                        try:
+                            if not parent_conn.poll():
+                                break
+
+                            parent_conn.recv()
+                            parent_conn.send(len(processes))
+                        except BrokenPipeError:
+                            break
 
                     time.sleep(1)
             except KeyboardInterrupt:
@@ -722,13 +748,4 @@ class Tremolo:
             print('pid %d terminated' % p.pid)
 
         for sock in socks.values():
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-
-                if sock.family.name == 'AF_UNIX':
-                    os.unlink(sock.getsockname())
-            except FileNotFoundError:
-                pass
-            except OSError:
-                sock.close()
+            self.close_sock(sock)
