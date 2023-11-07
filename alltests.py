@@ -20,6 +20,7 @@ if __name__ == '__main__':
         kwargs=dict(host=HTTP_HOST,
                     port=HTTP_PORT,
                     debug=False,
+                    reload=True,
                     client_max_body_size=73728))
     )
     processes.append(mp.Process(

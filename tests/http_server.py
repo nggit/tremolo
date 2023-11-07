@@ -270,6 +270,17 @@ async def timeouts(request=None, **_):
         # should raise a TimeoutError and ended up with a RequestTimeout
         await request.recv(100)
 
+
+@app.route('/reload')
+async def reload(request=None, **_):
+    yield b'%d' % hash(app)
+
+    if request.query_string != b'':
+        mtime = float(request.query_string)
+
+        # simulate a code change
+        os.utime(TEST_FILE, (mtime, mtime))
+
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
 app.listen(HTTP_PORT + 2)
@@ -279,6 +290,7 @@ app.listen(HTTP_PORT + 2)
 app.listen('tremolo-test', debug=False, client_max_body_size=73728)
 
 if __name__ == '__main__':
-    app.run(HTTP_HOST, port=HTTP_PORT, debug=True, client_max_body_size=73728)
+    app.run(HTTP_HOST, port=HTTP_PORT, debug=True, reload=True,
+            client_max_body_size=73728)
 
 # END

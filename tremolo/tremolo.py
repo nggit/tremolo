@@ -13,11 +13,11 @@ import sys  # noqa: E402
 import time  # noqa: E402
 
 from functools import wraps  # noqa: E402
-from importlib import import_module  # noqa: E402
+from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
-from .utils import log_date, server_date  # noqa: E402
+from .utils import file_signature, log_date, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
@@ -263,7 +263,6 @@ class Tremolo:
         pools = {
             'queue': QueuePool(1024, self._logger)
         }
-        lifespan = None
 
         if 'app' in options and isinstance(options['app'], str):
             from .asgi_lifespan import ASGILifespan
@@ -278,13 +277,14 @@ class Tremolo:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
-            dir_name, base_name = os.path.split(path)
+            options['app_dir'], base_name = os.path.split(
+                os.path.abspath(path))
             module_name = os.path.splitext(base_name)[0]
 
-            if dir_name == '':
-                dir_name = os.getcwd()
+            if options['app_dir'] == '':
+                options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, dir_name)
+            sys.path.insert(0, options['app_dir'])
 
             options['app'] = getattr(import_module(module_name), attr_name)
 
@@ -365,6 +365,9 @@ class Tremolo:
 
         print()
 
+        paths = [path for path in sys.path
+                 if not options['app_dir'].startswith(path)]
+        modules = {}
         process_num = 1
 
         # serve forever
@@ -379,6 +382,43 @@ class Tremolo:
                     # update server date
                     server_info['date'] = server_date()
 
+                    # detect code changes
+                    if options.get('reload', False):
+                        for module in (dict(modules) or sys.modules.values()):
+                            if hasattr(module, '__file__'):
+                                for path in paths:
+                                    if (module.__file__ is None or
+                                            module.__file__.startswith(path)):
+                                        break
+                                else:
+                                    if not os.path.exists(module.__file__):
+                                        if module in modules:
+                                            del modules[module]
+
+                                        continue
+
+                                    _sign = file_signature(module.__file__)
+
+                                    if module in modules:
+                                        if modules[module] == _sign:
+                                            # file not modified
+                                            continue
+
+                                        modules[module] = _sign
+                                    else:
+                                        modules[module] = _sign
+                                        continue
+
+                                    self._logger.info('reload: %s',
+                                                      module.__file__)
+
+                                    server.close()
+                                    await server.wait_closed()
+
+                                    # essentially means sys.exit(0)
+                                    # to trigger a reload
+                                    return
+
                     if options['_conn'].poll():
                         break
 
@@ -389,7 +429,7 @@ class Tremolo:
         server.close()
         await server.wait_closed()
 
-        if lifespan is None:
+        if options['app'] is None:
             i = len(self.events['worker_stop'])
 
             while i > 0:
@@ -436,6 +476,12 @@ class Tremolo:
             self._loop.create_task(self._stop(task))
             self._loop.run_forever()
         finally:
+            exc = task.exception()
+
+            # to avoid None, SystemExit, etc. for being printed
+            if isinstance(exc, Exception):
+                self._logger.error(exc)
+
             self._loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
@@ -447,6 +493,9 @@ class Tremolo:
                     sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 
                     if host == '::' and hasattr(socket, 'IPPROTO_IPV6'):
+                        # on Windows, Python versions below 3.8
+                        # don't properly support dual-stack IPv4/6.
+                        # https://github.com/python/cpython/issues/73701
                         sock.setsockopt(socket.IPPROTO_IPV6,
                                         socket.IPV6_V6ONLY, 0)
                 else:
@@ -482,6 +531,18 @@ class Tremolo:
 
         return sock
 
+    def close_sock(self, sock):
+        try:
+            sock.shutdown(socket.SHUT_RDWR)
+            sock.close()
+
+            if sock.family.name == 'AF_UNIX':
+                os.unlink(sock.getsockname())
+        except FileNotFoundError:
+            pass
+        except OSError:
+            sock.close()
+
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
         terminal_width = min(get_terminal_size()[0], 72)
@@ -495,25 +556,30 @@ class Tremolo:
         )
         print('-' * terminal_width)
 
+        import __main__
+
         if 'app' in kwargs:
-            if not isinstance(kwargs['app'], str):
-                import __main__
+            if (not isinstance(kwargs['app'], str) and
+                    hasattr(__main__, '__file__')):
+                for attr_name in dir(__main__):
+                    if attr_name.startswith('__'):
+                        continue
 
-                if hasattr(__main__, '__file__'):
-                    for attr_name in dir(__main__):
-                        if attr_name.startswith('__'):
-                            continue
+                    if getattr(__main__, attr_name) == kwargs['app']:
+                        break
+                else:
+                    attr_name = 'app'
 
-                        if getattr(__main__, attr_name) == kwargs['app']:
-                            break
-                    else:
-                        attr_name = 'app'
-
-                    kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
+                kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
 
             locks = []
         else:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
+
+            if hasattr(__main__, '__file__'):
+                kwargs['app_dir'], base_name = os.path.split(
+                    os.path.abspath(__main__.__file__))
+                module_name = os.path.splitext(base_name)[0]
 
             if kwargs['log_level'] in ('DEBUG', 'INFO'):
                 print('Routes:')
@@ -541,6 +607,9 @@ class Tremolo:
             host = 'localhost'
         else:
             self.listen(port, host=host, **kwargs)
+
+        if worker_num < 1:
+            raise ValueError('worker_num must be greater than 0')
 
         try:
             worker_num = min(worker_num, len(os.sched_getaffinity(0)))
@@ -608,7 +677,48 @@ class Tremolo:
             try:
                 for i, (parent_conn, p, args, options) in enumerate(processes):
                     if not p.is_alive():
-                        print('A worker process died. Restarting...')
+                        if p.exitcode == 0:
+                            print('Reloading...')
+
+                            if 'app' not in kwargs:
+                                for module in list(sys.modules.values()):
+                                    if (hasattr(module, '__file__') and
+                                            module.__name__ not in (
+                                                '__main__',
+                                                '__mp_main__',
+                                                'tremolo') and
+                                            not module.__name__.startswith(
+                                                'tremolo.') and
+                                            module.__file__ is not None and
+                                            module.__file__.startswith(
+                                                kwargs['app_dir']) and
+                                            os.path.exists(module.__file__)):
+                                        reload_module(module)
+
+                                if module_name in sys.modules:
+                                    _module = sys.modules[module_name]
+                                else:
+                                    _module = import_module(module_name)
+
+                                # we need to update/rebind objects like
+                                # routes, middleware, etc.
+                                for attr_name in dir(_module):
+                                    if attr_name.startswith('__'):
+                                        continue
+
+                                    attr = getattr(_module, attr_name)
+
+                                    if isinstance(attr, self.__class__):
+                                        self.__dict__.update(attr.__dict__)
+                        else:
+                            print('A worker process died. Restarting...')
+
+                        if p.exitcode != 0 or hasattr(socks[args], 'share'):
+                            # renew socket
+                            # this is a workaround, especially on Windows
+                            socks[args] = self.create_sock(
+                                *args, options.get('reuse_port', reuse_port)
+                            )
 
                         parent_conn.close()
                         parent_conn, child_conn = mp.Pipe()
@@ -624,10 +734,10 @@ class Tremolo:
                         )
 
                         p.start()
-                        pid = parent_conn.recv()
+                        child_pid = parent_conn.recv()
 
                         if hasattr(socks[args], 'share'):
-                            parent_conn.send(socks[args].share(pid))
+                            parent_conn.send(socks[args].share(child_pid))
                         else:
                             parent_conn.send(socks[args].fileno())
 
@@ -637,9 +747,15 @@ class Tremolo:
                         processes[i] = (parent_conn, p, args, options)
 
                     # response ping from child
-                    while parent_conn.poll():
-                        parent_conn.recv()
-                        parent_conn.send(len(processes))
+                    while True:
+                        try:
+                            if not parent_conn.poll():
+                                break
+
+                            parent_conn.recv()
+                            parent_conn.send(len(processes))
+                        except BrokenPipeError:
+                            break
 
                     time.sleep(1)
             except KeyboardInterrupt:
@@ -654,13 +770,4 @@ class Tremolo:
             print('pid %d terminated' % p.pid)
 
         for sock in socks.values():
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-                sock.close()
-
-                if sock.family.name == 'AF_UNIX':
-                    os.unlink(sock.getsockname())
-            except FileNotFoundError:
-                pass
-            except OSError:
-                sock.close()
+            self.close_sock(sock)

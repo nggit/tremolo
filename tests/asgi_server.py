@@ -2,7 +2,6 @@
 
 __all__ = ('app', 'ASGI_HOST', 'ASGI_PORT')
 
-import asyncio  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 
@@ -16,7 +15,13 @@ import tremolo  # noqa: E402
 
 from tests.http_server import HTTP_PORT, TEST_FILE  # noqa: E402
 
-ASGI_HOST = '::'
+if sys.version_info[:2] < (3, 8):
+    # on Windows, Python versions below 3.8 don't properly support
+    # dual-stack IPv4/6. https://github.com/python/cpython/issues/73701
+    ASGI_HOST = '0.0.0.0'
+else:
+    ASGI_HOST = '::'
+
 ASGI_PORT = HTTP_PORT + 10
 
 
@@ -116,11 +121,4 @@ async def app(scope, receive, send):
     })
 
 if __name__ == '__main__':
-    try:
-        import uvloop
-
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    except ImportError:
-        print('INFO: uvloop is not installed')
-
     tremolo.run(app, host=ASGI_HOST, port=ASGI_PORT, debug=True, worker_num=2)
