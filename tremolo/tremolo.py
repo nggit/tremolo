@@ -384,13 +384,19 @@ class Tremolo:
 
                     # detect code changes
                     if options.get('reload', False):
-                        for module in (modules or sys.modules.values()):
+                        for module in (dict(modules) or sys.modules.values()):
                             if hasattr(module, '__file__'):
                                 for path in paths:
                                     if (module.__file__ is None or
                                             module.__file__.startswith(path)):
                                         break
                                 else:
+                                    if not os.path.exists(module.__file__):
+                                        if module in modules:
+                                            del modules[module]
+
+                                        continue
+
                                     _sign = file_signature(module.__file__)
 
                                     if module in modules:
@@ -405,6 +411,7 @@ class Tremolo:
 
                                     self._logger.info('reload: %s',
                                                       module.__file__)
+
                                     server.close()
                                     await server.wait_closed()
 
@@ -671,19 +678,32 @@ class Tremolo:
                             print('Reloading...')
 
                             if 'app' not in kwargs:
+                                for module in sys.modules.values():
+                                    if (hasattr(module, '__file__') and
+                                            module.__name__ not in (
+                                                '__main__',
+                                                '__mp_main__',
+                                                'tremolo') and
+                                            not module.__name__.startswith(
+                                                'tremolo.') and
+                                            module.__file__ is not None and
+                                            module.__file__.startswith(
+                                                kwargs['app_dir']) and
+                                            os.path.exists(module.__file__)):
+                                        reload_module(module)
+
                                 if module_name in sys.modules:
-                                    module = reload_module(
-                                        sys.modules[module_name])
+                                    _module = sys.modules[module_name]
                                 else:
-                                    module = import_module(module_name)
+                                    _module = import_module(module_name)
 
                                 # we need to update/rebind objects like
                                 # routes, middleware, etc.
-                                for attr_name in dir(module):
+                                for attr_name in dir(_module):
                                     if attr_name.startswith('__'):
                                         continue
 
-                                    attr = getattr(module, attr_name)
+                                    attr = getattr(_module, attr_name)
 
                                     if isinstance(attr, self.__class__):
                                         self.__dict__.update(attr.__dict__)
@@ -711,10 +731,10 @@ class Tremolo:
                         )
 
                         p.start()
-                        pid = parent_conn.recv()
+                        child_pid = parent_conn.recv()
 
                         if hasattr(socks[args], 'share'):
-                            parent_conn.send(socks[args].share(pid))
+                            parent_conn.send(socks[args].share(child_pid))
                         else:
                             parent_conn.send(socks[args].fileno())
 
