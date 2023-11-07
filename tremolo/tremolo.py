@@ -678,7 +678,7 @@ class Tremolo:
                             print('Reloading...')
 
                             if 'app' not in kwargs:
-                                for module in sys.modules.values():
+                                for module in list(sys.modules.values()):
                                     if (hasattr(module, '__file__') and
                                             module.__name__ not in (
                                                 '__main__',
