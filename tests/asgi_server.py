@@ -2,7 +2,6 @@
 
 __all__ = ('app', 'ASGI_HOST', 'ASGI_PORT')
 
-import asyncio  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 
@@ -122,11 +121,4 @@ async def app(scope, receive, send):
     })
 
 if __name__ == '__main__':
-    try:
-        import uvloop
-
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-    except ImportError:
-        print('INFO: uvloop is not installed')
-
     tremolo.run(app, host=ASGI_HOST, port=ASGI_PORT, debug=True, worker_num=2)
