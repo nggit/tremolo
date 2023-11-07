@@ -693,7 +693,6 @@ class Tremolo:
                         if p.exitcode != 0 or hasattr(socks[args], 'share'):
                             # renew socket
                             # this is a workaround, especially on Windows
-                            self.close_sock(socks[args])
                             socks[args] = self.create_sock(
                                 *args, options.get('reuse_port', reuse_port)
                             )
