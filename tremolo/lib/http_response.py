@@ -298,10 +298,10 @@ class HTTPResponse(Response):
                 self._request.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
-        file_size = os.stat(path).st_size
-        mtime = os.path.getmtime(path)
+        st = os.stat(path)
+        file_size = st.st_size
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
-                              time.gmtime(mtime)).encode('latin-1')
+                              time.gmtime(st.st_mtime)).encode('latin-1')
 
         if (self._request.version == b'1.1' and
                 b'range' in self._request.headers):

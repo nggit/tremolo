@@ -57,14 +57,14 @@ def getcontents(
     family = socket.AF_INET
 
     if ':' in host:
-        if host == '::':
-            host = '127.0.0.1'
-        else:
-            family = socket.AF_INET6
+        family = socket.AF_INET6
+
+    if host in ('0.0.0.0', '::'):
+        host = 'localhost'
 
     with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.settimeout(5)
+        sock.settimeout(10)
 
         while sock.connect_ex((host, port)) != 0:
             time.sleep(1)
