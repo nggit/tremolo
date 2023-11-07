@@ -493,6 +493,9 @@ class Tremolo:
                     sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
 
                     if host == '::' and hasattr(socket, 'IPPROTO_IPV6'):
+                        # on Windows, Python versions below 3.8
+                        # don't properly support dual-stack IPv4/6.
+                        # https://github.com/python/cpython/issues/73701
                         sock.setsockopt(socket.IPPROTO_IPV6,
                                         socket.IPV6_V6ONLY, 0)
                 else:
