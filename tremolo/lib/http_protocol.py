@@ -218,7 +218,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 break
 
-        if self.options['debug']:
+        if self._options['debug']:
             data = b'<ul><li>%s</li></ul>' % '</li><li>'.join(
                 traceback.TracebackException.from_exception(exc).format()
             ).encode(encoding)

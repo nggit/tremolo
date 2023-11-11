@@ -337,7 +337,7 @@ class HTTPResponse(Response):
             ranges = []
 
             try:
-                for v in _range.replace(b'bytes=', b'').split(b','):
+                for v in _range.replace(b'bytes=', b'').split(b',', 100):
                     v = v.strip()
 
                     if v.startswith(b'-'):
@@ -359,7 +359,7 @@ class HTTPResponse(Response):
                             (start, file_size - 1, file_size - start)
                         )
                     else:
-                        start, end = v.split(b'-')
+                        start, end = v.split(b'-', 1)
                         start = int(start)
                         end = int(end)
 
