@@ -223,18 +223,15 @@ class Tremolo:
             sock = socket.fromshare(options['_conn'].recv())
             sock.listen(backlog)
         else:
-            fd = options['_conn'].recv()
-
             try:
                 # Linux 'fork'
-                sock = socket.fromfd(fd, options['_sa_family'],
+                sock = socket.fromfd(options['_conn'].recv(),
+                                     options['_sa_family'],
                                      socket.SOCK_STREAM)
                 sock.listen(backlog)
-                options['_conn'].send(True)
             except OSError:
                 # Linux 'spawn'
-                options['_conn'].send(False)
-                sock = options['_conn'].recv()
+                sock = self.create_sock(host, port, options['reuse_port'])
                 sock.listen(backlog)
 
         if ('ssl' in options and options['ssl'] and
@@ -476,13 +473,14 @@ class Tremolo:
             self._loop.create_task(self._stop(task))
             self._loop.run_forever()
         finally:
-            exc = task.exception()
+            try:
+                exc = task.exception()
 
-            # to avoid None, SystemExit, etc. for being printed
-            if isinstance(exc, Exception):
-                self._logger.error(exc)
-
-            self._loop.close()
+                # to avoid None, SystemExit, etc. for being printed
+                if isinstance(exc, Exception):
+                    self._logger.error(exc)
+            finally:
+                self._loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
@@ -544,6 +542,7 @@ class Tremolo:
             sock.close()
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
+        kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
         terminal_width = min(get_terminal_size()[0], 72)
 
@@ -640,9 +639,7 @@ class Tremolo:
             )
 
             args = (_host, _port)
-            socks[args] = self.create_sock(
-                _host, _port, options.get('reuse_port', reuse_port)
-            )
+            socks[args] = self.create_sock(_host, _port, options['reuse_port'])
 
             for _ in range(options.get('worker_num', worker_num)):
                 parent_conn, child_conn = mp.Pipe()
@@ -665,9 +662,6 @@ class Tremolo:
                     parent_conn.send(socks[args].share(child_pid))
                 else:
                     parent_conn.send(socks[args].fileno())
-
-                    if parent_conn.recv() is False:
-                        parent_conn.send(socks[args])
 
                 processes.append((parent_conn, p, args, options))
 
@@ -717,7 +711,7 @@ class Tremolo:
                             # renew socket
                             # this is a workaround, especially on Windows
                             socks[args] = self.create_sock(
-                                *args, options.get('reuse_port', reuse_port)
+                                *args, options['reuse_port']
                             )
 
                         parent_conn.close()
@@ -740,9 +734,6 @@ class Tremolo:
                             parent_conn.send(socks[args].share(child_pid))
                         else:
                             parent_conn.send(socks[args].fileno())
-
-                            if parent_conn.recv() is False:
-                                parent_conn.send(socks[args])
 
                         processes[i] = (parent_conn, p, args, options)
 
