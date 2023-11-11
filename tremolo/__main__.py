@@ -5,7 +5,7 @@ import sys
 from tremolo import Tremolo
 
 server = Tremolo()
-options = {'ssl': {}}
+options = {'host': '127.0.0.1', 'port': 8000, 'ssl': {}}
 
 for i in range(len(sys.argv)):
     if sys.argv[i - 1] == '--help':
@@ -23,6 +23,8 @@ for i in range(len(sys.argv)):
         print('  --bind                    Address to bind.')
         print('                            Instead of using --host or --port')
         print('                            E.g. "127.0.0.1:8000" or "/tmp/file.sock"')  # noqa: E501
+        print('                            Multiple binds can be separated by commas')  # noqa: E501
+        print('                            E.g. "127.0.0.1:8000,:8001"')
         print('  --worker-num              Number of worker processes. Defaults to 1')  # noqa: E501
         print('  --backlog                 Maximum number of pending connections')  # noqa: E501
         print('                            Defaults to 100')
@@ -81,12 +83,15 @@ for i in range(len(sys.argv)):
             )
             sys.exit(1)
     elif sys.argv[i - 1] == '--bind':
+        options['host'] = None
+
         try:
-            if ':\\' not in sys.argv[i] and ':' in sys.argv[i]:
-                options['host'], port = sys.argv[i].split(':', 1)
-                options['port'] = int(port)
-            else:
-                options['host'] = sys.argv[i]
+            for bind in sys.argv[i].split(','):
+                if ':\\' not in bind and ':' in bind:
+                    host, port = bind.rsplit(':', 1)
+                    server.listen(int(port), host=host.strip('[]') or None)
+                else:
+                    server.listen(bind)
         except ValueError:
             print('Invalid --bind value "%s"' % sys.argv[i])
             sys.exit(1)
@@ -105,11 +110,5 @@ if __name__ == '__main__':
     if 'app' not in options:
         print('You must specify APP. Use "--help" for help')
         sys.exit(1)
-
-    if 'host' not in options:
-        options['host'] = '127.0.0.1'
-
-    if 'port' not in options:
-        options['port'] = 8000
 
     server.run(**options)
