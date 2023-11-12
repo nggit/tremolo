@@ -23,30 +23,30 @@ app = Tremolo()
 
 
 @app.on_worker_start
-async def worker_start(**server):
-    worker = server['context']
-    worker.shared = 0
-    worker.socket_family = 'AF_UNIX'
+async def worker_start(**worker):
+    worker_ctx = worker['context']
+    worker_ctx.shared = 0
+    worker_ctx.socket_family = 'AF_UNIX'
 
 
 @app.on_worker_start()
-async def worker_start2(**server):
+async def worker_start2(**worker):
     pass
 
 
 @app.on_worker_stop()
-async def worker_stop2(**server):
+async def worker_stop2(**worker):
     pass
 
 
 @app.on_worker_stop
-async def worker_stop(**server):
-    worker = server['context']
+async def worker_stop(**worker):
+    worker_ctx = worker['context']
 
-    if worker.socket_family == 'AF_UNIX':
-        assert worker.shared == 0
+    if worker_ctx.socket_family == 'AF_UNIX':
+        assert worker_ctx.shared == 0
     else:
-        assert worker.shared > 0
+        assert worker_ctx.shared > 0
 
 
 @app.on_connect
@@ -64,11 +64,12 @@ async def on_close(**server):
 
 
 @app.on_request
-async def my_request_middleware(worker=None, **server):
+async def my_request_middleware(**server):
     request = server['request']
     response = server['response']
-    worker.shared += 1
-    worker.socket_family = request.socket.family.name
+    worker_ctx = server['worker']
+    worker_ctx.shared += 1
+    worker_ctx.socket_family = request.socket.family.name
 
     assert request.ctx.foo == 'bar'
 
