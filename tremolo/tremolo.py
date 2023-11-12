@@ -630,10 +630,9 @@ class Tremolo:
             options = {**kwargs, **options}
 
             print(
-                '  run(host=%s, port=%d, reuse_port=%s, worker_num=%d, %s)' % (
+                '  run(host=%s, port=%d, worker_num=%d, %s)' % (
                     _host,
                     _port,
-                    reuse_port,
                     worker_num,
                     ', '.join('%s=%s' % item for item in options.items()))
             )
