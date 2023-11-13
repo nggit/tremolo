@@ -227,7 +227,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         if self._response is not None:
             self._response.set_status(exc.code, exc.message)
-            self._response.set_content_type(exc.message)
+            self._response.set_content_type(exc.content_type)
             await self._response.end(data, keepalive=False)
 
     async def _handle_request_header(self, data, header_size):
