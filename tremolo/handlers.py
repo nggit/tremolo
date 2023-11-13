@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+import traceback
+
 from .exceptions import BadRequest
 from .utils import html_escape
 
@@ -27,3 +29,12 @@ async def error_404(request=None, **_):
         b'<address title="Powered by Tremolo">%s</address>'
         b'</body></html>' % request.protocol.options['server_info']['name']
     )
+
+
+async def error_500(request=None, exc=None, **_):
+    if request.protocol.options['debug']:
+        return '<ul><li>%s</li></ul>' % '</li><li>'.join(
+            traceback.TracebackException.from_exception(exc).format()
+        )
+
+    return str(exc)

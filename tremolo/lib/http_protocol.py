@@ -1,7 +1,6 @@
 # Copyright (c) 2023 nggit
 
 import asyncio
-import traceback
 
 from urllib.parse import quote, unquote
 
@@ -205,30 +204,35 @@ class HTTPProtocol(asyncio.Protocol):
         elif not isinstance(exc, HTTPException):
             exc = InternalServerError(cause=exc)
 
-        encoding = 'utf-8'
-
-        for v in exc.content_type.split(';'):
-            v = v.lstrip()
-
-            if v.startswith('charset='):
-                charset = v[len('charset='):].strip()
-
-                if charset != '':
-                    encoding = charset
-
-                break
-
-        if self._options['debug']:
-            data = b'<ul><li>%s</li></ul>' % '</li><li>'.join(
-                traceback.TracebackException.from_exception(exc).format()
-            ).encode(encoding)
-        else:
-            data = str(exc).encode(encoding)
-
-        if self._response is not None:
+        if self._request is not None and self._response is not None:
             self._response.set_status(exc.code, exc.message)
             self._response.set_content_type(exc.content_type)
-            await self._response.end(data, keepalive=False)
+            data = b''
+
+            try:
+                data = await self._options['_routes'][0][-1][1](
+                    request=self._request, response=self._response, exc=exc)
+
+                if data is None:
+                    data = b''
+            finally:
+                if isinstance(data, str):
+                    encoding = 'utf-8'
+
+                    for v in exc.content_type.split(';'):
+                        v = v.lstrip()
+
+                        if v.startswith('charset='):
+                            charset = v[len('charset='):].strip()
+
+                            if charset != '':
+                                encoding = charset
+
+                            break
+
+                    data = data.encode(encoding)
+
+                await self._response.end(data, keepalive=False)
 
     async def _handle_request_header(self, data, header_size):
         header = ParseHeader(data,

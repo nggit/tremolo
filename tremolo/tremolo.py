@@ -35,7 +35,8 @@ class Tremolo:
             0: [
                 (400, handlers.error_400, {}),
                 (404, handlers.error_404, dict(status=(404, b'Not Found'),
-                                               stream=False))
+                                               stream=False)),
+                (500, handlers.error_500, {})
             ],
             1: [
                 (
