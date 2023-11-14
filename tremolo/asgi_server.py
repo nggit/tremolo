@@ -26,22 +26,16 @@ _WS_OR_WSS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('_app',
-                 '_scope',
+    __slots__ = ('_scope',
                  '_read',
-                 '_task',
                  '_timer',
-                 '_timeout',
                  '_websocket',
                  '_http_chunked')
 
-    def __init__(self, _app=None, **kwargs):
-        self._app = _app
+    def __init__(self, **kwargs):
         self._scope = None
         self._read = None
-        self._task = None
         self._timer = None
-        self._timeout = 30
         self._websocket = None
         self._http_chunked = None
 
@@ -88,37 +82,32 @@ class ASGIServer(HTTPProtocol):
             await self._handle_http()
             self._read = self.request.stream()
 
-        self._task = self.loop.create_task(self.app())
+        self.handler = self.loop.create_task(self.app())
 
     def connection_lost(self, exc):
-        if (self._task is not None and not self._task.done() and
-                self._timer is None):
-            self._timer = self.loop.call_at(self.loop.time() + self._timeout,
-                                            self._task.cancel)
+        if self.handler is not None and not self.handler.done():
+            self._set_app_close_timeout()
 
         super().connection_lost(exc)
 
     async def app(self):
         try:
-            await self._app(self._scope, self.receive, self.send)
+            await self.options['_app'](self._scope, self.receive, self.send)
 
             if self._timer is not None:
                 self._timer.cancel()
-        except asyncio.CancelledError:
-            self.logger.warning(
-                'task: ASGI application is cancelled due to timeout'
-            )
-        except Exception as exc:
+        except (asyncio.CancelledError, Exception) as exc:
             if (self.request is not None and self.request.upgraded and
                     self._websocket is not None):
                 exc = WebSocketServerClosed(cause=exc)
 
             await self.handle_exception(exc)
 
-    def _set_app_timeout(self):
+    def _set_app_close_timeout(self):
         if self._timer is None:
             self._timer = self.loop.call_at(
-                self.loop.time() + self._timeout, self._task.cancel
+                self.loop.time() + self.options['_app_close_timeout'],
+                self.handler.cancel
             )
 
     async def receive(self):
@@ -152,7 +141,7 @@ class ASGIServer(HTTPProtocol):
                 if self.request is not None:
                     self.print_exception(exc)
 
-                self._set_app_timeout()
+                self._set_app_close_timeout()
                 return {
                     'type': 'websocket.disconnect',
                     'code': code
@@ -181,7 +170,7 @@ class ASGIServer(HTTPProtocol):
                     isinstance(exc, StopAsyncIteration)):
                 self.print_exception(exc)
 
-            self._set_app_timeout()
+            self._set_app_close_timeout()
             return {'type': 'http.disconnect'}
 
     async def send(self, data):

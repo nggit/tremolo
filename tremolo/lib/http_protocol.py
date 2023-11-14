@@ -29,6 +29,7 @@ class HTTPProtocol(asyncio.Protocol):
                  '_request',
                  '_response',
                  '_watermarks',
+                 'handler',
                  '_header_buf',
                  '_waiters')
 
@@ -44,6 +45,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._response = None
         self._watermarks = {'high': 65536, 'low': 8192}
 
+        self.handler = None
         self._header_buf = None
         self._waiters = {}
 
@@ -101,6 +103,22 @@ class HTTPProtocol(asyncio.Protocol):
             timeout_cb=self.request_timeout))
         )
 
+    def abort(self, exc=None):
+        if (self._transport is not None and
+                not self._transport.is_closing()):
+            self._transport.abort()
+
+            if exc:
+                self.print_exception(exc, 'abort')
+
+    def close(self):
+        if (self._transport is not None and
+                not self._transport.is_closing()):
+            if self._transport.can_write_eof():
+                self._transport.write_eof()
+
+            self._transport.close()
+
     async def request_timeout(self, timeout):
         self._logger.info('request timeout after %gs' % timeout)
 
@@ -121,9 +139,7 @@ class HTTPProtocol(asyncio.Protocol):
                     if callable(timeout_cb):
                         await timeout_cb(timeout)
                 finally:
-                    if (self._transport is not None and
-                            not self._transport.is_closing()):
-                        self._transport.abort()
+                    self.abort()
         finally:
             timer.cancel()
 
@@ -170,6 +186,17 @@ class HTTPProtocol(asyncio.Protocol):
     async def header_received(self):
         return
 
+    def handler_timeout(self):
+        if (self._request is None or self._request.upgraded or
+                self.handler is None):
+            return
+
+        self.handler.cancel()
+        self._logger.error('handler timeout after %gs. consider increasing '
+                           'the value of app_handler_timeout' %
+                           self._options['app_handler_timeout'])
+        self.handler = None
+
     def print_exception(self, exc, *args):
         self._logger.error(
             ': '.join((*args, exc.__class__.__name__, str(exc))),
@@ -180,6 +207,8 @@ class HTTPProtocol(asyncio.Protocol):
         if (self._request is None or self._response is None or
                 (self._response.headers_sent() and
                  not self._request.upgraded)):
+            # it's here for redundancy
+            self.abort(exc)
             return
 
         self.print_exception(
@@ -300,7 +329,16 @@ class HTTPProtocol(asyncio.Protocol):
                            'keepalive') and not fut.done():
                     fut.set_result(None)
 
-            await self.header_received()
+            self.handler = self._loop.create_task(self.header_received())
+            timer = self._loop.call_at(
+                self._loop.time() + self._options['app_handler_timeout'],
+                self.handler_timeout)
+
+            try:
+                await self.handler
+            finally:
+                if self._options['_app'] is None:
+                    timer.cancel()
         except Exception as exc:
             await self.handle_exception(exc)
 
@@ -342,11 +380,11 @@ class HTTPProtocol(asyncio.Protocol):
                 self._header_buf = None
             elif header_size > self._options['client_max_header_size']:
                 self._logger.info('request header too large')
-                self._transport.abort()
+                self.abort()
             elif not (header_size == -1 and len(self._header_buf) <=
                       self._options['client_max_header_size']):
                 self._logger.info('bad request')
-                self._transport.abort()
+                self.abort()
 
             return
 
@@ -394,10 +432,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                         self._request.clear_body()
 
-                    if self._transport.can_write_eof():
-                        self._transport.write_eof()
-
-                    self._transport.close()
+                    self.close()
                     return
 
                 # send data
@@ -426,9 +461,7 @@ class HTTPProtocol(asyncio.Protocol):
             except asyncio.CancelledError:
                 pass
             except Exception as exc:
-                if self._transport is not None:
-                    self._transport.abort()
-                    self.print_exception(exc)
+                self.abort(exc)
 
     def _handle_keepalive(self):
         if 'request' in self._waiters:
@@ -436,10 +469,7 @@ class HTTPProtocol(asyncio.Protocol):
             self._options['_connections'][self] = None
 
         if self not in self._options['_connections']:
-            if self._transport.can_write_eof():
-                self._transport.write_eof()
-
-            self._transport.close()
+            self.close()
             self._logger.info(
                 'a keepalive connection is kicked out of the list'
             )
