@@ -10,26 +10,26 @@ class ASGILifespan:
         self._loop = kwargs['loop']
         self._logger = kwargs['logger']
 
-        scope = {
-            'type': 'lifespan',
-            'asgi': {'version': '3.0'}
-        }
-
         self._queue = asyncio.Queue()
-        self._task = self._loop.create_task(
-            app(scope, self.receive, self.send)
-        )
-        self._complete = False
+        self._waiter = self._loop.create_future()
+        self._task = self._loop.create_task(self.main(app))
+
+    async def main(self, app):
+        try:
+            scope = {
+                'type': 'lifespan',
+                'asgi': {'version': '3.0'}
+            }
+
+            await app(scope, self.receive, self.send)
+        finally:
+            self._waiter.cancel()
 
     def startup(self):
-        self._complete = False
-
         self._queue.put_nowait({'type': 'lifespan.startup'})
         self._logger.info('lifespan: startup')
 
     def shutdown(self):
-        self._complete = False
-
         self._queue.put_nowait({'type': 'lifespan.shutdown'})
         self._logger.info('lifespan: shutdown')
 
@@ -42,7 +42,8 @@ class ASGILifespan:
     async def send(self, data):
         if data['type'] in ('lifespan.startup.complete',
                             'lifespan.shutdown.complete'):
-            self._complete = True
+            self._waiter.set_result(None)
+            self._waiter = self._loop.create_future()
             self._logger.info(data['type'])
         elif data['type'] in ('lifespan.startup.failed',
                               'lifespan.shutdown.failed'):
@@ -56,10 +57,12 @@ class ASGILifespan:
             raise LifespanProtocolUnsupported
 
     async def exception(self, timeout=30):
-        for _ in range(timeout):
-            if self._complete:
-                return
+        timer = self._loop.call_at(self._loop.time() + timeout,
+                                   self._waiter.cancel)
 
+        try:
+            await self._waiter
+        except asyncio.CancelledError:
             try:
                 exc = self._task.exception()
 
@@ -72,12 +75,9 @@ class ASGILifespan:
                     else:
                         self._logger.info(
                             '%s: %s' % (LifespanProtocolUnsupported.message,
-                                        str(exc))
+                                        str(exc) or repr(exc))
                         )
-
-                return
             except asyncio.InvalidStateError:
-                await asyncio.sleep(1)
-
-        if not self._complete:
-            self._logger.warning('lifespan: timeout after %gs' % timeout)
+                self._logger.warning('lifespan: timeout after %gs' % timeout)
+        finally:
+            timer.cancel()
