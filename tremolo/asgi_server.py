@@ -82,7 +82,7 @@ class ASGIServer(HTTPProtocol):
             await self._handle_http()
             self._read = self.request.stream()
 
-        self.handler = self.loop.create_task(self.app())
+        self.handler = self.loop.create_task(self.main())
 
     def connection_lost(self, exc):
         if self.handler is not None and not self.handler.done():
@@ -90,7 +90,7 @@ class ASGIServer(HTTPProtocol):
 
         super().connection_lost(exc)
 
-    async def app(self):
+    async def main(self):
         try:
             await self.options['_app'](self._scope, self.receive, self.send)
 
@@ -165,7 +165,7 @@ class ASGIServer(HTTPProtocol):
                     self.request.body_size < self.request.content_length
                 )
             }
-        except Exception as exc:
+        except (asyncio.CancelledError, Exception) as exc:
             if not (self.request is None or
                     isinstance(exc, StopAsyncIteration)):
                 self.print_exception(exc)
