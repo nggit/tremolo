@@ -43,7 +43,6 @@ class ASGILifespan:
         if data['type'] in ('lifespan.startup.complete',
                             'lifespan.shutdown.complete'):
             self._waiter.set_result(None)
-            self._waiter = self._loop.create_future()
             self._logger.info(data['type'])
         elif data['type'] in ('lifespan.startup.failed',
                               'lifespan.shutdown.failed'):
@@ -62,6 +61,8 @@ class ASGILifespan:
 
         try:
             await self._waiter
+
+            self._waiter = self._loop.create_future()
         except asyncio.CancelledError:
             try:
                 exc = self._task.exception()
