@@ -35,7 +35,8 @@ class Tremolo:
             0: [
                 (400, handlers.error_400, {}),
                 (404, handlers.error_404, dict(status=(404, b'Not Found'),
-                                               stream=False))
+                                               stream=False)),
+                (500, handlers.error_500, {})
             ],
             1: [
                 (
@@ -336,10 +337,16 @@ class Tremolo:
                            keepalive_timeout=options.get(
                                'keepalive_timeout', 30
                            ),
+                           app_handler_timeout=options.get(
+                               'app_handler_timeout', 120
+                           ),
                            server_info=server_info,
                            _connections=connections,
                            _pools=pools,
                            _app=options['app'],
+                           _app_close_timeout=options.get(
+                               'app_close_timeout', 30
+                           ),
                            _root_path=options.get('root_path', ''),
                            _routes=options['_routes'],
                            _middlewares=options['_middlewares']),

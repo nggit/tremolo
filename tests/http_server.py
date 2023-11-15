@@ -270,6 +270,8 @@ async def timeouts(request=None, **_):
         # attempt to read body on a GET request
         # should raise a TimeoutError and ended up with a RequestTimeout
         await request.recv(100)
+    elif request.query_string == b'handler':
+        await asyncio.sleep(10)
 
 
 @app.route('/reload')
@@ -284,7 +286,7 @@ async def reload(request=None, **_):
 
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
-app.listen(HTTP_PORT + 2)
+app.listen(HTTP_PORT + 2, app_handler_timeout=1)
 
 # test unix socket
 # 'tremolo-test.sock'
