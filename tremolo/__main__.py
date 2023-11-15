@@ -50,6 +50,12 @@ for i in range(len(sys.argv)):
         print('  --keepalive-timeout       Defaults to 30 (seconds)')
         print('  --keepalive-connections   Maximum number of keep-alive connections')  # noqa: E501
         print('                            Defaults to 512 (connections/worker)')  # noqa: E501
+        print('  --app-handler-timeout     Kill the app if it takes too long to finish')  # noqa: E501
+        print('                            Upgraded connection/scope will not be affected')  # noqa: E501
+        print('                            Defaults to 120 (seconds)')
+        print('  --app-close-timeout       Kill the app if it does not exit within this timeframe,')  # noqa: E501
+        print('                            from when the client is disconnected')  # noqa: E501
+        print('                            Defaults to 30 (seconds)')
         print('  --server-name             Set the "Server" field in the response header')  # noqa: E501
         print('  --root-path               Set the ASGI root_path. Defaults to ""')  # noqa: E501
         print('  --help                    Show this help and exit')
@@ -73,7 +79,9 @@ for i in range(len(sys.argv)):
                              '--client-max-header-size',
                              '--request-timeout',
                              '--keepalive-timeout',
-                             '--keepalive-connections'):
+                             '--keepalive-connections',
+                             '--app-handler-timeout',
+                             '--app-close-timeout'):
         try:
             options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = int(sys.argv[i])  # noqa: E501
         except ValueError:

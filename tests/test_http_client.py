@@ -501,6 +501,18 @@ class TestHTTPClient(unittest.TestCase):
                          b'HTTP/1.1 408 Request Timeout')
         self.assertEqual(body, b'Request Timeout')
 
+    def test_handlertimeout(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'GET /timeouts?handler HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 2)
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+        self.assertEqual(body, b'Internal Server Error')
+
     def test_download_10(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT + 2,
