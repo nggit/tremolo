@@ -86,7 +86,10 @@ class HTTPRequest(Request):
     @property
     def client(self):
         if not self._client:
-            self._client = self.socket.getpeername()[:2]
+            try:
+                self._client = self.socket.getpeername()[:2]
+            except TypeError:
+                pass
 
         return self._client
 

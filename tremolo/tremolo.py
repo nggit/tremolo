@@ -36,6 +36,7 @@ class Tremolo:
                 (400, handlers.error_400, {}),
                 (404, handlers.error_404, dict(status=(404, b'Not Found'),
                                                stream=False)),
+                # must be at the very end
                 (500, handlers.error_500, {})
             ],
             1: [
@@ -56,8 +57,8 @@ class Tremolo:
             'worker_start': [],
             'worker_stop': []
         }
+        self.ports = {}
 
-        self._ports = {}
         self._loop = None
         self._logger = None
 
@@ -67,11 +68,11 @@ class Tremolo:
             host = port
             port = None
 
-        if (host, port) in self._ports:
+        if (host, port) in self.ports:
             return False
 
-        self._ports[(host, port)] = options
-        return (host, port) in self._ports
+        self.ports[(host, port)] = options
+        return (host, port) in self.ports
 
     def route(self, path):
         if isinstance(path, int):
@@ -605,7 +606,7 @@ class Tremolo:
                 print()
 
         if host is None:
-            if not self._ports:
+            if not self.ports:
                 raise ValueError(
                     'with host=None, listen() must be called first'
                 )
@@ -627,7 +628,7 @@ class Tremolo:
 
         print('Options:')
 
-        for (_host, _port), options in self._ports.items():
+        for (_host, _port), options in self.ports.items():
             if _host is None:
                 _host = host
 

@@ -56,7 +56,9 @@ class HTTPServer(HTTPProtocol):
     def connection_lost(self, exc):
         if self._middlewares['close']:
             task = self.loop.create_task(self._connection_lost(exc))
-            self.loop.call_at(self.loop.time() + 30, task.cancel)
+            self.loop.call_at(
+                self.loop.time() + self.options['_app_close_timeout'],
+                task.cancel)
         else:
             super().connection_lost(exc)
 
@@ -73,6 +75,8 @@ class HTTPServer(HTTPProtocol):
             return options
 
         if not isinstance(data, (bytes, bytearray, str, tuple)):
+            self.logger.info('middleware %s has exited with the connection '
+                             'possibly left open', func.__name__)
             return
 
         if 'status' in options:
@@ -132,6 +136,8 @@ class HTTPServer(HTTPProtocol):
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
+                self.logger.info('handler %s has exited with the connection '
+                                 'possibly left open', func.__name__)
                 return
 
         status = self.response.get_status()
