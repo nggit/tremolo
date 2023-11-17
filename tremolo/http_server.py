@@ -73,6 +73,8 @@ class HTTPServer(HTTPProtocol):
             return options
 
         if not isinstance(data, (bytes, bytearray, str, tuple)):
+            self.logger.info('middleware %s has exited with the connection '
+                             'possibly left open', func.__name__)
             return
 
         if 'status' in options:
@@ -132,6 +134,8 @@ class HTTPServer(HTTPProtocol):
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
+                self.logger.info('handler %s has exited with the connection '
+                                 'possibly left open', func.__name__)
                 return
 
         status = self.response.get_status()
