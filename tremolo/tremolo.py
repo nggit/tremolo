@@ -83,7 +83,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_route(path, wrapper, self.getoptions(func))
+            self.add_route(wrapper, path, self.getoptions(func))
             return wrapper
 
         return decorator
@@ -134,7 +134,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.middlewares[name].append((wrapper, self.getoptions(func)))
+            self.add_middleware(wrapper, name, self.getoptions(func))
             return wrapper
 
         return decorator
@@ -176,7 +176,17 @@ class Tremolo:
 
         return options
 
-    def add_route(self, path, func, kwargs={}):
+    def add_middleware(self, func, name='request', kwargs={}):
+        if name not in self.middlewares:
+            raise ValueError('%s is not one of the: %s' %
+                             (name, ', '.join(self.middlewares)))
+
+        self.middlewares[name].append((func, kwargs or self.getoptions(func)))
+
+    def add_route(self, func, path='/', kwargs={}):
+        if not kwargs:
+            kwargs = self.getoptions(func)
+
         if path.startswith('^') or path.endswith('$'):
             pattern = path.encode('latin-1')
             self.routes[-1].append((pattern, func, kwargs))
