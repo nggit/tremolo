@@ -29,4 +29,4 @@ async def app(scope, receive, send):
     })
 
 if __name__ == '__main__':
-    tremolo.run(app, host='0.0.0.0', port=8000, debug=True)
+    tremolo.run(app, host='0.0.0.0', port=8000, debug=True, reload=True)

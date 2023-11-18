@@ -7,7 +7,7 @@ with open('README.md', 'r') as f:
 
 setup(
     name='tremolo',
-    version='0.0.302',
+    version='0.0.303',
     license='MIT',
     author='nggit',
     author_email='contact@anggit.com',

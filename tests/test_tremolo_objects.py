@@ -118,6 +118,10 @@ class TestTremoloObjects(unittest.TestCase):
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})
 
+    def test_invalidmiddleware(self):
+        with self.assertRaises(ValueError):
+            app.add_middleware(middlewares.on_request, 'invalid')
+
     @function
     async def test_handler(self):
         for handler in app.routes[1]:
