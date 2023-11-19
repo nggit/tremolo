@@ -156,7 +156,6 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger.error('handler timeout after %gs. consider increasing '
                           'the value of app_handler_timeout' %
                           self.options['app_handler_timeout'])
-        self.handler = None
 
     def print_exception(self, exc, *args):
         self.logger.error(
@@ -507,4 +506,5 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue = (None, None)
         self.request = None
         self.response = None
+        self.handler = None
         self._header_buf = None
