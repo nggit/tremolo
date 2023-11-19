@@ -82,6 +82,8 @@ class ASGIServer(HTTPProtocol):
             await self._handle_http()
             self._read = self.request.stream()
 
+        # the current task is done
+        # update the handler with the ASGI main task
         self.handler = self.loop.create_task(self.main())
 
     def connection_lost(self, exc):
