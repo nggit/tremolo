@@ -7,7 +7,6 @@ from urllib.parse import unquote
 
 from .exceptions import (
     InternalServerError,
-    WebSocketException,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
