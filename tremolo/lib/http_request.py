@@ -27,7 +27,7 @@ class HTTPRequest(Request):
                  'http_continue',
                  'http_keepalive',
                  '_upgraded',
-                 '_params',
+                 'params',
                  '_eof',
                  '_read_instance',
                  '_read_buf')
@@ -70,7 +70,7 @@ class HTTPRequest(Request):
         self.http_continue = False
         self.http_keepalive = False
         self._upgraded = False
-        self._params = {}
+        self.params = {}
 
         self._eof = False
         self._read_instance = None
@@ -250,44 +250,40 @@ class HTTPRequest(Request):
         self._upgraded = value
 
     @property
-    def params(self):
-        return self._params
-
-    @property
     def query(self):
-        return self._params['query']
+        return self.params['query']
 
     @query.setter
     def query(self, value):
-        self._params['query'] = value
+        self.params['query'] = value
 
     @property
     def cookies(self):
         try:
-            return self._params['cookies']
+            return self.params['cookies']
         except KeyError:
-            self._params['cookies'] = {}
+            self.params['cookies'] = {}
 
             if b'cookie' in self.headers:
                 if isinstance(self.headers[b'cookie'], list):
-                    self._params['cookies'] = parse_qs(
+                    self.params['cookies'] = parse_qs(
                         b'; '.join(self.headers[b'cookie'])
                         .replace(b'; ', b'&').replace(b';', b'&')
                         .decode('latin-1')
                     )
                 else:
-                    self._params['cookies'] = parse_qs(
+                    self.params['cookies'] = parse_qs(
                         self.headers[b'cookie'].replace(b'; ', b'&')
                         .replace(b';', b'&').decode('latin-1')
                     )
 
-            return self._params['cookies']
+            return self.params['cookies']
 
     async def form(self, limit=8 * 1048576):
         try:
-            return self._params['post']
+            return self.params['post']
         except KeyError:
-            self._params['post'] = {}
+            self.params['post'] = {}
 
             if (b'application/x-www-form-urlencoded' in
                     self.content_type.lower()):
@@ -298,11 +294,11 @@ class HTTPRequest(Request):
                         break
 
                 if 2 < self.body_size <= limit:
-                    self._params['post'] = parse_qs(
+                    self.params['post'] = parse_qs(
                         self._body.decode('latin-1')
                     )
 
-            return self._params['post']
+            return self.params['post']
 
     async def files(self):
         ct = parse_qs(

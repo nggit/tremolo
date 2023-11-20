@@ -7,7 +7,6 @@ from urllib.parse import unquote
 
 from .exceptions import (
     InternalServerError,
-    WebSocketException,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
@@ -82,6 +81,8 @@ class ASGIServer(HTTPProtocol):
             await self._handle_http()
             self._read = self.request.stream()
 
+        # the current task is done
+        # update the handler with the ASGI main task
         self.handler = self.loop.create_task(self.main())
 
     def connection_lost(self, exc):
@@ -132,13 +133,13 @@ class ASGIServer(HTTPProtocol):
                     'type': 'websocket.receive',
                     'bytes': payload
                 }
-            except WebSocketException as exc:
+            except (asyncio.CancelledError, Exception) as exc:
                 code = 1005
 
                 if isinstance(exc, WebSocketClientClosed):
                     code = exc.code
 
-                if self.request is not None:
+                if not (self._websocket is None or self.request is None):
                     self.print_exception(exc)
 
                 self._set_app_close_timeout()
@@ -166,7 +167,7 @@ class ASGIServer(HTTPProtocol):
                 )
             }
         except (asyncio.CancelledError, Exception) as exc:
-            if not (self.request is None or
+            if not (self._read is None or self.request is None or
                     isinstance(exc, StopAsyncIteration)):
                 self.print_exception(exc)
 
@@ -253,6 +254,8 @@ class ASGIServer(HTTPProtocol):
                 if 'more_body' not in data or data['more_body'] is False:
                     await self.response.write(b'', throttle=False)
                     self.response.close(keepalive=True)
+
+                    self._read = None
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
                     await self._websocket.send(data['bytes'])
@@ -262,6 +265,8 @@ class ASGIServer(HTTPProtocol):
                 await self._websocket.accept()
             elif data['type'] == 'websocket.close':
                 await self._websocket.close(data.get('code', 1000))
+
+                self._websocket = None
         except asyncio.CancelledError:
             pass
         except Exception as exc:
