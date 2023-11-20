@@ -202,8 +202,7 @@ class ASGIServer(HTTPProtocol):
 
                         if name in (b'date',
                                     b'server',
-                                    b'transfer-encoding',
-                                    b'sec-websocket-protocol'):
+                                    b'transfer-encoding'):
                             # disallow apps from changing them,
                             # as they are managed by Tremolo
                             continue
