@@ -398,41 +398,43 @@ class Tremolo:
                     server_info['date'] = server_date()
 
                     # detect code changes
-                    if options.get('reload', False):
+                    if 'reload' in options and options['reload']:
                         for module in (dict(modules) or sys.modules.values()):
-                            if hasattr(module, '__file__'):
-                                for path in paths:
-                                    if (module.__file__ is None or
-                                            module.__file__.startswith(path)):
-                                        break
-                                else:
-                                    if not os.path.exists(module.__file__):
-                                        if module in modules:
-                                            del modules[module]
+                            if not hasattr(module, '__file__'):
+                                continue
 
-                                        continue
-
-                                    _sign = file_signature(module.__file__)
-
+                            for path in paths:
+                                if (module.__file__ is None or
+                                        module.__file__.startswith(path)):
+                                    break
+                            else:
+                                if not os.path.exists(module.__file__):
                                     if module in modules:
-                                        if modules[module] == _sign:
-                                            # file not modified
-                                            continue
+                                        del modules[module]
 
-                                        modules[module] = _sign
-                                    else:
-                                        modules[module] = _sign
+                                    continue
+
+                                _sign = file_signature(module.__file__)
+
+                                if module in modules:
+                                    if modules[module] == _sign:
+                                        # file not modified
                                         continue
 
-                                    self._logger.info('reload: %s',
-                                                      module.__file__)
+                                    modules[module] = _sign
+                                else:
+                                    modules[module] = _sign
+                                    continue
 
-                                    server.close()
-                                    await server.wait_closed()
+                                self._logger.info('reload: %s',
+                                                  module.__file__)
 
-                                    # essentially means sys.exit(0)
-                                    # to trigger a reload
-                                    return
+                                server.close()
+                                await server.wait_closed()
+
+                                # essentially means sys.exit(0)
+                                # to trigger a reload
+                                return
 
                     if options['_conn'].poll():
                         break
