@@ -17,33 +17,29 @@ class Queue:
     def qsize(self):
         return len(self._queue)
 
-    def _wakeup_next(self):
+    def put_nowait(self, item):
         while True:
             try:
                 fut = self._getters.popleft()
 
                 if not fut.done():
-                    fut.set_result(None)
+                    fut.set_result(item)
                     break
             except IndexError:
+                self._queue.append(item)
                 break
 
-    def put_nowait(self, item):
-        self._queue.append(item)
-        self._wakeup_next()
-
     async def get(self):
-        while True:
-            try:
+        try:
+            if not self._getters:
                 return self._queue.popleft()
-            except IndexError:
-                fut = self._loop.create_future()
-                self._getters.append(fut)
+        except IndexError:
+            pass
 
-                if self._queue:
-                    self._wakeup_next()
+        fut = self._loop.create_future()
+        self._getters.append(fut)
 
-                await fut
+        return await fut
 
     def task_done(self):
         return
@@ -53,4 +49,4 @@ class Queue:
         self._queue.clear()
         self._getters.clear()
 
-        return len(self._queue) == 0 and len(self._getters) == 0
+        return not self._queue and not self._getters
