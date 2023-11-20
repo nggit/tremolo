@@ -280,7 +280,7 @@ class HTTPServer(HTTPProtocol):
 
         self.response.close(keepalive=True)
 
-    async def header_received(self):
+    async def headers_received(self):
         if self.context.ON_CONNECT is not None:
             await self.context.ON_CONNECT
 
