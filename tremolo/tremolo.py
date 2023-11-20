@@ -492,11 +492,12 @@ class Tremolo:
             self._loop.run_forever()
         finally:
             try:
-                exc = task.exception()
+                if task.done():
+                    exc = task.exception()
 
-                # to avoid None, SystemExit, etc. for being printed
-                if isinstance(exc, Exception):
-                    self._logger.error(exc)
+                    # to avoid None, SystemExit, etc. for being printed
+                    if isinstance(exc, Exception):
+                        self._logger.error(exc)
             finally:
                 self._loop.close()
 
