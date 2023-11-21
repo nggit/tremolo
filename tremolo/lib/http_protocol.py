@@ -144,7 +144,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.logger.info('payload too large')
 
-    async def header_received(self):
+    async def headers_received(self):
         return
 
     def handler_timeout(self):
@@ -288,7 +288,7 @@ class HTTPProtocol(asyncio.Protocol):
                            'keepalive') and not fut.done():
                     fut.set_result(None)
 
-            self.handler = self.loop.create_task(self.header_received())
+            self.handler = self.loop.create_task(self.headers_received())
             timer = self.loop.call_at(
                 self.loop.time() + self.options['app_handler_timeout'],
                 self.handler_timeout)

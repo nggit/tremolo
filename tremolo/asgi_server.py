@@ -59,7 +59,7 @@ class ASGIServer(HTTPProtocol):
             # in the case of bodyless requests, e.g. GET
             self.queue[0].put_nowait(b'')
 
-    async def header_received(self):
+    async def headers_received(self):
         self._scope = {
             'asgi': {'version': '3.0'},
             'http_version': self.request.version.decode('utf-8'),
@@ -202,8 +202,7 @@ class ASGIServer(HTTPProtocol):
 
                         if name in (b'date',
                                     b'server',
-                                    b'transfer-encoding',
-                                    b'sec-websocket-protocol'):
+                                    b'transfer-encoding'):
                             # disallow apps from changing them,
                             # as they are managed by Tremolo
                             continue
