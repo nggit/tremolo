@@ -235,11 +235,21 @@ async def upload_multipart(stream=False, **server):
     yield b''
 
     # stream multipart file upload then send it back as csv
+    async for info, data in server['request'].files(1):
+        yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
+                                    info['length'],
+                                    info['type'].encode(),
+                                    (data[:5] + data[-3:]))
+
     async for info, data in server['request'].files():
         yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
                                     info['length'],
                                     info['type'].encode(),
                                     (data[:5] + data[-3:]))
+
+    async for info, data in server['request'].files():
+        # should not raised
+        raise Exception('EOF!!!')
 
 
 @app.route('/download')
