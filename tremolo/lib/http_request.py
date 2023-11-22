@@ -300,7 +300,10 @@ class HTTPRequest(Request):
 
             return self.params['post']
 
-    async def files(self):
+    async def files(self, limit=1024):
+        if self.eof():
+            return
+
         ct = parse_qs(
             self.content_type.replace(b'; ', b'&').replace(b';', b'&')
             .decode('latin-1')
@@ -311,45 +314,45 @@ class HTTPRequest(Request):
         except KeyError:
             raise BadRequest('missing boundary')
 
-        header = bytearray()
+        header = None
         body = bytearray()
 
         header_size = 0
         body_size = 0
         content_length = 0
-
-        agen = self.stream()
         paused = False
 
-        while header != b'--%s--\r\n' % boundary:
+        if self._read_instance is None:
+            self._read_instance = self.stream()
+
+        while limit > 0 and self._read_buf != b'--%s--\r\n' % boundary:
             data = b''
 
             if not paused:
                 try:
-                    data = await agen.__anext__()
+                    data = await self._read_instance.__anext__()
                 except StopAsyncIteration:
                     if header_size == -1 or body_size == -1:
                         del body[:]
                         raise BadRequest('malformed multipart/form-data')
 
-            if isinstance(header, bytearray):
-                header.extend(data)
-                header_size = header.find(b'\r\n\r\n')
+            if header is None:
+                self._read_buf.extend(data)
+                header_size = self._read_buf.find(b'\r\n\r\n')
 
                 if header_size == -1:
-                    if len(header) > 8192:
-                        del header[:]
+                    if len(self._read_buf) > 8192:
                         raise BadRequest('malformed multipart/form-data')
 
                     paused = False
                 else:
-                    body = header[header_size + 4:]
+                    body.extend(self._read_buf[header_size + 4:])
                     info = {}
 
-                    if header_size <= 8192 and header.startswith(
+                    if header_size <= 8192 and self._read_buf.startswith(
                             b'--%s\r\n' % boundary):
                         header = self.header.parse(
-                            header,
+                            self._read_buf,
                             header_size=header_size
                         ).headers
 
@@ -380,8 +383,10 @@ class HTTPRequest(Request):
 
             yield info, body[:body_size]
 
-            header = body[body_size + 2:]
+            self._read_buf[:] = body[body_size + 2:]
+            header = None
             content_length = 0
             paused = True
+            limit -= 1
 
             del body[:]

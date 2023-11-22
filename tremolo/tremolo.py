@@ -344,6 +344,7 @@ class Tremolo:
                            client_max_header_size=options.get(
                                'client_max_header_size', 8192
                            ),
+                           max_queue_size=options.get('max_queue_size', 128),
                            request_timeout=options.get('request_timeout', 30),
                            keepalive_timeout=options.get(
                                'keepalive_timeout', 30

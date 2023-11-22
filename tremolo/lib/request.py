@@ -37,14 +37,13 @@ class Request:
             )
 
             try:
-                await task
+                data = await task
+
                 self.protocol.queue[0].task_done()
             except asyncio.CancelledError:
                 raise TimeoutError('recv timeout')
             finally:
                 timer.cancel()
-
-            data = task.result()
 
             if data is None:
                 break
