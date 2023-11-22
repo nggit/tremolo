@@ -1,7 +1,5 @@
 # Copyright (c) 2023 nggit
 
-from urllib.parse import parse_qs
-
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
@@ -302,11 +300,6 @@ class HTTPServer(HTTPProtocol):
                 {**self._routes[0][0][2], **options}
             )
             return
-
-        if self.request.query_string != b'':
-            self.request.query = parse_qs(
-                self.request.query_string.decode('latin-1')
-            )
 
         _path = self.request.path.strip(b'/')
 
