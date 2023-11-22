@@ -70,6 +70,7 @@ async def my_request_middleware(**server):
     worker_ctx = server['worker']
     worker_ctx.shared += 1
     worker_ctx.socket_family = request.socket.family.name
+    request.protocol.options['max_queue_size'] = 128
 
     assert request.ctx.foo == 'bar'
 
@@ -208,6 +209,9 @@ async def post_form(**server):
 @app.route('/upload')
 async def upload(content_type=b'application/octet-stream', **server):
     request = server['request']
+
+    if request.query_string == b'maxqueue':
+        request.protocol.options['max_queue_size'] = 0
 
     try:
         size = int(request.query['size'][0])

@@ -118,10 +118,16 @@ class HTTPProtocol(asyncio.Protocol):
 
         while mv and queue is not None:
             queue.put_nowait(mv[:buffer_size].tobytes())
-            await asyncio.sleep(
-                1 / (rate / max(queue.qsize(), 1) /
-                     mv[:buffer_size].nbytes)
-            )
+            queue_size = queue.qsize()
+
+            if queue_size > self.options['max_queue_size']:
+                self.logger.error('%d exceeds the value of max_queue_size',
+                                  queue_size)
+                self.abort()
+                return
+
+            await asyncio.sleep(1 / (rate / max(queue_size, 1) /
+                                     mv[:buffer_size].nbytes))
             mv = mv[buffer_size:]
 
         if transport is not None and self.request is not None:

@@ -277,6 +277,18 @@ class TestHTTPClient(unittest.TestCase):
         )
         self.assertEqual(read_chunked(body), create_dummy_body(65536))
 
+    def test_post_upload_maxqueue(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /upload?maxqueue HTTP/1.0\r\nHost: localhost:%d\r\n'
+                b'Content-Length: 8192\r\n\r\n%s' % (
+                    HTTP_PORT, create_dummy_body(8192))
+        )
+
+        self.assertEqual(header, b'')
+        self.assertEqual(body, b'')
+
     def test_post_upload_multipart_11(self):
         boundary = b'----MultipartBoundary'
         header, body = getcontents(
