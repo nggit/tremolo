@@ -70,6 +70,7 @@ async def my_request_middleware(**server):
     worker_ctx = server['worker']
     worker_ctx.shared += 1
     worker_ctx.socket_family = request.socket.family.name
+    request.protocol.options['max_queue_size'] = 128
 
     assert request.ctx.foo == 'bar'
 
@@ -209,6 +210,9 @@ async def post_form(**server):
 async def upload(content_type=b'application/octet-stream', **server):
     request = server['request']
 
+    if request.query_string == b'maxqueue':
+        request.protocol.options['max_queue_size'] = 0
+
     try:
         size = int(request.query['size'][0])
         yield (await request.read(0)) + (await request.read(size))
@@ -235,11 +239,21 @@ async def upload_multipart(stream=False, **server):
     yield b''
 
     # stream multipart file upload then send it back as csv
+    async for info, data in server['request'].files(1):
+        yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
+                                    info['length'],
+                                    info['type'].encode(),
+                                    (data[:5] + data[-3:]))
+
     async for info, data in server['request'].files():
         yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
                                     info['length'],
                                     info['type'].encode(),
                                     (data[:5] + data[-3:]))
+
+    async for info, data in server['request'].files():
+        # should not raised
+        raise Exception('EOF!!!')
 
 
 @app.route('/download')

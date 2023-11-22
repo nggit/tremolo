@@ -32,11 +32,11 @@ for i in range(len(sys.argv)):
         print('                            E.g. "/path/to/fullchain.pem"')
         print('  --ssl-key                 SSL private key location')
         print('                            E.g. "/path/to/privkey.pem"')
-        print('  --debug                   Enable debug mode.')
+        print('  --debug                   Enable debug mode')
         print('                            Intended for development')
-        print('  --reload                  Enable auto reload on code changes.')  # noqa: E501
+        print('  --reload                  Enable auto reload on code changes')
         print('                            Intended for development')
-        print('  --no-ws                   Disable built-in WebSocket support')  # noqa: E501
+        print('  --no-ws                   Disable built-in WebSocket support')
         print('  --log-level               Defaults to "DEBUG". See')
         print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
         print('  --download-rate           Limits the sending speed to the client')  # noqa: E501
@@ -46,6 +46,8 @@ for i in range(len(sys.argv)):
         print('  --buffer-size             Defaults to 16384, or 16KiB')
         print('  --client-max-body-size    Defaults to 2 * 1048576, or 2MiB')
         print('  --client-max-header-size  Defaults to 8192, or 8KiB')
+        print('  --max-queue-size          Maximum number of buffers in the queue')  # noqa: E501
+        print('                            Defaults to 128')
         print('  --request-timeout         Defaults to 30 (seconds)')
         print('  --keepalive-timeout       Defaults to 30 (seconds)')
         print('  --keepalive-connections   Maximum number of keep-alive connections')  # noqa: E501
@@ -77,6 +79,7 @@ for i in range(len(sys.argv)):
                              '--buffer-size',
                              '--client-max-body-size',
                              '--client-max-header-size',
+                             '--max-queue-size',
                              '--request-timeout',
                              '--keepalive-timeout',
                              '--keepalive-connections',
