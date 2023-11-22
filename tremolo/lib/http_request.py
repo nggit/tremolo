@@ -251,11 +251,18 @@ class HTTPRequest(Request):
 
     @property
     def query(self):
-        return self.params['query']
+        try:
+            return self.params['query']
+        except KeyError:
+            self.params['query'] = {}
 
-    @query.setter
-    def query(self, value):
-        self.params['query'] = value
+            if self.query_string != b'':
+                self.params['query'] = parse_qs(
+                    self.query_string.decode('latin-1'),
+                    max_num_fields=100
+                )
+
+            return self.params['query']
 
     @property
     def cookies(self):
@@ -269,17 +276,19 @@ class HTTPRequest(Request):
                     self.params['cookies'] = parse_qs(
                         b'; '.join(self.headers[b'cookie'])
                         .replace(b'; ', b'&').replace(b';', b'&')
-                        .decode('latin-1')
+                        .decode('latin-1'),
+                        max_num_fields=100
                     )
                 else:
                     self.params['cookies'] = parse_qs(
                         self.headers[b'cookie'].replace(b'; ', b'&')
-                        .replace(b';', b'&').decode('latin-1')
+                        .replace(b';', b'&').decode('latin-1'),
+                        max_num_fields=100
                     )
 
             return self.params['cookies']
 
-    async def form(self, limit=8 * 1048576):
+    async def form(self, limit=8 * 1048576, max_fields=100):
         try:
             return self.params['post']
         except KeyError:
@@ -295,7 +304,8 @@ class HTTPRequest(Request):
 
                 if 2 < self.body_size <= limit:
                     self.params['post'] = parse_qs(
-                        self._body.decode('latin-1')
+                        self._body.decode('latin-1'),
+                        max_num_fields=max_fields
                     )
 
             return self.params['post']
@@ -306,7 +316,8 @@ class HTTPRequest(Request):
 
         ct = parse_qs(
             self.content_type.replace(b'; ', b'&').replace(b';', b'&')
-            .decode('latin-1')
+            .decode('latin-1'),
+            max_num_fields=100
         )
 
         try:
@@ -360,7 +371,7 @@ class HTTPRequest(Request):
                             for k, v in parse_qsl(
                                     header[b'content-disposition']
                                     .replace(b'; ', b'&').replace(b';', b'&')
-                                    .decode('latin-1')):
+                                    .decode('latin-1'), max_num_fields=100):
                                 info[k] = v.strip('"')
 
                         if b'content-length' in header:
