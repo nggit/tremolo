@@ -9,7 +9,7 @@ class Headers(dict):
             result = []
 
             for v in values:
-                result.extend(v.replace(b', ', b',').split(b','))
+                result.extend(v.replace(b', ', b',').split(b',', 100))
 
             return result
 
