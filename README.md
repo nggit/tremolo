@@ -37,7 +37,7 @@ And other use cases…
 ## Features
 Tremolo is only suitable for those who value [minimalism](https://en.wikipedia.org/wiki/Minimalism_%28computing%29) and stability over features.
 
-With only 3K lines of code, with no dependencies other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
+With only 3k lines of code, with no dependencies other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
 
 * HTTP/1.x with [WebSocket support](https://nggit.github.io/tremolo-docs/websocket.html)
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
@@ -136,10 +136,7 @@ python3 -m tremolo --log-level ERROR example:app
 
 You will find that Tremolo is reasonably fast.
 
-What's interesting is that this may become different when [CPython becomes faster](https://devblogs.microsoft.com/python/python-311-faster-cpython-team/),
-or another faster Python implementation comes along.
-
-All I can say is that Tremolo is built with simplicity in mind, so performance will naturally follow.
+But whatever it is, the bottleneck is often on the application side.
 
 ## Misc
 Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
