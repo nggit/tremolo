@@ -136,7 +136,8 @@ python3 -m tremolo --log-level ERROR example:app
 
 You will find that Tremolo is reasonably fast.
 
-But whatever it is, the bottleneck is often on the application side.
+However, it should be noted that bottlenecks often occur on the application side.
+Which means that in real-world usage, throughput reflects more on the application than the server.
 
 ## Misc
 Tremolo utilizes `SO_REUSEPORT` (Linux 3.9+) to load balance worker processes.
