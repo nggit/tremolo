@@ -258,8 +258,7 @@ class HTTPRequest(Request):
 
             if self.query_string != b'':
                 self.params['query'] = parse_qs(
-                    self.query_string.decode('latin-1'),
-                    max_num_fields=100
+                    self.query_string.decode('latin-1'), max_num_fields=100
                 )
 
             return self.params['query']
@@ -345,7 +344,9 @@ class HTTPRequest(Request):
                 except StopAsyncIteration:
                     if header_size == -1 or body_size == -1:
                         del body[:]
-                        raise BadRequest('malformed multipart/form-data')
+                        raise BadRequest(
+                            'malformed multipart/form-data: incomplete read'
+                        )
 
             if header is None:
                 self._read_buf.extend(data)
@@ -353,7 +354,9 @@ class HTTPRequest(Request):
 
                 if header_size == -1:
                     if len(self._read_buf) > 8192:
-                        raise BadRequest('malformed multipart/form-data')
+                        raise BadRequest(
+                            'malformed multipart/form-data: header too large'
+                        )
 
                     paused = False
                 else:
