@@ -75,6 +75,7 @@ jobs:
         run: |
           python -m coverage combine artifact
           python -m coverage report --show-missing --skip-covered
+          python -m coverage xml
       - uses: codecov/codecov-action@v3
       - uses: sonarsource/sonarcloud-github-action@master
         env:

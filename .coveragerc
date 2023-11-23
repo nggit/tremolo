@@ -2,4 +2,4 @@
 concurrency = multiprocessing
 parallel = True
 relative_files = True
-source = tremolo
+source = tremolo/
