@@ -37,7 +37,7 @@ And other use cases…
 ## Features
 Tremolo is only suitable for those who value [minimalism](https://en.wikipedia.org/wiki/Minimalism_%28computing%29) and stability over features.
 
-With only 3k lines of code, with no dependencies other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
+With only **3k** lines of code, with no dependencies other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
 
 * HTTP/1.x with [WebSocket support](https://nggit.github.io/tremolo-docs/websocket.html)
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
