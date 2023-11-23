@@ -59,7 +59,7 @@ jobs:
           path: artifact
         if: ${{ matrix.python-version == '3.12' }}
   report:
-    name: Upload Coverage to Codecov
+    name: Upload Coverage to Codecov & SonarCloud Scan
     needs: ['tests']
     runs-on: ubuntu-latest
     steps:
@@ -75,4 +75,9 @@ jobs:
         run: |
           python -m coverage combine artifact
           python -m coverage report --show-missing --skip-covered
+          python -m coverage xml
       - uses: codecov/codecov-action@v3
+      - uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
