@@ -180,12 +180,12 @@ class HTTPRequest(Request):
                 if not paused:
                     try:
                         buf.extend(await agen.__anext__())
-                    except StopAsyncIteration:
+                    except StopAsyncIteration as exc:
                         if b'0\r\n' not in buf:
                             del buf[:]
                             raise BadRequest(
                                 'bad chunked encoding: incomplete read'
-                            )
+                            ) from exc
 
                 if unread_bytes > 0:
                     data = buf[:unread_bytes]
@@ -215,9 +215,9 @@ class HTTPRequest(Request):
 
                     try:
                         chunk_size = int(buf[:i].split(b';', 1)[0], 16)
-                    except ValueError:
+                    except ValueError as exc:
                         del buf[:]
-                        raise BadRequest('bad chunked encoding')
+                        raise BadRequest('bad chunked encoding') from exc
 
                     data = buf[i + 2:i + 2 + chunk_size]
                     unread_bytes = chunk_size - len(data)
@@ -321,8 +321,8 @@ class HTTPRequest(Request):
 
         try:
             boundary = ct['boundary'][-1].encode('latin-1')
-        except KeyError:
-            raise BadRequest('missing boundary')
+        except KeyError as exc:
+            raise BadRequest('missing boundary') from exc
 
         header = None
         body = bytearray()
@@ -341,12 +341,12 @@ class HTTPRequest(Request):
             if not paused:
                 try:
                     data = await self._read_instance.__anext__()
-                except StopAsyncIteration:
+                except StopAsyncIteration as exc:
                     if header_size == -1 or body_size == -1:
                         del body[:]
                         raise BadRequest(
                             'malformed multipart/form-data: incomplete read'
-                        )
+                        ) from exc
 
             if header is None:
                 self._read_buf.extend(data)
