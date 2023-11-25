@@ -40,8 +40,8 @@ class Request:
                 data = await task
 
                 self.protocol.queue[0].task_done()
-            except asyncio.CancelledError:
-                raise TimeoutError('recv timeout')
+            except asyncio.CancelledError as exc:
+                raise TimeoutError('recv timeout') from exc
             finally:
                 timer.cancel()
 

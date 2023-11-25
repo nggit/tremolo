@@ -13,7 +13,7 @@ class Headers(dict):
 
             return result
 
-        return values.replace(b', ', b',').split(b',')
+        return values.replace(b', ', b',').split(b',', 100)
 
 
 class ParseHeader:

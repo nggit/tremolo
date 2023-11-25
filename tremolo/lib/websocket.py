@@ -110,8 +110,9 @@ class WebSocket:
 
             try:
                 payload = await self.recv()
-            except TimeoutError:
-                raise WebSocketServerClosed('receive timeout', code=1000)
+            except TimeoutError as exc:
+                raise WebSocketServerClosed('receive timeout',
+                                            code=1000) from exc
             finally:
                 timer.cancel()
 
@@ -166,7 +167,7 @@ class WebSocket:
         # ping only if this connection is still listed,
         # otherwise let the recv timeout drop it
         if self.protocol in self.protocol.options['_connections']:
-            return self.protocol.loop.create_task(self.ping())
+            self.protocol.loop.create_task(self.ping())
 
     async def ping(self, data=b''):
         await self.send(data, opcode=9)

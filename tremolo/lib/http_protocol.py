@@ -214,7 +214,7 @@ class HTTPProtocol(asyncio.Protocol):
                 if isinstance(data, str):
                     encoding = 'utf-8'
 
-                    for v in exc.content_type.split(';'):
+                    for v in exc.content_type.split(';', 100):
                         v = v.lstrip()
 
                         if v.startswith('charset='):

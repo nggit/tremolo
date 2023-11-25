@@ -25,7 +25,7 @@ class HTTPServer(HTTPProtocol):
 
     async def _connection_made(self):
         for func, _ in self._middlewares['connect']:
-            if (await func(**self._server)):
+            if await func(**self._server):
                 break
 
     async def _connection_lost(self, exc):
@@ -35,7 +35,7 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
 
-                if (await self._middlewares['close'][i][0](**self._server)):
+                if await self._middlewares['close'][i][0](**self._server):
                     break
         finally:
             super().connection_lost(exc)
