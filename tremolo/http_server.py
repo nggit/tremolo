@@ -77,6 +77,8 @@ class HTTPServer(HTTPProtocol):
                              'possibly left open', func.__name__)
             return
 
+        self.response.headers.clear()
+
         if 'status' in options:
             self.response.set_status(*options['status'])
 

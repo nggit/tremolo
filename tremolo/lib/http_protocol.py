@@ -200,6 +200,7 @@ class HTTPProtocol(asyncio.Protocol):
             exc = InternalServerError(cause=exc)
 
         if self.request is not None and self.response is not None:
+            self.response.headers.clear()
             self.response.set_status(exc.code, exc.message)
             self.response.set_content_type(exc.content_type)
             data = b''
