@@ -63,10 +63,11 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(
             header[:header.find(b'\r\n')],
-            b'HTTP/1.0 503 Under Maintenance'
+            b'HTTP/1.0 503 Service Unavailable'
         )
         self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertFalse(chunked_detected(header))
+        self.assertEqual(body, b'Under Maintenance')
 
         # these values are set by the request and response middleware
         self.assertTrue(b'\r\nX-Foo: baz' in header and
@@ -174,7 +175,7 @@ class TestHTTPClient(unittest.TestCase):
                                    version='1.0')
 
         self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 503 Under Maintenance')
+                         b'HTTP/1.0 503 Service Unavailable')
         self.assertTrue(b'\r\nContent-Length: ' in header)
         self.assertTrue(b'\r\nContent-Type: text/plain' in header)
         self.assertFalse(b'\r\nTransfer-Encoding: chunked\r\n' in header)
