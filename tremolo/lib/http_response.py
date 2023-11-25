@@ -135,6 +135,10 @@ class HTTPResponse(Response):
             self._status.append((status, message))
 
     def get_status(self):
+        if b'_line' in self.headers:
+            _, status, message = self.headers.pop(b'_line')
+            return int(status), message
+
         try:
             return self._status.pop()
         except IndexError:
@@ -153,6 +157,9 @@ class HTTPResponse(Response):
             self._content_type.append(content_type)
 
     def get_content_type(self):
+        if b'content-type' in self.headers:
+            return self.headers.pop(b'content-type')[0][13:].lstrip()
+
         try:
             return self._content_type.pop()
         except IndexError:
@@ -192,6 +199,8 @@ class HTTPResponse(Response):
                     ):
                 data = b''
 
+            excludes = (b'connection', b'content-length', b'transfer-encoding')
+
             await self.send(
                 b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n'
                 b'Connection: %s\r\n%s\r\n\r\n%s' % (
@@ -202,7 +211,8 @@ class HTTPResponse(Response):
                     KEEPALIVE_OR_CLOSE[
                         keepalive and self._request.http_keepalive],
                     b'\r\n'.join(
-                        b'\r\n'.join(v) for v in self.headers.values()),
+                        b'\r\n'.join(v) for k, v in self.headers.items() if
+                        k not in excludes),
                     data), throttle=False, **kwargs
             )
 

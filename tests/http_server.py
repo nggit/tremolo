@@ -101,6 +101,8 @@ async def my_response_middleware(**server):
         response.set_status(503, b'Under Maintenance')
         response.set_content_type(b'text/plain')
 
+        return b'Under Maintenance'
+
 
 @app.route('/getheaderline')
 async def get_headerline(**server):
