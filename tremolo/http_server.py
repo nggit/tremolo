@@ -232,7 +232,7 @@ class HTTPServer(HTTPProtocol):
             if isinstance(data, str):
                 data = data.encode(encoding[0])
 
-            if no_content or data == b'':
+            if no_content:
                 self.response.set_header(b'Connection', b'close')
             else:
                 if self.response.http_chunked:
@@ -265,15 +265,17 @@ class HTTPServer(HTTPProtocol):
                 if not isinstance(options, dict):
                     return
 
-            if data == b'' or self.request.method == b'HEAD' or no_content:
+            if self.request.method == b'HEAD' or no_content:
                 await self.response.write(None)
                 return
 
-            self.set_watermarks(high=options['buffer_size'] * 4,
-                                low=options['buffer_size'] // 2)
-            await self.response.write(data,
-                                      rate=options['rate'],
-                                      buffer_size=options['buffer_size'])
+            if data != b'':
+                self.set_watermarks(high=options['buffer_size'] * 4,
+                                    low=options['buffer_size'] // 2)
+                await self.response.write(data,
+                                          rate=options['rate'],
+                                          buffer_size=options['buffer_size'])
+
             await self.response.write(b'', throttle=False)
 
         self.response.close(keepalive=True)
