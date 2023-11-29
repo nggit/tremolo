@@ -30,11 +30,14 @@ def getcontents(
         method='GET',
         url='/',
         version='1.1',
-        headers=[],
+        headers=None,
         data='',
         raw=b''
         ):
     if raw == b'':
+        if not headers:
+            headers = []
+
         content_length = len(data)
 
         if content_length > 0:

@@ -216,6 +216,18 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(read_chunked(body),
                          b'username=myuser&password=mypass')
 
+    def test_post_form_limit(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='POST',
+                                   url='/submitform',
+                                   version='1.1',
+                                   data='d' * 8193)
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+        self.assertEqual(body, b'Internal Server Error')
+
     def test_post_upload_ok_10(self):
         header, body = getcontents(
             host=HTTP_HOST,
