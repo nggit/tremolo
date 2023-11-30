@@ -2,7 +2,7 @@
 
 from collections import deque
 
-from .__queue import Queue
+from .queue import Queue
 
 
 class Pool:

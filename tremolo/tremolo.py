@@ -176,14 +176,14 @@ class Tremolo:
 
         return options
 
-    def add_middleware(self, func, name='request', kwargs={}):
+    def add_middleware(self, func, name='request', kwargs=None):
         if name not in self.middlewares:
             raise ValueError('%s is not one of the: %s' %
                              (name, ', '.join(self.middlewares)))
 
         self.middlewares[name].append((func, kwargs or self.getoptions(func)))
 
-    def add_route(self, func, path='/', kwargs={}):
+    def add_route(self, func, path='/', kwargs=None):
         if not kwargs:
             kwargs = self.getoptions(func)
 

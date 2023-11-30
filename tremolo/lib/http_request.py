@@ -273,10 +273,10 @@ class HTTPRequest(Request):
             if b'cookie' in self.headers:
                 if isinstance(self.headers[b'cookie'], list):
                     self.params['cookies'] = parse_qs(
-                        b'; '.join(self.headers[b'cookie'])
+                        b'&'.join(self.headers[b'cookie'])
                         .replace(b'; ', b'&').replace(b';', b'&')
                         .decode('latin-1'),
-                        max_num_fields=100
+                        max_num_fields=100 * len(self.headers[b'cookie'])
                     )
                 else:
                     self.params['cookies'] = parse_qs(
@@ -290,7 +290,7 @@ class HTTPRequest(Request):
     async def form(self, limit=8 * 1048576, max_fields=100):
         try:
             return self.params['post']
-        except KeyError:
+        except KeyError as exc:
             self.params['post'] = {}
 
             if (b'application/x-www-form-urlencoded' in
@@ -299,7 +299,7 @@ class HTTPRequest(Request):
                     self._body.extend(data)
 
                     if self.body_size > limit:
-                        break
+                        raise ValueError('form limit reached') from exc
 
                 if 2 < self.body_size <= limit:
                     self.params['post'] = parse_qs(

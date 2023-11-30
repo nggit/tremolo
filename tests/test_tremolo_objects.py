@@ -13,7 +13,7 @@ sys.path.insert(
 
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
-from tremolo.lib.__queue import Queue  # noqa: E402
+from tremolo.lib.queue import Queue  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import ServerContext  # noqa: E402
 from tremolo.lib.pools import Pool, QueuePool  # noqa: E402

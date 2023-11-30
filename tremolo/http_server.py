@@ -61,9 +61,8 @@ class HTTPServer(HTTPProtocol):
             super().connection_lost(exc)
 
     async def _handle_middleware(self, func, options={}):
-        if not self.response.headers_sent():
-            self.response.set_base_header()
-            self.context.set('options', options)
+        self.response.set_base_header()
+        self.context.set('options', options)
 
         data = await func(**self._server,
                           request=self.request,
@@ -284,7 +283,7 @@ class HTTPServer(HTTPProtocol):
         if self.context.ON_CONNECT is not None:
             await self.context.ON_CONNECT
 
-        options = self.context.options
+        options = {}
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(

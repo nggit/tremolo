@@ -197,7 +197,7 @@ async def get_lock(**server):
 async def post_form(**server):
     request = server['request']
 
-    await request.form()
+    await request.form(limit=8192)
 
     data = []
 
