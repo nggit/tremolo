@@ -10,6 +10,7 @@ from .exceptions import (
     WebSocketClientClosed,
     WebSocketServerClosed
 )
+from .handlers import error_500
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
@@ -84,6 +85,9 @@ class ASGIServer(HTTPProtocol):
         # the current task is done
         # update the handler with the ASGI main task
         self.handler = self.loop.create_task(self.main())
+
+    async def handle_error_500(self, exc):
+        return await error_500(request=self.request, exc=exc)
 
     def connection_lost(self, exc):
         if self.handler is not None and not self.handler.done():

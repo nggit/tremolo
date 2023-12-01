@@ -10,9 +10,9 @@ from .lib.websocket import WebSocket
 class HTTPServer(HTTPProtocol):
     __slots__ = ('_routes', '_middlewares', '_server')
 
-    def __init__(self, lock=None, **kwargs):
-        self._routes = kwargs['_routes']
-        self._middlewares = kwargs['_middlewares']
+    def __init__(self, _routes=None, _middlewares=None, lock=None, **kwargs):
+        self._routes = _routes
+        self._middlewares = _middlewares
         self._server = {
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
@@ -355,3 +355,9 @@ class HTTPServer(HTTPProtocol):
             self._routes[0][1][1],
             {**self._routes[0][1][2], **options}
         )
+
+    async def handle_error_500(self, exc):
+        # internal server error
+        return await self._routes[0][-1][1](request=self.request,
+                                            response=self.response,
+                                            exc=exc)
