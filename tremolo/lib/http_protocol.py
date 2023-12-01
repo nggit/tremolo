@@ -153,6 +153,9 @@ class HTTPProtocol(asyncio.Protocol):
     async def headers_received(self):
         return
 
+    async def handle_error_500(self, exc):
+        return
+
     def handler_timeout(self):
         if (self.request is None or self.request.upgraded or
                 self.handler is None):
@@ -206,8 +209,7 @@ class HTTPProtocol(asyncio.Protocol):
             data = b''
 
             try:
-                data = await self.options['_routes'][0][-1][1](
-                    request=self.request, response=self.response, exc=exc)
+                data = await self.handle_error_500(exc)
 
                 if data is None:
                     data = b''
