@@ -37,6 +37,8 @@ for i in range(len(sys.argv)):
         print('  --reload                  Enable auto reload on code changes')
         print('                            Intended for development')
         print('  --no-ws                   Disable built-in WebSocket support')
+        print('  --ws-max-payload-size     Maximum payload size for the built-in WebSocket')  # noqa: E501
+        print('                            Defaults to 2 * 1048576, or 2MiB')
         print('  --log-level               Defaults to "DEBUG". See')
         print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
         print('  --download-rate           Limits the sending speed to the client')  # noqa: E501
@@ -77,6 +79,7 @@ for i in range(len(sys.argv)):
                              '--download-rate',
                              '--upload-rate',
                              '--buffer-size',
+                             '--ws-max-payload-size',
                              '--client-max-body-size',
                              '--client-max-header-size',
                              '--max-queue-size',

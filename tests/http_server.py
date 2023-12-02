@@ -310,6 +310,6 @@ app.listen('tremolo-test', debug=False, client_max_body_size=73728)
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, debug=True, reload=True,
-            client_max_body_size=73728)
+            client_max_body_size=73728, ws_max_payload_size=73728)
 
 # END
