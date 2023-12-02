@@ -255,7 +255,9 @@ class ASGIServer(HTTPProtocol):
                     )
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self.response.write(b'', throttle=False)
+                    await self.response.write(
+                        b'', chunked=self._http_chunked, throttle=False
+                    )
                     self.response.close(keepalive=True)
 
                     self._read = None
