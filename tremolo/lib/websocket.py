@@ -46,11 +46,11 @@ class WebSocket:
             payload_length = int.from_bytes(await self.request.recv(8),
                                             byteorder='big')
 
-            if payload_length > self.protocol.options['client_max_body_size']:
+            if payload_length > self.protocol.options['ws_max_payload_size']:
                 raise WebSocketServerClosed(
                     '%d exceeds maximum payload size (%d)' % (
                         payload_length,
-                        self.protocol.options['client_max_body_size']),
+                        self.protocol.options['ws_max_payload_size']),
                     code=1009
                 )
 

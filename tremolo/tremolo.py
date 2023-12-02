@@ -335,6 +335,9 @@ class Tremolo:
                            worker=context,
                            debug=options.get('debug', False),
                            ws=options.get('ws', True),
+                           ws_max_payload_size=options.get(
+                               'ws_max_payload_size', 2 * 1048576
+                           ),
                            download_rate=options.get('download_rate', 1048576),
                            upload_rate=options.get('upload_rate', 1048576),
                            buffer_size=options.get('buffer_size', 16 * 1024),

@@ -21,7 +21,8 @@ if __name__ == '__main__':
                     port=HTTP_PORT,
                     debug=False,
                     reload=True,
-                    client_max_body_size=73728))
+                    client_max_body_size=73728,
+                    ws_max_payload_size=73728))
     )
     processes.append(mp.Process(
         target=tremolo.run,
