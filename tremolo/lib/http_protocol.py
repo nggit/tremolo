@@ -232,7 +232,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 await self.response.end(data, keepalive=False)
 
-    async def _handle_request_header(self, data, header_size):
+    async def _handle_request(self, data, header_size):
         header = ParseHeader(data,
                              header_size=header_size, excludes=[b'proxy'])
 
@@ -341,8 +341,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.tasks.append(
                     self.loop.create_task(
-                        self._handle_request_header(self._header_buf,
-                                                    header_size))
+                        self._handle_request(self._header_buf, header_size))
                 )
 
                 self._header_buf = None
