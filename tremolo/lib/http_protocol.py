@@ -2,7 +2,7 @@
 
 import asyncio
 
-from urllib.parse import quote, unquote
+from urllib.parse import quote_from_bytes, unquote_to_bytes
 
 from .h1parser import ParseHeader
 from .http_exception import (
@@ -181,8 +181,7 @@ class HTTPProtocol(asyncio.Protocol):
             return
 
         self.print_exception(
-            exc,
-            quote(unquote(self.request.path.decode('latin-1')))
+            exc, quote_from_bytes(unquote_to_bytes(bytes(self.request.path)))
         )
 
         if isinstance(exc, WebSocketException):
