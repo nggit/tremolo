@@ -165,7 +165,7 @@ class TestParseHeader(unittest.TestCase):
 
     def test_request_bad_path(self):
         self.obj.parse(
-            b'HEAD /path to/dir HTTP/1.1\r\n'
+            b'HEAD /path: to/dir HTTP/1.1\r\n'
             b'Host: example.com:443\r\n\r\n'
         )
         self.assertTrue(self.obj.is_request)
@@ -174,7 +174,7 @@ class TestParseHeader(unittest.TestCase):
         self.assertFalse(self.obj.is_valid_response)
         self.assertEqual(self.obj.gethost(), b'example.com:443')
         self.assertEqual(self.obj.getmethod(), b'HEAD')
-        self.assertEqual(self.obj.geturl(), b'/path to/dir')
+        self.assertEqual(self.obj.geturl(), b'/path: to/dir')
         self.assertEqual(self.obj.getversion(), b'1.1')
         self.assertEqual(self.obj.getstatus(), None)
         self.assertEqual(self.obj.getmessage(), None)
