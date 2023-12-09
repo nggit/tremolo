@@ -78,26 +78,7 @@ class ParseHeader:
             line = header[start:end]
             colon_pos = line.find(b':', 1)
 
-            if colon_pos > 0:
-                name = line[:colon_pos]
-                name_lc = bytes(name.lower())
-                value = line[colon_pos + 1:]
-
-                if value.startswith(b' '):
-                    value = value[1:]
-
-                if name_lc in self.headers and isinstance(
-                        self.headers[name_lc], list):
-                    self.headers[name_lc].append(value)
-                else:
-                    if name_lc in self.headers:
-                        self.headers[name_lc] = [self.headers[name_lc], value]
-                    else:
-                        self.headers[name_lc] = value
-
-                if name_lc not in excludes:
-                    self._headers.append((name_lc, value))
-            elif start == 0:
+            if start == 0:
                 if line.startswith(b'HTTP/'):
                     self.is_response = True
 
@@ -133,6 +114,25 @@ class ParseHeader:
                             self.headers[b'_version'] = b''
 
                 self.headers[b'_line'] = line
+            elif colon_pos > 0:
+                name = line[:colon_pos]
+                name_lc = bytes(name.lower())
+                value = line[colon_pos + 1:]
+
+                if value.startswith(b' '):
+                    value = value[1:]
+
+                if name_lc in self.headers and isinstance(
+                        self.headers[name_lc], list):
+                    self.headers[name_lc].append(value)
+                else:
+                    if name_lc in self.headers:
+                        self.headers[name_lc] = [self.headers[name_lc], value]
+                    else:
+                        self.headers[name_lc] = value
+
+                if name_lc not in excludes:
+                    self._headers.append((name_lc, value))
             else:
                 self.is_valid_request = False
                 self.is_valid_response = False

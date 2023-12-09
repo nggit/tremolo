@@ -3,7 +3,7 @@
 import asyncio
 
 from http import HTTPStatus
-from urllib.parse import unquote
+from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
     InternalServerError,
@@ -63,8 +63,9 @@ class ASGIServer(HTTPProtocol):
     async def headers_received(self):
         self._scope = {
             'asgi': {'version': '3.0'},
-            'http_version': self.request.version.decode('utf-8'),
-            'path': unquote(self.request.path.decode('utf-8'), 'utf-8'),
+            'http_version': self.request.version.decode('latin-1'),
+            'path': unquote_to_bytes(
+                bytes(self.request.path)).decode('latin-1'),
             'raw_path': self.request.path,
             'query_string': self.request.query_string,
             'root_path': self.options['_root_path'],
