@@ -22,7 +22,7 @@ KEEPALIVE_OR_UPGRADE = {
 
 
 class HTTPResponse(Response):
-    __slots__ = ('headers',
+    __slots__ = ('_headers',
                  'http_chunked',
                  '_request',
                  '_status',
@@ -31,18 +31,25 @@ class HTTPResponse(Response):
     def __init__(self, request):
         super().__init__(request)
 
-        self.headers = {}
+        self._headers = {}
         self.http_chunked = False
 
         self._request = request
         self._status = []
         self._content_type = []
 
+    @property
+    def headers(self):
+        if self._headers is None:
+            raise InternalServerError('headers already sent')
+
+        return self._headers
+
     def headers_sent(self, sent=False):
         if sent:
-            self.headers = None
+            self._headers = None
 
-        return self.headers is None
+        return self._headers is None
 
     def append_header(self, name, value):
         if isinstance(name, str):
