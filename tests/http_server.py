@@ -123,7 +123,7 @@ async def get_ip(**server):
     request = server['request']
 
     # b'127.0.0.1'
-    return request.ip and request.ip
+    return request.ip
 
 
 @app.route('/gethost')
