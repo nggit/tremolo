@@ -17,6 +17,9 @@ class WebSocket:
         return self
 
     async def __anext__(self):
+        if not self.request.upgraded:
+            await self.accept()
+
         return await self.receive()
 
     async def accept(self):
