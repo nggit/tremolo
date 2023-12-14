@@ -320,7 +320,7 @@ class HTTPRequest(Request):
         )
 
         try:
-            boundary = ct['boundary'][-1].encode('latin-1')
+            boundary = ct['boundary'][0].encode('latin-1')
         except KeyError as exc:
             raise BadRequest('missing boundary') from exc
 
