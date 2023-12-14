@@ -763,11 +763,11 @@ class TestHTTPClient(unittest.TestCase):
                 (b'receive', b'i' * 127, b'\x82~\x00\x7fiiii', 2),
                 (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
                 (b'receive', b'i' * 81920, b'\x88\x02\x03\xf1', 2),
-                (b'ping', b'', b'\x89\x00', 9),
+                (b'ping', b'', b'\x8a\x00', 9),
                 (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8),
                 (b'', b'\x03\xe8CLOSE_NORMAL', b'', 8),
                 (b'', b'', b'\x88\x02\x03\xf0', 0xc)):
-            payload = getcontents(
+            header, body = getcontents(
                 host=HTTP_HOST,
                 port=HTTP_PORT,
                 raw=b'GET /ws?%s HTTP/1.1\r\nHost: localhost:%d\r\n'
@@ -781,7 +781,7 @@ class TestHTTPClient(unittest.TestCase):
                                                opcode=opcode))
             )
 
-            self.assertEqual(payload[:7], data_out[:7])
+            self.assertEqual(body[:7], data_out[:7])
 
     def test_reload(self):
         header, body1 = getcontents(host=HTTP_HOST,

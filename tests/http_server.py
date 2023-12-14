@@ -13,7 +13,7 @@ sys.path.insert(
 )
 
 from tremolo import Tremolo  # noqa: E402
-from tremolo.exceptions import BadRequest  # noqa: E402
+from tremolo.exceptions import BadRequest, WebSocketClientClosed  # noqa: E402
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
@@ -265,16 +265,28 @@ async def download(**server):
 
 @app.route('/ws')
 async def ws_handler(websocket=None, tasks=None, **_):
-    # await websocket.accept()
-    task = tasks.create(websocket.accept())
-    await task
-
     if websocket.request.query_string == b'ping':
-        await websocket.ping()
+        # test Tasks.create
+        task = tasks.create(websocket.accept())
+
+        # await websocket.accept()
+        await task
+
+        # WebSocket.recv automatically sends pong
+        await websocket.recv()
     elif websocket.request.query_string == b'close':
-        await websocket.close()
+        await websocket.accept()
+
+        try:
+            await websocket.receive()
+        except WebSocketClientClosed:
+            # test send close manually
+            await websocket.close()
     else:
-        # data = await websocket.receive()
+        # await websocket.accept()
+        # while True: data = await websocket.receive()
+        #
+        # async iterator implicitly performs WebSocket.accept
         async for data in websocket:
             await websocket.send(data)
             break
