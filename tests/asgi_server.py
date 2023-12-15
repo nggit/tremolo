@@ -56,6 +56,9 @@ async def app(scope, receive, send):
             'type': 'websocket.send',
             'bytes': (await receive()).get('bytes', b'')
         })
+        await send({
+            'type': 'websocket.close'
+        })
         return
 
     assert scope['type'] == 'http'

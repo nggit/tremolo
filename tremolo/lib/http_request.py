@@ -146,11 +146,11 @@ class HTTPRequest(Request):
         if size == 0 or self.eof():
             return bytearray()
 
-        if size == -1:
-            return await self.body(raw=raw)
-
         if self._read_instance is None:
             self._read_instance = self.stream(raw=raw)
+
+        if size == -1:
+            return await self._read_instance.__anext__()
 
         if len(self._read_buf) < size:
             async for data in self._read_instance:
@@ -320,7 +320,7 @@ class HTTPRequest(Request):
         )
 
         try:
-            boundary = ct['boundary'][-1].encode('latin-1')
+            boundary = ct['boundary'][0].encode('latin-1')
         except KeyError as exc:
             raise BadRequest('missing boundary') from exc
 
