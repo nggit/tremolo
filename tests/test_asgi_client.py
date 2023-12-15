@@ -139,7 +139,7 @@ class TestASGIClient(unittest.TestCase):
         )
 
     def test_websocket(self):
-        payload = getcontents(
+        header, body = getcontents(
             host=ASGI_HOST,
             port=ASGI_PORT,
             raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
@@ -149,7 +149,7 @@ class TestASGIClient(unittest.TestCase):
                     ASGI_PORT,
                     WebSocket.create_frame(b'Hello, world!', mask=True))
         )
-        self.assertEqual(payload, WebSocket.create_frame(b'Hello, world!'))
+        self.assertEqual(body[:15], WebSocket.create_frame(b'Hello, world!'))
 
 
 if __name__ == '__main__':

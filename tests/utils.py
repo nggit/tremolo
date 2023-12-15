@@ -24,38 +24,27 @@ def function(coro):
 
 
 # a simple HTTP client for tests
-def getcontents(
-        host='localhost',
-        port=80,
-        method='GET',
-        url='/',
-        version='1.1',
-        headers=None,
-        data='',
-        raw=b''
-        ):
+def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
+                data='', raw=b''):
     if raw == b'':
         if not headers:
             headers = []
 
-        content_length = len(data)
-
-        if content_length > 0:
+        if data:
             if headers == []:
                 headers.append(
                     'Content-Type: application/x-www-form-urlencoded'
                 )
 
-            headers.append('Content-Length: {:d}'.format(content_length))
+            headers.append('Content-Length: %d' % len(data))
 
-        raw = ('{:s} {:s} HTTP/{:s}\r\nHost: {:s}:{:d}\r\n{:s}\r\n\r\n'
-               '{:s}').format(method,
-                              url,
-                              version,
-                              host,
-                              port,
-                              '\r\n'.join(headers),
-                              data).encode('latin-1')
+        raw = (
+            '{:s} {:s} HTTP/{:s}\r\n'
+            'Host: {:s}:{:d}\r\n{:s}'
+            '\r\n\r\n{:s}'
+        ).format(
+            method, url, version, host, port,
+            '\r\n'.join(headers), data).encode('latin-1')
 
     family = socket.AF_INET
 
@@ -72,62 +61,58 @@ def getcontents(
         while sock.connect_ex((host, port)) != 0:
             time.sleep(1)
 
-        payload = b''
+        request_header = raw[:raw.find(b'\r\n\r\n') + 4]
+        request_body = raw[raw.find(b'\r\n\r\n') + 4:]
+        _request_header = request_header.lower()
 
-        if b'\r\nupgrade:' in raw.lower():
-            payload = raw[raw.find(b'\r\n\r\n') + 4:]
-            raw = raw[:raw.find(b'\r\n\r\n') + 4]
+        sock.sendall(request_header)
 
-        sock.sendall(raw)
+        if not (b'\r\nexpect: 100-continue' in _request_header or
+                b'\r\nupgrade:' in _request_header):
+            sock.sendall(request_body)
 
         response_data = bytearray()
         response_header = b''
+        cl = -1
         buf = True
 
         while buf:
+            if ((cl != -1 and len(response_data) >= cl) or
+                    response_data.endswith(b'\r\n0\r\n\r\n')):
+                break
+
             buf = sock.recv(4096)
             response_data.extend(buf)
 
+            if response_header:
+                continue
+
             header_size = response_data.find(b'\r\n\r\n')
+
+            if header_size == -1:
+                continue
+
             response_header = response_data[:header_size]
+            del response_data[:header_size + 4]
 
-            if header_size > -1:
-                _response_header = response_header.lower()
+            if method.upper() == 'HEAD':
+                break
 
-                if _response_header.startswith(
-                        'http/{:s} 100 continue'
-                        .format(version).encode('latin-1')):
-                    del response_data[:]
-                    continue
+            _response_header = response_header.lower()
+            _version = version.encode('latin-1')
+            cl = _response_header.find(b'\r\ncontent-length:')
 
-                if _response_header.startswith(
-                        'http/{:s} 101 '
-                        .format(version).encode('latin-1')):
-                    del response_data[:]
-                    sock.sendall(payload)
-                    continue
+            if cl != -1:
+                cl = int(_response_header[
+                    cl + 17:_response_header.find(b'\r\n', cl + 2)])
 
-                if method.upper() == 'HEAD':
-                    break
+            if _response_header.startswith(b'http/%s 100 continue' % _version):
+                sock.sendall(request_body)
+                response_header = b''
+            elif _response_header.startswith(b'http/%s 101 ' % _version):
+                sock.sendall(request_body)
 
-                if (
-                        b'\r\ntransfer-encoding: chunked' in
-                        _response_header and
-                        response_data.endswith(b'\r\n0\r\n\r\n')
-                        ):
-                    break
-
-                if (
-                        (b'\r\ncontent-length: %d\r\n' %
-                            (len(response_data) - header_size - 4)) in
-                        _response_header
-                        ):
-                    break
-
-            if payload != b'':
-                return response_data
-
-        return response_header, response_data[header_size + 4:]
+        return response_header, response_data
 
 
 def chunked_detected(header):
