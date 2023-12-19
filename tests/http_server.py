@@ -13,7 +13,7 @@ sys.path.insert(
 )
 
 from tremolo import Tremolo  # noqa: E402
-from tremolo.exceptions import BadRequest, WebSocketClientClosed  # noqa: E402
+from tremolo.exceptions import BadRequest  # noqa: E402
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
@@ -265,6 +265,15 @@ async def download(**server):
 
 @app.route('/ws')
 async def ws_handler(websocket=None, tasks=None, **_):
+    if websocket.request.query_string == b'close':
+        await websocket.accept()
+
+        # test send close manually
+        await websocket.close()
+
+        # this suggests that you want to handle the disconnection manually
+        return True
+
     if websocket.request.query_string == b'ping':
         # test Tasks.create
         task = tasks.create(websocket.accept())
@@ -274,14 +283,6 @@ async def ws_handler(websocket=None, tasks=None, **_):
 
         # WebSocket.recv automatically sends pong
         await websocket.recv()
-    elif websocket.request.query_string == b'close':
-        await websocket.accept()
-
-        try:
-            await websocket.receive()
-        except WebSocketClientClosed:
-            # test send close manually
-            await websocket.close()
     else:
         # await websocket.accept()
         # while True: data = await websocket.receive()
