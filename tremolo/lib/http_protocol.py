@@ -193,7 +193,7 @@ class HTTPProtocol(asyncio.Protocol):
                 )
 
             if self.response is not None:
-                self.response.close()
+                self.response.close(keepalive=True)
             return
 
         if isinstance(exc, TimeoutError):
@@ -465,7 +465,12 @@ class HTTPProtocol(asyncio.Protocol):
 
         if self.request.http_continue:
             self.request.http_continue = False
-        elif not self.request.upgraded:
+        elif self.request.upgraded:
+            if 'request' in self._waiters:
+                self._waiters['receive'] = self._waiters.pop('request')
+            else:
+                self.close()
+        else:
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
             self._header_buf = bytearray()
