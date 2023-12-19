@@ -182,4 +182,4 @@ class WebSocket:
         await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
 
         if self.response is not None:
-            self.response.close()
+            self.response.close(keepalive=True)
