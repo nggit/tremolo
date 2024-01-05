@@ -1,6 +1,8 @@
-__all__ = ('function', 'getcontents', 'chunked_detected', 'read_chunked',
-           'valid_chunked', 'create_dummy_data', 'create_chunked_body',
-           'create_dummy_body', 'create_multipart_body', 'logger')
+__all__ = (
+    'function', 'getcontents', 'chunked_detected', 'read_chunked',
+    'valid_chunked', 'create_dummy_data', 'create_chunked_body',
+    'create_dummy_body', 'create_multipart_body', 'logger'
+)
 
 import asyncio  # noqa: E402
 import logging  # noqa: E402

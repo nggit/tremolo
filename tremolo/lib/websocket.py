@@ -35,7 +35,13 @@ class WebSocket:
         await self.response.write(None)
 
     async def recv(self):
-        first_byte, second_byte = await self.request.recv(2)
+        try:
+            first_byte, second_byte = await self.request.recv(2)
+        except ValueError as exc:
+            raise WebSocketClientClosed(
+                'connection closed: recv failed'
+            ) from exc
+
         # we don't use FIN
         # fin = (first_byte & 0x80) >> 7
         opcode = first_byte & 0x0f
