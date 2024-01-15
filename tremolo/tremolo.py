@@ -17,7 +17,9 @@ from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
-from .utils import file_signature, log_date, memory_usage, server_date  # noqa: E402
+from .utils import (  # noqa: E402
+    file_signature, log_date, memory_usage, server_date
+)
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
