@@ -17,7 +17,7 @@ from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
-from .utils import file_signature, log_date, server_date  # noqa: E402
+from .utils import file_signature, log_date, memory_usage, server_date  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
@@ -439,6 +439,12 @@ class Tremolo:
                                 # essentially means sys.exit(0)
                                 # to trigger a reload
                                 return
+
+                    if ('limit_memory' in options and
+                            options['limit_memory'] > 0 and
+                            memory_usage() > options['limit_memory']):
+                        self._logger.error('memory limit exceeded')
+                        sys.exit(1)
 
                     if options['_conn'].poll():
                         break

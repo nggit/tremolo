@@ -26,6 +26,8 @@ for i in range(len(sys.argv)):
         print('                            Multiple binds can be separated by commas')  # noqa: E501
         print('                            E.g. "127.0.0.1:8000,:8001"')
         print('  --worker-num              Number of worker processes. Defaults to 1')  # noqa: E501
+        print('  --limit-memory            Restart the worker if this limit (in KiB) is reached')  # noqa: E501
+        print('                            (Linux-only). Defaults to 0 or unlimited')  # noqa: E501
         print('  --backlog                 Maximum number of pending connections')  # noqa: E501
         print('                            Defaults to 100')
         print('  --ssl-cert                SSL certificate location')
@@ -75,6 +77,7 @@ for i in range(len(sys.argv)):
         options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = sys.argv[i]
     elif sys.argv[i - 1] in ('--port',
                              '--worker-num',
+                             '--limit-memory',
                              '--backlog',
                              '--download-rate',
                              '--upload-rate',
