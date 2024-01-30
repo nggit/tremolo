@@ -26,10 +26,9 @@ class ServerContext:
         return self.__dict__.get(name, default)
 
     def __setitem__(self, name, value):
+        if 'options' in name or 'tasks' in name:
+            raise ValueError(f'"{name}" is reserved')
         self.__dict__[name] = value
 
     def __getitem__(self, name):
         return self.__dict__[name]
-
-    def __delitem__(self, name):
-        del self.__dict__[name]
