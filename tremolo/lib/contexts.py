@@ -21,3 +21,12 @@ class ServerContext:
 
     def set(self, name, value):
         self.__dict__[name] = value
+
+    def get(self, name, default=None):
+        return self.__dict__.get(name, default)
+
+    def __setitem__(self, *args):
+        self.__setattr__(*args)
+
+    def __getitem__(self, name):
+        return self.__dict__[name]
