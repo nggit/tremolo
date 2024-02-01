@@ -196,6 +196,23 @@ class TestTremoloObjects(unittest.TestCase):
 
         self.assertEqual(list(conn.values()), [2, 3])
 
+    def test_servercontext(self):
+        context = ServerContext()
+
+        self.assertEqual(context.get('options'), {})
+
+        context.set('options', False)
+        self.assertEqual(context.get('options'), False)
+        self.assertEqual(context.get('opt'), None)
+
+        with self.assertRaises(AttributeError):
+            context['options'] = {}
+
+        context['opt'] = {}
+
+        self.assertEqual(context['options'], False)
+        self.assertEqual(context['opt'], {})
+
 
 if __name__ == '__main__':
     unittest.main()
