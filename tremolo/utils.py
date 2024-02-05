@@ -37,7 +37,7 @@ def memory_usage(pid=0):
 
     try:
         with open('/proc/%d/statm' % pid, 'r') as f:
-            return int(f.read().split()[1]) * os.sysconf('SC_PAGESIZE')
+            return int(f.read().split()[1]) * os.sysconf('SC_PAGESIZE') // 1024
     except FileNotFoundError:
         # non-Linux
         return -1

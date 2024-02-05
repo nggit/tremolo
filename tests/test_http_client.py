@@ -204,6 +204,15 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'Lock was acquired!')
 
+    def test_limit_memory(self):
+        _, body = getcontents(host=HTTP_HOST,
+                              port=HTTP_PORT,
+                              method='GET',
+                              url='/triggermemoryleak',
+                              version='1.0')
+
+        self.assertEqual(body, b'')
+
     def test_post_form_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
@@ -821,7 +830,8 @@ if __name__ == '__main__':
                     port=HTTP_PORT,
                     debug=False,
                     reload=True,
-                    client_max_body_size=73728,
+                    limit_memory=32768,  # 32MiB
+                    client_max_body_size=73728,  # 72KiB
                     ws_max_payload_size=73728)
     )
 
