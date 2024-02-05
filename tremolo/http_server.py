@@ -48,8 +48,6 @@ class HTTPServer(HTTPProtocol):
                 self._connection_made()
             )
             self.tasks.append(self.context.ON_CONNECT)
-        else:
-            self.context.ON_CONNECT = None
 
     def connection_lost(self, exc):
         if self._middlewares['close']:
@@ -280,7 +278,7 @@ class HTTPServer(HTTPProtocol):
         self.response.close(keepalive=True)
 
     async def headers_received(self):
-        if self.context.ON_CONNECT is not None:
+        if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
         options = {}
