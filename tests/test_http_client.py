@@ -204,6 +204,15 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'Lock was acquired!')
 
+    def test_limit_memory(self):
+        _, body = getcontents(host=HTTP_HOST,
+                              port=HTTP_PORT,
+                              method='GET',
+                              url='/triggermemoryleak',
+                              version='1.0')
+
+        self.assertEqual(body, b'')
+
     def test_post_form_ok_11(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
@@ -500,17 +509,12 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(data, (b'', b''))
 
     def test_requesttimeout(self):
-        for _ in range(10):
-            try:
-                data = getcontents(
-                    host=HTTP_HOST,
-                    port=HTTP_PORT + 1,
-                    raw=b'GET / HTTP/1.1\r\n'
-                        b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
-                )
-                break
-            except ConnectionResetError:
-                continue
+        data = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 1,
+            raw=b'GET / HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
+        )
 
         self.assertEqual(data, (b'', b''))
 
@@ -801,6 +805,7 @@ class TestHTTPClient(unittest.TestCase):
                                             method='GET',
                                             url='/reload',
                                             version='1.0')
+                break
             except ConnectionResetError:
                 continue
 
@@ -821,7 +826,8 @@ if __name__ == '__main__':
                     port=HTTP_PORT,
                     debug=False,
                     reload=True,
-                    client_max_body_size=73728,
+                    limit_memory=32768,  # 32MiB
+                    client_max_body_size=73728,  # 72KiB
                     ws_max_payload_size=73728)
     )
 

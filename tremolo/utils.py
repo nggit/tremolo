@@ -1,6 +1,8 @@
 # Copyright (c) 2023 nggit
 
-__all__ = ('file_signature', 'html_escape', 'log_date', 'server_date')
+__all__ = (
+    'file_signature', 'html_escape', 'log_date', 'memory_usage', 'server_date'
+)
 
 import os  # noqa: E402
 import stat  # noqa: E402
@@ -27,6 +29,18 @@ def html_escape(data):
 
 def log_date():
     return datetime.now().strftime('[%Y-%m-%d %H:%M:%S]')
+
+
+def memory_usage(pid=0):
+    if not pid:
+        pid = os.getpid()
+
+    try:
+        with open('/proc/%d/statm' % pid, 'r') as f:
+            return int(f.read().split()[1]) * os.sysconf('SC_PAGESIZE') // 1024
+    except FileNotFoundError:
+        # non-Linux
+        return -1
 
 
 def server_date():
