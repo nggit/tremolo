@@ -509,17 +509,12 @@ class TestHTTPClient(unittest.TestCase):
         self.assertEqual(data, (b'', b''))
 
     def test_requesttimeout(self):
-        for _ in range(10):
-            try:
-                data = getcontents(
-                    host=HTTP_HOST,
-                    port=HTTP_PORT + 1,
-                    raw=b'GET / HTTP/1.1\r\n'
-                        b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
-                )
-                break
-            except ConnectionResetError:
-                continue
+        data = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 1,
+            raw=b'GET / HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
+        )
 
         self.assertEqual(data, (b'', b''))
 
@@ -810,6 +805,7 @@ class TestHTTPClient(unittest.TestCase):
                                             method='GET',
                                             url='/reload',
                                             version='1.0')
+                break
             except ConnectionResetError:
                 continue
 
