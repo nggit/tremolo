@@ -14,6 +14,7 @@ sys.path.insert(
 
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
+from tremolo.utils import memory_usage  # noqa: E402
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
@@ -191,6 +192,25 @@ async def get_lock(**server):
         yield b'was acquired!'
     finally:
         lock.release()
+
+
+@app.route('/triggermemoryleak')
+async def trigger_memory_leak(**server):
+    initial_memory_usage = memory_usage()
+
+    if initial_memory_usage == -1:
+        # non-Linux
+        return b''
+
+    data = bytearray()
+
+    while initial_memory_usage + len(data) < 32 * 1048576:
+        data.extend(b' ' * 1048576)
+
+    await asyncio.sleep(10)
+    # b'' will be returned instead of b'OK'
+    # due to the memory limit being exceeded
+    return b'OK'
 
 
 @app.route('/submitform')
