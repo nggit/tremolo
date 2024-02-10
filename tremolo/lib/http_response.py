@@ -302,6 +302,7 @@ class HTTPResponse(Response):
     async def sendfile(
             self,
             path,
+            file_size=None,
             buffer_size=16 * 1024,
             content_type=b'application/octet-stream'
             ):
@@ -316,7 +317,10 @@ class HTTPResponse(Response):
             )
 
         st = os.stat(path)
-        file_size = st.st_size
+
+        if not file_size:
+            file_size = st.st_size
+
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
                               time.gmtime(st.st_mtime)).encode('latin-1')
 
