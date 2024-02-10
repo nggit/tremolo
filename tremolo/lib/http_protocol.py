@@ -82,13 +82,13 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.close()
 
     async def request_timeout(self, timeout):
-        self.logger.info('request timeout after %gs' % timeout)
+        self.logger.info('request timeout after %gs', timeout)
 
     async def keepalive_timeout(self, timeout):
-        self.logger.info('keepalive timeout after %gs' % timeout)
+        self.logger.info('keepalive timeout after %gs', timeout)
 
     async def send_timeout(self, timeout):
-        self.logger.info('send timeout after %gs' % timeout)
+        self.logger.info('send timeout after %gs', timeout)
 
     async def set_timeout(self, waiter, timeout=30, timeout_cb=None):
         timer = self.loop.call_at(self.loop.time() + timeout, waiter.cancel)
@@ -163,7 +163,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.handler.cancel()
         self.logger.error('handler timeout after %gs. consider increasing '
-                          'the value of app_handler_timeout' %
+                          'the value of app_handler_timeout',
                           self.options['app_handler_timeout'])
 
     def print_exception(self, exc, *args):
@@ -411,10 +411,10 @@ class HTTPProtocol(asyncio.Protocol):
                 if write_buffer_size > self._watermarks['high']:
                     self.logger.info(
                         '%d exceeds the current watermark limits '
-                        '(high=%d, low=%d)' % (
-                            write_buffer_size,
-                            self._watermarks['high'],
-                            self._watermarks['low'])
+                        '(high=%d, low=%d)',
+                        write_buffer_size,
+                        self._watermarks['high'],
+                        self._watermarks['low']
                     )
                     self._waiters['send'] = self.loop.create_future()
 
