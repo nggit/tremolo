@@ -75,10 +75,11 @@ class ASGILifespan:
                         self._logger.info(exc)
                     else:
                         self._logger.info(
-                            '%s: %s' % (LifespanProtocolUnsupported.message,
-                                        str(exc) or repr(exc))
+                            '%s: %s',
+                            LifespanProtocolUnsupported.message,
+                            str(exc) or repr(exc)
                         )
             except asyncio.InvalidStateError:
-                self._logger.warning('lifespan: timeout after %gs' % timeout)
+                self._logger.warning('lifespan: timeout after %gs', timeout)
         finally:
             timer.cancel()
