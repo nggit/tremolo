@@ -214,7 +214,7 @@ class HTTPRequest(Request):
                         continue
 
                     try:
-                        chunk_size = int(buf[:i].split(b';', 1)[0], 16)
+                        chunk_size = int(b'0x' + buf[:i].split(b';', 1)[0], 16)
                     except ValueError as exc:
                         del buf[:]
                         raise BadRequest('bad chunked encoding') from exc
@@ -378,7 +378,9 @@ class HTTPRequest(Request):
                                 info[k] = v.strip('"')
 
                         if b'content-length' in header:
-                            content_length = int(header[b'content-length'])
+                            content_length = int(
+                                b'+' + header[b'content-length']
+                            )
                             info['length'] = content_length
 
                         if b'content-type' in header:
