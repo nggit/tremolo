@@ -273,7 +273,7 @@ class HTTPProtocol(asyncio.Protocol):
                         raise BadRequest
 
                     self.request.content_length = int(
-                        self.request.headers[b'content-length']
+                        b'+' + self.request.headers[b'content-length']
                     )
                 elif self.request.version == b'1.0':
                     raise BadRequest
