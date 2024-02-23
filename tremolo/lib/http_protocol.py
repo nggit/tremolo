@@ -284,8 +284,12 @@ class HTTPProtocol(asyncio.Protocol):
                     # we can handle continue later after the route is found
                     # by checking this state
                     self.request.http_continue = True
+            else:
+                self.queue[0].put_nowait(b'')
 
+            if len(data) > header_size + 4:
                 # the initial body that accompanies the header
+                # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
                     data[header_size + 4:],
                     queue=self.queue[0],
@@ -485,6 +489,10 @@ class HTTPProtocol(asyncio.Protocol):
                     timeout=self.options['keepalive_timeout'],
                     timeout_cb=self.keepalive_timeout))
             )
+
+            while not self.request.has_body and self.queue[0].qsize():
+                # this data is supposed to be the next header
+                self.data_received(self.queue[0].get_nowait())
 
         self.transport.resume_reading()
 
