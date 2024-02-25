@@ -41,6 +41,9 @@ class Queue:
 
         return await fut
 
+    def get_nowait(self):
+        return self._queue.popleft()
+
     def task_done(self):
         return
 

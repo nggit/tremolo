@@ -55,11 +55,6 @@ class ASGIServer(HTTPProtocol):
         self._scope['method'] = self.request.method.decode('utf-8')
         self._scope['scheme'] = _HTTP_OR_HTTPS[self.request.is_secure]
 
-        if not self.request.has_body and self.queue[0] is not None:
-            # avoid blocking on initial receive() due to empty Queue
-            # in the case of bodyless requests, e.g. GET
-            self.queue[0].put_nowait(b'')
-
     async def headers_received(self):
         self._scope = {
             'asgi': {'version': '3.0'},
