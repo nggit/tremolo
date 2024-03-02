@@ -7,6 +7,7 @@ from .queue import Queue
 
 class Pool:
     def __init__(self, pool_size, logger):
+        self._pool_size = pool_size
         self._pool = deque(maxlen=pool_size)
         self._logger = logger
 
@@ -20,12 +21,12 @@ class Pool:
         try:
             return self._pool.popleft()
         except IndexError:
-            pool_size = len(self._pool) + 1
-            self._pool = deque(self._pool, maxlen=pool_size)
+            self._pool_size += 1
+            self._pool = deque(self._pool, maxlen=self._pool_size)
 
             self._logger.info(
-                '%s: limit exceeded. pool size has been adjusted to %d' % (
-                    self.__class__.__name__, pool_size)
+                '%s: limit exceeded. pool size has been adjusted to %d',
+                self.__class__.__name__, self._pool_size
             )
             return self.create()
 
