@@ -50,8 +50,7 @@ async def ws_handler(websocket=None, request=None, stream=False, **_):
     """
     ws_scheme = b'ws'
 
-    if (b'x-forwarded-proto' in request.headers and
-            request.headers[b'x-forwarded-proto'] == b'https'):
+    if request.scheme == b'https':
         ws_scheme = b'wss'
 
     yield b"\

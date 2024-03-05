@@ -68,14 +68,14 @@ class ParseHeader:
                 break
 
             max_lines -= 1
+            line = header[start:end]
 
-            if max_lines < 0 or end - start > max_line_size:
+            if max_lines < 0 or end - start > max_line_size or b'\n' in line:
                 self.is_valid_request = False
                 self.is_valid_response = False
 
                 return self
 
-            line = header[start:end]
             colon_pos = line.find(b':', 1)
 
             if start == 0:
@@ -114,7 +114,7 @@ class ParseHeader:
                             self.headers[b'_version'] = b''
 
                 self.headers[b'_line'] = line
-            elif colon_pos > 0:
+            elif colon_pos > 0 and line[colon_pos - 1] != 32:
                 name = line[:colon_pos]
                 name_lc = bytes(name.lower())
                 value = line[colon_pos + 1:]
