@@ -43,13 +43,13 @@ class ASGIServer(HTTPProtocol):
         self._scope['type'] = 'websocket'
         self._scope['scheme'] = _WS_OR_WSS[self.request.scheme == b'https']
         self._scope['subprotocols'] = [
-            value.decode('utf-8') for value in
+            value.decode('latin-1') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]
 
     async def _handle_http(self):
         self._scope['type'] = 'http'
-        self._scope['method'] = self.request.method.decode('utf-8')
-        self._scope['scheme'] = self.request.scheme
+        self._scope['method'] = self.request.method.decode('latin-1')
+        self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
     async def headers_received(self):
         self._scope = {
