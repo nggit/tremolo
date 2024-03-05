@@ -11,6 +11,7 @@ class HTTPRequest(Request):
                  '_client',
                  '_ip',
                  '_is_secure',
+                 '_scheme',
                  'header',
                  'headers',
                  'is_valid',
@@ -39,6 +40,7 @@ class HTTPRequest(Request):
         self._client = None
         self._ip = None
         self._is_secure = None
+        self._scheme = None
         self.header = header
         self.headers = header.headers
         self.is_valid = header.is_valid_request
@@ -116,6 +118,18 @@ class HTTPRequest(Request):
             self._is_secure = self.transport.get_extra_info('sslcontext') is not None  # noqa: E501
 
         return self._is_secure
+
+    @property
+    def scheme(self):
+        if not self._scheme:
+            scheme = self.headers.get(b'x-forwarded-proto', b'').strip()
+
+            if scheme == b'' and self.is_secure:
+                self._scheme = b'https'
+            else:
+                self._scheme = scheme or b'http'
+
+        return self._scheme
 
     @property
     def has_body(self):

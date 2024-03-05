@@ -15,10 +15,6 @@ from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
-_HTTP_OR_HTTPS = {
-    False: 'http',
-    True: 'https'
-}
 _WS_OR_WSS = {
     False: 'ws',
     True: 'wss'
@@ -45,7 +41,7 @@ class ASGIServer(HTTPProtocol):
         self._websocket = WebSocket(self.request, self.response)
 
         self._scope['type'] = 'websocket'
-        self._scope['scheme'] = _WS_OR_WSS[self.request.is_secure]
+        self._scope['scheme'] = _WS_OR_WSS[self.request.scheme == b'https']
         self._scope['subprotocols'] = [
             value.decode('utf-8') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]
@@ -53,7 +49,7 @@ class ASGIServer(HTTPProtocol):
     async def _handle_http(self):
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('utf-8')
-        self._scope['scheme'] = _HTTP_OR_HTTPS[self.request.is_secure]
+        self._scope['scheme'] = self.request.scheme
 
     async def headers_received(self):
         self._scope = {
