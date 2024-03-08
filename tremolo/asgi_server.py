@@ -217,9 +217,6 @@ class ASGIServer(HTTPProtocol):
                             # self.response.write()
                             self._http_chunked = False
 
-                        if isinstance(header, list):
-                            header = tuple(header)
-
                         self.response.append_header(*header)
 
                 # websocket has this
