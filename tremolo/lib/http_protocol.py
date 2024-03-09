@@ -287,6 +287,8 @@ class HTTPProtocol(asyncio.Protocol):
                     # by checking this state
                     self.request.http_continue = True
             else:
+                # because put_to_queue may also resume reading
+                # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
             if self.request.has_body or len(data) > header_size + 4:
