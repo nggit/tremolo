@@ -269,12 +269,14 @@ class HTTPProtocol(asyncio.Protocol):
                     self.request.transfer_encoding = self.request.headers[b'transfer-encoding'].lower()  # noqa: E501
 
                 if b'content-length' in self.request.headers:
-                    if b'chunked' in self.request.transfer_encoding:
-                        raise BadRequest
-
                     self.request.content_length = int(
                         b'+' + self.request.headers[b'content-length']
                     )
+
+                    if (b'%d' % self.request.content_length !=
+                            self.request.headers[b'content-length'] or
+                            b'chunked' in self.request.transfer_encoding):
+                        raise BadRequest
                 elif self.request.version == b'1.0':
                     raise BadRequest
 
