@@ -269,12 +269,14 @@ class HTTPProtocol(asyncio.Protocol):
                     self.request.transfer_encoding = self.request.headers[b'transfer-encoding'].lower()  # noqa: E501
 
                 if b'content-length' in self.request.headers:
-                    if b'chunked' in self.request.transfer_encoding:
-                        raise BadRequest
-
                     self.request.content_length = int(
                         b'+' + self.request.headers[b'content-length']
                     )
+
+                    if (b'%d' % self.request.content_length !=
+                            self.request.headers[b'content-length'] or
+                            b'chunked' in self.request.transfer_encoding):
+                        raise BadRequest
                 elif self.request.version == b'1.0':
                     raise BadRequest
 
@@ -285,6 +287,8 @@ class HTTPProtocol(asyncio.Protocol):
                     # by checking this state
                     self.request.http_continue = True
             else:
+                # because put_to_queue may also resume reading
+                # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
             if self.request.has_body or len(data) > header_size + 4:

@@ -1,0 +1,32 @@
+[build-system]
+requires = [ 'setuptools>=61.0', 'wheel' ]
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'tremolo'
+authors = [
+    { name = 'nggit', email = 'contact@anggit.com' },
+]
+description = """\
+    Tremolo is a stream-oriented, asynchronous, programmable HTTP server \
+    written in pure Python. It can also serve as an ASGI server.\
+    """
+requires-python = '>=3.6'
+license = { text = 'MIT License' }
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent',
+    'Topic :: Internet :: WWW/HTTP :: HTTP Servers',
+    'Topic :: Software Development :: Libraries :: Application Frameworks',
+]
+dynamic = [ 'version', 'readme' ]
+
+[project.urls]
+Homepage = 'https://github.com/nggit/tremolo'
+Source = 'https://github.com/nggit/tremolo'
+Funding = 'https://github.com/sponsors/nggit'
+
+[tool.setuptools.dynamic]
+version = { attr = 'tremolo.__version__' }
+readme = { file = 'README.md', content-type = 'text/markdown' }
