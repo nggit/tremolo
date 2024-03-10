@@ -21,7 +21,7 @@ if __name__ == '__main__':
                     port=HTTP_PORT,
                     debug=False,
                     reload=True,
-                    limit_memory=32768,  # 32MiB
+                    limit_memory=65536,  # 64MiB
                     client_max_body_size=73728,  # 72KiB
                     ws_max_payload_size=73728))
     )
