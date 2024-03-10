@@ -508,6 +508,31 @@ class TestHTTPClient(unittest.TestCase):
 
         self.assertEqual(data, (b'', b''))
 
+    def test_sec_content_length_and_transfer_encoding(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Content-Length: 5r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n0\r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'Bad Request')
+
+    def test_sec_double_content_length(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Content-Length: 1\r\nContent-Length: 2\r\n\r\nAB' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+        self.assertEqual(body, b'Internal Server Error')
+
     def test_requesttimeout(self):
         data = getcontents(
             host=HTTP_HOST,

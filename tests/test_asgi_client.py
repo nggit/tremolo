@@ -124,7 +124,7 @@ class TestASGIClient(unittest.TestCase):
             (b'\r\ncontent-length: %d' % os.stat(TEST_FILE).st_size) in header
         )
 
-    def test_response_splitting(self):
+    def test_sec_response_splitting(self):
         header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
                                    method='GET',
