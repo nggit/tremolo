@@ -138,39 +138,35 @@ class HTTPServer(HTTPProtocol):
         status = self.response.get_status()
         no_content = status[0] in (204, 205, 304) or 100 <= status[0] < 200
         self.response.http_chunked = options.get(
-            'chunked', self.request.version == b'1.1' and
-            self.request.http_keepalive and not no_content
+            'chunked', self.request.version == b'1.1' and not no_content
         )
-
-        if self.response.http_chunked:
-            self.response.set_header(b'Transfer-Encoding', b'chunked')
-
         self.response.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
                                            b'%d' % status[0],
                                            status[1]]
 
+        if not no_content:
+            self.response.set_header(
+                b'Content-Type', self.response.get_content_type()
+            )
+
+        if self.response.http_chunked:
+            self.response.set_header(b'Transfer-Encoding', b'chunked')
+
         if next_data:
-            if no_content and status[0] not in (101, 426):
-                self.response.set_header(b'Connection', b'close')
-            else:
+            if self.request.http_keepalive:
                 if status[0] == 101:
                     self.request.upgraded = True
-                else:
-                    if not self.response.http_chunked:
-                        # no chunk, no close, no size.
-                        # Assume close to signal end
-                        self.request.http_keepalive = False
-
-                    if not no_content:
-                        self.response.set_header(
-                            b'Content-Type',
-                            self.response.get_content_type()
-                        )
+                elif not self.response.http_chunked:
+                    # no chunk, no close, no size.
+                    # Assume close to signal end
+                    self.request.http_keepalive = False
 
                 self.response.set_header(
                     b'Connection',
                     KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
                 )
+            else:
+                self.response.set_header(b'Connection', b'close')
 
             i = len(self._middlewares['response'])
 
@@ -229,26 +225,12 @@ class HTTPServer(HTTPProtocol):
             if isinstance(data, str):
                 data = data.encode(encoding[0])
 
-            if no_content:
-                self.response.set_header(b'Connection', b'close')
-            else:
-                if self.response.http_chunked:
-                    self.response.set_header(
-                        b'Content-Type',
-                        self.response.get_content_type()
-                    )
-                    self.response.set_header(b'Connection', b'keep-alive')
-                else:
-                    self.response.set_header(
-                        b'Content-Type',
-                        self.response.get_content_type()
-                    )
-                    self.response.set_header(b'Content-Length',
-                                             b'%d' % len(data))
-                    self.response.set_header(
-                        b'Connection',
-                        KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
-                    )
+            if not (no_content or self.response.http_chunked):
+                self.response.set_header(b'Content-Length', b'%d' % len(data))
+
+            self.response.set_header(
+                b'Connection', KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
+            )
 
             i = len(self._middlewares['response'])
 
