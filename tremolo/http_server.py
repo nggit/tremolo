@@ -2,7 +2,7 @@
 
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
-from .lib.http_response import KEEPALIVE_OR_UPGRADE
+from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
 from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket
 
@@ -225,13 +225,12 @@ class HTTPServer(HTTPProtocol):
             if isinstance(data, str):
                 data = data.encode(encoding[0])
 
-            if self.request.http_keepalive:
-                if not self.response.http_chunked:
-                    self.response.set_header(b'Content-Length',
-                                             b'%d' % len(data))
-                    self.response.set_header(b'Connection', b'keep-alive')
-            else:
-                self.response.set_header(b'Connection', b'close')
+            if not (no_content or self.response.http_chunked):
+                self.response.set_header(b'Content-Length', b'%d' % len(data))
+
+            self.response.set_header(
+                b'Connection', KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
+            )
 
             i = len(self._middlewares['response'])
 
