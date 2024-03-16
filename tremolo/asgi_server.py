@@ -206,6 +206,7 @@ class ASGIServer(HTTPProtocol):
                         if name == b'connection':
                             if header[1].lower() == b'close':
                                 self.request.http_keepalive = False
+
                             continue
 
                         if name == b'content-length':
