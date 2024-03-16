@@ -140,13 +140,17 @@ class HTTPServer(HTTPProtocol):
         self.response.http_chunked = options.get(
             'chunked', self.request.version == b'1.1' and not no_content
         )
-
-        if self.response.http_chunked:
-            self.response.set_header(b'Transfer-Encoding', b'chunked')
-
         self.response.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
                                            b'%d' % status[0],
                                            status[1]]
+
+        if not no_content:
+            self.response.set_header(
+                b'Content-Type', self.response.get_content_type()
+            )
+
+        if self.response.http_chunked:
+            self.response.set_header(b'Transfer-Encoding', b'chunked')
 
         if next_data:
             if self.request.http_keepalive:
@@ -163,11 +167,6 @@ class HTTPServer(HTTPProtocol):
                 )
             else:
                 self.response.set_header(b'Connection', b'close')
-
-            if not no_content:
-                self.response.set_header(
-                    b'Content-Type', self.response.get_content_type()
-                )
 
             i = len(self._middlewares['response'])
 
@@ -233,11 +232,6 @@ class HTTPServer(HTTPProtocol):
                     self.response.set_header(b'Connection', b'keep-alive')
             else:
                 self.response.set_header(b'Connection', b'close')
-
-            if not no_content:
-                self.response.set_header(
-                    b'Content-Type', self.response.get_content_type()
-                )
 
             i = len(self._middlewares['response'])
 

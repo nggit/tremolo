@@ -247,12 +247,15 @@ class HTTPResponse(Response):
                 else:
                     self.http_chunked = chunked
 
-                if self.http_chunked:
-                    self.set_header(b'Transfer-Encoding', b'chunked')
-
                 self.headers[b'_line'] = [b'HTTP/%s' % self._request.version,
                                           b'%d' % status[0],
                                           status[1]]
+
+                if not no_content:
+                    self.set_header(b'Content-Type', self.get_content_type())
+
+                if self.http_chunked:
+                    self.set_header(b'Transfer-Encoding', b'chunked')
 
                 if self._request.http_keepalive:
                     if status[0] == 101:
@@ -268,9 +271,6 @@ class HTTPResponse(Response):
                     )
                 else:
                     self.set_header(b'Connection', b'close')
-
-                if not no_content:
-                    self.set_header(b'Content-Type', self.get_content_type())
 
                 if self._request.method == b'HEAD' or no_content:
                     if status[0] not in (101, 426):
