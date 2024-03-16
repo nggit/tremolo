@@ -205,10 +205,6 @@ class ASGIServer(HTTPProtocol):
 
                         if name == b'connection':
                             if header[1].lower() == b'close':
-                                # this does not necessarily set
-                                # "Connection: close" in the response header.
-                                # but it guarantees that the TCP connection
-                                # will be terminated
                                 self.request.http_keepalive = False
                             continue
 

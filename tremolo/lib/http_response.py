@@ -243,7 +243,6 @@ class HTTPResponse(Response):
 
                 if chunked is None:
                     self.http_chunked = (self._request.version == b'1.1' and
-                                         self._request.http_keepalive and
                                          not no_content)
                 else:
                     self.http_chunked = chunked
@@ -255,25 +254,23 @@ class HTTPResponse(Response):
                                           b'%d' % status[0],
                                           status[1]]
 
-                if no_content and status[0] not in (101, 426):
-                    self.set_header(b'Connection', b'close')
-                else:
-                    if chunked is None and not self.http_chunked and not (
-                            self._request.version == b'1.1' and (
-                                status[0] in (101, 426) or
-                                b'range' in self._request.headers)):
-                        self._request.http_keepalive = False
-
+                if self._request.http_keepalive:
                     if status[0] == 101:
                         self._request.upgraded = True
-                    elif not no_content:
-                        self.set_header(b'Content-Type',
-                                        self.get_content_type())
+                    elif not self.http_chunked:
+                        # no chunk, no close, no size.
+                        # Assume close to signal end
+                        self._request.http_keepalive = False
 
                     self.set_header(
                         b'Connection',
                         KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
                     )
+                else:
+                    self.set_header(b'Connection', b'close')
+
+                if not no_content:
+                    self.set_header(b'Content-Type', self.get_content_type())
 
                 if self._request.method == b'HEAD' or no_content:
                     if status[0] not in (101, 426):
