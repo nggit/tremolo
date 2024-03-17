@@ -10,7 +10,7 @@ from .exceptions import (
     WebSocketClientClosed,
     WebSocketServerClosed
 )
-from .handlers import error_500
+from .handlers import error_400, error_500
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
@@ -52,6 +52,10 @@ class ASGIServer(HTTPProtocol):
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
     async def headers_received(self):
+        if not self.request.is_valid:
+            await error_400(request=self.request, response=self.response)
+            return
+
         self._scope = {
             'asgi': {'version': '3.0'},
             'http_version': self.request.version.decode('latin-1'),
@@ -79,7 +83,9 @@ class ASGIServer(HTTPProtocol):
         self.handler = self.loop.create_task(self.main())
 
     async def handle_error_500(self, exc):
-        return await error_500(request=self.request, exc=exc)
+        return await error_500(
+            request=self.request, response=self.response, exc=exc
+        )
 
     def connection_lost(self, exc):
         if self.handler is not None and not self.handler.done():
