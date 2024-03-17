@@ -156,7 +156,8 @@ class HTTPServer(HTTPProtocol):
             if self.request.http_keepalive:
                 if status[0] == 101:
                     self.request.upgraded = True
-                elif not self.response.http_chunked:
+                elif not (self.response.http_chunked or
+                          b'content-length' in self.response.headers):
                     # no chunk, no close, no size.
                     # Assume close to signal end
                     self.request.http_keepalive = False

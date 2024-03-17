@@ -260,7 +260,8 @@ class HTTPResponse(Response):
                 if self._request.http_keepalive:
                     if status[0] == 101:
                         self._request.upgraded = True
-                    elif not self.http_chunked:
+                    elif not (self.http_chunked or
+                              b'content-length' in self.headers):
                         # no chunk, no close, no size.
                         # Assume close to signal end
                         self._request.http_keepalive = False
