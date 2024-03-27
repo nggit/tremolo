@@ -46,7 +46,9 @@ class ASGIServer(HTTPProtocol):
             value.decode('latin-1') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]
 
-    async def _handle_http(self):
+    def _handle_http(self):
+        self._read = self.request.stream()
+
         self._scope['type'] = 'http'
         self._scope['method'] = self.request.method.decode('latin-1')
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
@@ -75,8 +77,7 @@ class ASGIServer(HTTPProtocol):
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
             self._handle_websocket()
         else:
-            await self._handle_http()
-            self._read = self.request.stream()
+            self._handle_http()
 
         # the current task is done
         # update the handler with the ASGI main task
