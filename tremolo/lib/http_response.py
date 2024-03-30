@@ -227,7 +227,7 @@ class HTTPResponse(Response):
 
         self.close(keepalive=keepalive)
 
-    async def write(self, data, buffer_size=16 * 1024, **kwargs):
+    async def write(self, data, chunked=None, buffer_size=16 * 1024, **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
@@ -239,7 +239,6 @@ class HTTPResponse(Response):
                 status = self.get_status()
                 no_content = (status[0] in (204, 205, 304) or
                               100 <= status[0] < 200)
-                chunked = kwargs.get('chunked')
 
                 if chunked is None:
                     self.http_chunked = (self._request.version == b'1.1' and
