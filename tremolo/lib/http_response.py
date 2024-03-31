@@ -227,7 +227,7 @@ class HTTPResponse(Response):
 
         self.close(keepalive=keepalive)
 
-    async def write(self, data, buffer_size=16 * 1024, **kwargs):
+    async def write(self, data, chunked=None, buffer_size=16 * 1024, **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
@@ -239,7 +239,6 @@ class HTTPResponse(Response):
                 status = self.get_status()
                 no_content = (status[0] in (204, 205, 304) or
                               100 <= status[0] < 200)
-                chunked = kwargs.get('chunked')
 
                 if chunked is None:
                     self.http_chunked = (self._request.version == b'1.1' and
@@ -302,8 +301,10 @@ class HTTPResponse(Response):
             path,
             file_size=None,
             buffer_size=16 * 1024,
-            content_type=b'application/octet-stream'
-            ):
+            content_type=b'application/octet-stream',
+            **kwargs):
+        kwargs['buffer_size'] = buffer_size
+
         try:
             handle = self._request.context.RESPONSE_SENDFILE_HANDLE
         except AttributeError:
@@ -336,7 +337,7 @@ class HTTPResponse(Response):
                 while data:
                     data = handle.read(buffer_size)
 
-                    await self.write(data, chunked=False)
+                    await self.write(data, chunked=False, **kwargs)
 
                 self.close(keepalive=True)
                 return
@@ -407,7 +408,7 @@ class HTTPResponse(Response):
 
                 while size > 0:
                     await self.write(handle.read(min(size, buffer_size)),
-                                     chunked=False)
+                                     chunked=False, **kwargs)
                     size -= buffer_size
             else:
                 client = self._request.client
@@ -432,18 +433,21 @@ class HTTPResponse(Response):
                     await self.write(
                         b'--%s\r\nContent-Type: %s\r\n'
                         b'Content-Range: bytes %d-%d/%d\r\n\r\n' % (
-                            boundary, content_type, start, end, file_size)
+                            boundary, content_type, start, end, file_size),
+                        **kwargs
                     )
                     handle.seek(start)
 
                     while size > 0:
-                        await self.write(handle.read(min(size, buffer_size)))
+                        await self.write(
+                            handle.read(min(size, buffer_size)), **kwargs
+                        )
                         size -= buffer_size
 
-                    await self.write(b'\r\n')
+                    await self.write(b'\r\n', **kwargs)
 
-                await self.write(b'--%s--\r\n' % boundary)
-                await self.write(b'')
+                await self.write(b'--%s--\r\n' % boundary, **kwargs)
+                await self.write(b'', **kwargs)
         else:
             if (b'if-modified-since' in self._request.headers and
                     self._request.headers[b'if-modified-since'] == mdate):
@@ -463,6 +467,6 @@ class HTTPResponse(Response):
             while data:
                 data = handle.read(buffer_size)
 
-                await self.write(data, chunked=False)
+                await self.write(data, chunked=False, **kwargs)
 
         self.close(keepalive=True)
