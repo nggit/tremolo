@@ -21,7 +21,7 @@ class Response:
             throttle=True,
             rate=1048576,
             buffer_size=16 * 1024,
-            buffer_min_size=None, **_
+            buffer_min_size=None
             ):
         if data is None:
             __class__.close(self)
