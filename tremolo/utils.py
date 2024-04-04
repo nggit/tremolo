@@ -7,7 +7,7 @@ __all__ = (
 import os  # noqa: E402
 import stat  # noqa: E402
 
-from datetime import datetime  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402
 from html import escape  # noqa: E402
 
 
@@ -44,5 +44,5 @@ def memory_usage(pid=0):
 
 
 def server_date():
-    return datetime.utcnow().strftime(
+    return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
