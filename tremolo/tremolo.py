@@ -310,7 +310,7 @@ class Tremolo:
             )
 
             if server_name != b'':
-                server_name = server_name + b' (ASGI)'
+                server_name += b' (ASGI)'
 
             lifespan = ASGILifespan(options['app'],
                                     loop=self._loop, logger=self._logger)
