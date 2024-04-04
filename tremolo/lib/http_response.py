@@ -3,7 +3,7 @@
 import os
 import time
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from .http_exception import (
@@ -93,9 +93,11 @@ class HTTPResponse(Response):
             name = name.encode('latin-1')
 
         value = quote(value).encode('latin-1')
-        date_expired = ((datetime.utcnow() + timedelta(seconds=expires))
-                        .strftime('%a, %d %b %Y %H:%M:%S GMT')
-                        .encode('latin-1'))
+        date_expired = (
+            (datetime.now(timezone.utc) + timedelta(seconds=expires))
+            .strftime('%a, %d %b %Y %H:%M:%S GMT')
+            .encode('latin-1')
+        )
         path = quote(path).encode('latin-1')
 
         cookie = bytearray(
