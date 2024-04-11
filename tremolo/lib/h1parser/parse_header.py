@@ -106,7 +106,7 @@ class ParseHeader:
                                 self.headers[b'_method'],
                                 self.headers[b'_url']
                             ) = line[:url_end_pos].split(b' ', 1)
-                            self.headers[b'_version'] = line[url_end_pos + len(' HTTP/'):]  # noqa: E501
+                            self.headers[b'_version'] = line[url_end_pos + 6:]
                             self.is_valid_request = True
                         except ValueError:
                             self.headers[b'_method'] = b''
