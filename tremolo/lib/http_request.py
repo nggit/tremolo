@@ -147,10 +147,7 @@ class HTTPRequest(Request):
 
         return self._body
 
-    def read(self, size=None):
-        if size is None:
-            return self.stream()
-
+    def read(self, size=-1):
         return self.recv(size=size, raw=False)
 
     def eof(self):
