@@ -242,7 +242,7 @@ class TestHTTPClient(unittest.TestCase):
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'POST /upload?size=-1 HTTP/1.0\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 8192\r\n\r\n%s' % (
+                b'Content-Length: 8192\r\n\r\n%sX' % (
                     HTTP_PORT, create_dummy_body(8192))
         )
 
@@ -274,7 +274,7 @@ class TestHTTPClient(unittest.TestCase):
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
+                b'Transfer-Encoding: chunked\r\n\r\n%sX' % (
                     HTTP_PORT, create_dummy_body(8192, chunk_size=4096))
         )
 

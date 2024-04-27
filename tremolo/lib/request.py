@@ -4,11 +4,12 @@ import asyncio
 
 
 class Request:
-    __slots__ = ('protocol', 'body_size')
+    __slots__ = ('protocol', 'body_size', 'body_consumed')
 
     def __init__(self, protocol):
         self.protocol = protocol
         self.body_size = 0
+        self.body_consumed = 0
 
     @property
     def context(self):
@@ -24,6 +25,7 @@ class Request:
 
     def clear_body(self):
         self.body_size = 0
+        self.body_consumed = 0
 
     async def recv(self):
         while self.protocol.queue[0] is not None:
@@ -48,4 +50,5 @@ class Request:
             if data is None:
                 break
 
+            self.body_consumed += len(data)
             yield data
