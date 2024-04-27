@@ -113,7 +113,6 @@ class HTTPProtocol(asyncio.Protocol):
             rate=1048576,
             buffer_size=16 * 1024
             ):
-        data_size = len(data)
         mv = memoryview(data)
 
         while mv and queue is not None:
@@ -135,7 +134,7 @@ class HTTPProtocol(asyncio.Protocol):
                 transport.resume_reading()
                 return
 
-            self.request.body_size += data_size
+            self.request.body_size += len(data)
 
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and

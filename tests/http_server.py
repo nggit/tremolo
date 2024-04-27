@@ -239,11 +239,10 @@ async def upload(content_type=b'application/octet-stream', **server):
         size = int(request.query['size'][0])
         yield (await request.read(0)) + (await request.read(size))
     except KeyError:
-        # request.stream()
-        async for data in request.read(None):
+        async for data in request.stream():
             yield data
 
-        async for data in request.read(None):
+        async for data in request.stream():
             # should not raised
             raise Exception('EOF!!!')
 
