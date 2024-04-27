@@ -166,7 +166,7 @@ class ASGIServer(HTTPProtocol):
                 'body': data,
                 'more_body': (
                     (data != b'' and self.request.content_length == -1) or
-                    self.request.body_size < self.request.content_length
+                    self.request.body_consumed < self.request.content_length
                 )
             }
         except (asyncio.CancelledError, Exception) as exc:
