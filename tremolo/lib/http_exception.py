@@ -72,14 +72,14 @@ class RequestTimeout(HTTPException):
     message = 'Request Timeout'
 
 
+class PreconditionFailed(HTTPException):
+    code = 412
+    message = 'Precondition Failed'
+
+
 class PayloadTooLarge(HTTPException):
     code = 413
     message = 'Payload Too Large'
-
-
-class URITooLong(HTTPException):
-    code = 414
-    message = 'URI Too Long'
 
 
 class RangeNotSatisfiable(HTTPException):
@@ -90,6 +90,11 @@ class RangeNotSatisfiable(HTTPException):
 class ExpectationFailed(HTTPException):
     code = 417
     message = 'Expectation Failed'
+
+
+class TooManyRequests(HTTPException):
+    code = 429
+    message = 'Too Many Requests'
 
 
 class InternalServerError(HTTPException):
