@@ -812,6 +812,31 @@ class TestHTTPClient(unittest.TestCase):
 
             self.assertEqual(body[:7], data_out[:7])
 
+    def test_sse(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/sse',
+                                   version='1.1')
+        body = read_chunked(body)
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertTrue(b'\r\nContent-Type: text/event-stream' in header)
+        self.assertTrue(b'\r\nCache-Control: no-cache' in header)
+        self.assertTrue(b'data: Hel\ndata: lo\nevent: hello\n\n' in body)
+        self.assertTrue(b'data: Wor\nid: foo\n\n' in body)
+        self.assertTrue(b'data: ld!\nretry: 10000\n\n' in body)
+
+    def test_sse_error(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/sse?error',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+
     def test_reload(self):
         header, body1 = getcontents(host=HTTP_HOST,
                                     port=HTTP_PORT,
