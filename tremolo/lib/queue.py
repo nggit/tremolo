@@ -34,12 +34,10 @@ class Queue:
             if not self._getters:
                 return self._queue.popleft()
         except IndexError:
-            pass
+            fut = self._loop.create_future()
+            self._getters.append(fut)
 
-        fut = self._loop.create_future()
-        self._getters.append(fut)
-
-        return await fut
+            return await fut
 
     def get_nowait(self):
         return self._queue.popleft()
