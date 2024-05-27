@@ -187,5 +187,4 @@ class WebSocket:
     async def close(self, code=1000):
         await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
 
-        if self.response is not None:
-            self.response.close(keepalive=True)
+        self.response.close(keepalive=True)

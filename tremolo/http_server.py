@@ -3,6 +3,7 @@
 from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
+from .lib.sse import SSE
 from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket
 
@@ -91,7 +92,7 @@ class HTTPServer(HTTPProtocol):
         await self.response.end(data)
 
     def _handle_websocket(self):
-        if (b'upgrade' in self.request.headers and
+        if (self.options['ws'] and b'upgrade' in self.request.headers and
                 b'connection' in self.request.headers and
                 b'sec-websocket-key' in self.request.headers and
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
@@ -102,8 +103,12 @@ class HTTPServer(HTTPProtocol):
         options['buffer_size'] = options.get('buffer_size',
                                              self.options['buffer_size'])
 
-        if self.options['ws'] and 'websocket' in options:
-            self._handle_websocket()
+        if not self.request.has_body:
+            if 'websocket' in options:
+                self._handle_websocket()
+
+            if 'sse' in options:
+                self._server['sse'] = SSE(self.request, self.response)
 
         if 'tasks' in options:
             self._server['tasks'] = ServerTasks(self.tasks, loop=self.loop)

@@ -312,6 +312,21 @@ async def ws_handler(websocket=None, tasks=None, **_):
             break
 
 
+@app.route('/sse')
+async def sse_handler(sse=None, **_):
+    if sse.request.query_string == b'error':
+        # InternalServerError due to '\n' in the event value
+        await sse.send('Hello', event='hel\nlo')
+
+    await sse.send('Hel\nlo', event='hello')
+    await sse.send(b'Wor', event_id='foo')
+    await sse.send(b'ld!', retry=10000)
+
+    # await sse.response.write(b'')
+    # sse.response.close(keepalive=True)
+    await sse.close()
+
+
 @app.route('/timeouts')
 async def timeouts(request=None, **_):
     if request.query_string == b'recv':
