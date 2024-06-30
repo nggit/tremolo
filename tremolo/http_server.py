@@ -312,9 +312,11 @@ class HTTPServer(HTTPProtocol):
                     await self._handle_response(func, {**kwargs, **options})
                     return
         else:
-            for i, (pattern,
-                    func,
-                    kwargs) in enumerate(self._routes[-1]):
+            i = len(self._routes[-1])
+
+            while i > 0:
+                i -= 1
+                pattern, func, kwargs = self._routes[-1][i]
                 m = pattern.search(self.request.url)
 
                 if m:
