@@ -150,10 +150,10 @@ class HTTPProtocol(asyncio.Protocol):
                 self.logger.info('payload too large')
 
     async def headers_received(self):
-        return
+        raise NotImplementedError
 
     async def handle_error_500(self, exc):
-        return
+        raise NotImplementedError
 
     def handler_timeout(self):
         if (self.request is None or self.request.upgraded or
