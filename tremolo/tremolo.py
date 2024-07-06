@@ -23,7 +23,7 @@ from .utils import (  # noqa: E402
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
-from .lib.pools import QueuePool  # noqa: E402
+from .lib.pools import ObjectPool  # noqa: E402
 
 _REUSEPORT_OR_REUSEADDR = {
     True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
@@ -271,9 +271,7 @@ class Tremolo:
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
-        pools = {
-            'queue': QueuePool(1024, self._logger)
-        }
+        pool = ObjectPool(pool_size=options.get('max_connections', 1000))
 
         if 'app' in options and isinstance(options['app'], str):
             from .asgi_lifespan import ASGILifespan
@@ -359,7 +357,7 @@ class Tremolo:
                            ),
                            server_info=server_info,
                            _connections=connections,
-                           _pools=pools,
+                           _pool=pool,
                            _app=options['app'],
                            _app_close_timeout=options.get(
                                'app_close_timeout', 30
