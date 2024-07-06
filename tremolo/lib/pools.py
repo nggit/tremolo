@@ -5,35 +5,24 @@ from collections import deque
 from .queue import Queue
 
 
-class Pool:
-    def __init__(self, pool_size, logger):
-        self._pool_size = pool_size
+class ObjectPool:
+    def __init__(self, pool_size=1000):
         self._pool = deque(maxlen=pool_size)
-        self._logger = logger
 
         for _ in range(pool_size):
-            self._pool.append(self.create())
+            self._pool.append(ObjectFactory())
 
-    def create(self):
-        return
-
-    def get(self):
+    def get(self, default=None):
         try:
             return self._pool.popleft()
         except IndexError:
-            self._pool_size += 1
-            self._pool = deque(self._pool, maxlen=self._pool_size)
-
-            self._logger.info(
-                '%s: limit exceeded. pool size has been adjusted to %d',
-                self.__class__.__name__, self._pool_size
-            )
-            return self.create()
+            return default
 
     def put(self, item):
         self._pool.append(item)
 
 
-class QueuePool(Pool):
-    def create(self):
+class ObjectFactory:
+    @property
+    def queue(self):
         return (Queue(), Queue())
