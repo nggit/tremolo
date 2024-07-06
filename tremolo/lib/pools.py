@@ -23,6 +23,5 @@ class ObjectPool:
 
 
 class ObjectFactory:
-    @property
-    def queue(self):
-        return (Queue(), Queue())
+    def __init__(self):
+        self.queue = (Queue(), Queue())
