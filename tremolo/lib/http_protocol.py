@@ -17,6 +17,8 @@ from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .websocket import WebSocket
 
+_DEFAULT_WATERMARKS = {'high': 65536, 'low': 8192}
+
 
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('context',
@@ -25,6 +27,7 @@ class HTTPProtocol(asyncio.Protocol):
                  'logger',
                  'worker',
                  'transport',
+                 '_pool',
                  'queue',
                  'request',
                  'response',
@@ -40,13 +43,14 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger = logger
         self.worker = worker
         self.transport = None
-        self.queue = (None, None)
+        self._pool = None
+        self.queue = [None, None]
         self.request = None
         self.response = None
         self.handler = None
 
-        self._watermarks = {'high': 65536, 'low': 8192}
-        self._header_buf = None
+        self._watermarks = _DEFAULT_WATERMARKS
+        self._header_buf = bytearray()
         self._waiters = {}
 
     @property
@@ -55,9 +59,14 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.queue = self.options['_pools']['queue'].get()
+        self._pool = self.options['_pool'].get()
 
-        self._header_buf = bytearray()
+        if self._pool is None:
+            self.logger.error('pool is empty / max_connections reached')
+            self.abort()
+            return
+
+        self.queue[0], self.queue[1] = self._pool.queue
         self._waiters['request'] = self.loop.create_future()
 
         self.tasks.append(self.loop.create_task(self._send_data()).cancel)
@@ -355,7 +364,6 @@ class HTTPProtocol(asyncio.Protocol):
                     self.loop.create_task(
                         self._handle_request(self._header_buf, header_size))
                 )
-
                 self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
                 self.logger.info('request header too large')
@@ -525,14 +533,17 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 self.print_exception(exc)
 
-        for queue in self.queue:
-            if not queue.clear():
-                break
-        else:
-            self.options['_pools']['queue'].put(self.queue)
+        if self._pool is not None:
+            for queue in self._pool.queue:
+                if not queue.clear():
+                    break
+            else:
+                self.options['_pool'].put(self._pool)
+
+            self._pool = None
 
         self.transport = None
-        self.queue = (None, None)
+        self.queue[0] = self.queue[1] = None
         self.request = None
         self.response = None
         self.handler = None

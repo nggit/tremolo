@@ -13,13 +13,11 @@ sys.path.insert(
 
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
-from tremolo.lib.queue import Queue  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import ServerContext  # noqa: E402
-from tremolo.lib.pools import Pool, QueuePool  # noqa: E402
 from tests import handlers, middlewares  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
-from tests.utils import function, logger  # noqa: E402
+from tests.utils import function  # noqa: E402
 
 app = Tremolo()
 
@@ -169,15 +167,6 @@ class TestTremoloObjects(unittest.TestCase):
                     self.assertEqual(sock.getsockname(), sock_file)
                 else:
                     self.assertEqual(sock.getsockname()[1], HTTP_PORT + 3)
-
-    def test_queue_pool(self):
-        pool = Pool(0, logger)
-        queue = QueuePool(0, logger)
-
-        self.assertEqual(pool.create(), None)
-        self.assertEqual(len(queue.get()), 2)
-        self.assertEqual(queue.get()[0].__class__, Queue)
-        self.assertEqual(queue.get()[1].__class__, Queue)
 
     def test_serverconnections(self):
         with self.assertRaises(ValueError):
