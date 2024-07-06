@@ -17,8 +17,6 @@ from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .websocket import WebSocket
 
-_DEFAULT_WATERMARKS = {'high': 65536, 'low': 8192}
-
 
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('context',
@@ -49,7 +47,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.response = None
         self.handler = None
 
-        self._watermarks = _DEFAULT_WATERMARKS
+        self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
         self._waiters = {}
 
