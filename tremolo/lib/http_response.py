@@ -309,6 +309,7 @@ class HTTPResponse(Response):
 
         try:
             handle = self._request.context.RESPONSE_SENDFILE_HANDLE
+            handle.seek(0)
         except AttributeError:
             handle = open(path, 'rb')
             self._request.context.RESPONSE_SENDFILE_HANDLE = handle
