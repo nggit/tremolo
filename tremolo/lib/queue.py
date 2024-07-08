@@ -31,8 +31,11 @@ class Queue:
 
     async def get(self):
         try:
-            if not self._getters:
-                return self._queue.popleft()
+            while True:
+                try:
+                    await self._getters[-1]
+                except IndexError:
+                    return self._queue.popleft()
         except IndexError:
             fut = self._loop.create_future()
             self._getters.append(fut)
