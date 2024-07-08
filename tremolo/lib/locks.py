@@ -14,11 +14,7 @@ class ServerLock:
 
         self.locks = locks
         self._timeout = timeout
-
-        if loop is None:
-            loop = asyncio.get_event_loop()
-
-        self._loop = loop
+        self._loop = loop or asyncio.get_event_loop()
 
         if executors is None:
             executors = {}
