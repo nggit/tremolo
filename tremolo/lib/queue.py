@@ -15,24 +15,21 @@ class Queue:
         return len(self._queue)
 
     def put_nowait(self, item):
-        while True:
-            try:
-                fut = self._getters.popleft()
+        while self._getters:
+            fut = self._getters.popleft()
 
-                if not fut.done():
-                    fut.set_result(item)
-                    break
-            except IndexError:
-                self._queue.append(item)
-                break
+            if not fut.done():
+                fut.set_result(item)
+                return
+
+        self._queue.append(item)
 
     async def get(self):
+        if self._getters:
+            await self._getters[-1]
+
         try:
-            while True:
-                try:
-                    await self._getters[-1]
-                except IndexError:
-                    return self._queue.popleft()
+            return self._queue.popleft()
         except IndexError:
             fut = self._loop.create_future()
             self._getters.append(fut)
