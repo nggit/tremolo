@@ -5,10 +5,7 @@ import asyncio
 
 class ServerTasks:
     def __init__(self, tasks, loop=None):
-        if loop is None:
-            loop = asyncio.get_event_loop()
-
-        self._loop = loop
+        self._loop = loop or asyncio.get_event_loop()
         self._tasks = tasks
 
     def create(self, coro, timeout=0):
