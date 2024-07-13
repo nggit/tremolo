@@ -405,7 +405,6 @@ class HTTPProtocol(asyncio.Protocol):
         while self.queue[1] is not None:
             try:
                 data = await self.queue[1].get()
-                self.queue[1].task_done()
 
                 if data is None:
                     # close the transport, unless keepalive is enabled

@@ -39,9 +39,6 @@ class Queue:
     def get_nowait(self):
         return self._queue.popleft()
 
-    def task_done(self):
-        return
-
     # non-standar
     def clear(self):
         self._queue.clear()
