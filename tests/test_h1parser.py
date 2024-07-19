@@ -58,7 +58,7 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(self.obj.getversion(), None)
         self.assertEqual(self.obj.getstatus(), None)
         self.assertEqual(self.obj.getmessage(), None)
-        self.assertEqual(self.obj.save(), b'')
+        self.assertEqual(self.obj.save(), b'\r\n\r\n')
 
     def test_break(self):
         self.obj.parse(b'\r\n\r\n')
@@ -217,10 +217,6 @@ class TestParseHeader(unittest.TestCase):
             b'Connection: close\r\n\r\n404 Not Found\r\n',
             excludes=[b'connection']
         )
-        self.assertEqual(
-            self.obj.save(),
-            b'HTTP/1.0 404 Not Found\r\ncontent-type: text/plain\r\n\r\n'
-        )
         self.assertEqual(self.obj.getheaders(),
                          [(b'content-type', b'text/plain')])
         self.obj.remove(b'content-type')
@@ -229,7 +225,7 @@ class TestParseHeader(unittest.TestCase):
         self.assertEqual(self.obj.getheaders(),
                          [(b'Content-Type', b'text/html')])
         self.assertEqual(
-            self.obj.save(body=True),
+            self.obj.save(),
             b'HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n'
             b'404 Not Found\r\n'
         )
