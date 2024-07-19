@@ -358,7 +358,7 @@ class HTTPRequest(Request):
                 try:
                     data = await self._read_instance.__anext__()
                 except StopAsyncIteration as exc:
-                    if header_size == -1 or body_size == -1:
+                    if header_size == 1 or body_size == -1:
                         del body[:]
                         raise BadRequest(
                             'malformed multipart/form-data: incomplete read'
@@ -366,9 +366,9 @@ class HTTPRequest(Request):
 
             if header is None:
                 self._read_buf.extend(data)
-                header_size = self._read_buf.find(b'\r\n\r\n')
+                header_size = self._read_buf.find(b'\r\n\r\n') + 2
 
-                if header_size == -1:
+                if header_size == 1:
                     if len(self._read_buf) > 8192:
                         raise BadRequest(
                             'malformed multipart/form-data: header too large'
@@ -376,7 +376,7 @@ class HTTPRequest(Request):
 
                     paused = False
                 else:
-                    body.extend(self._read_buf[header_size + 4:])
+                    body.extend(self._read_buf[header_size + 2:])
                     info = {}
 
                     if header_size <= 8192 and self._read_buf.startswith(

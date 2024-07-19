@@ -21,44 +21,40 @@ class ParseHeader:
                  'is_response',
                  'is_valid_request',
                  'is_valid_response',
-                 '_data',
                  'headers',
                  '_headers',
-                 '_header_size')
+                 '_body')
 
-    def __init__(self, data=bytearray(), **kwargs):
+    def __init__(self, data=None, **kwargs):
         self.parse(data, **kwargs)
 
-    def parse(self, data, header_size=None, excludes=[],
+    def parse(self, data, header_size=None, excludes=None,
               max_lines=100, max_line_size=8190):
+        # don't put these in __init__!!!
         self.is_request = False
         self.is_response = False
         self.is_valid_request = False
         self.is_valid_response = False
 
-        self._data = data
         self.headers = Headers()
         self._headers = []
-        self._header_size = header_size
+        self._body = b''
 
-        if data == b'' or not isinstance(data, (bytearray, bytes)):
+        if data is None:
             return self
-
-        if isinstance(data, bytes):
-            self._data = bytearray(data)
 
         if header_size is None:
-            self._header_size = self._data.find(b'\r\n\r\n')
+            header_size = data.find(b'\r\n\r\n') + 2
 
-        if self._header_size == -1:
+        if header_size < 2:
             return self
 
-        header = self._data[:self._header_size]
+        if excludes is None:
+            excludes = []
 
-        if header == b'':
-            return self
+        header = data[:header_size]
+        self._body = data[header_size + 2:]
 
-        header.extend(b'\r\n')
         start = 0
 
         while True:
@@ -88,7 +84,7 @@ class ParseHeader:
                             self.headers[b'_version'],
                             _status,
                             self.headers[b'_message']
-                        ) = line.replace(b'/', b' ').split(None, 3)
+                        ) = line.replace(b'/', b' ').split(b' ', 3)
                         self.headers[b'_status'] = int(_status)
                         self.is_valid_response = True
                     except ValueError:
@@ -115,24 +111,23 @@ class ParseHeader:
 
                 self.headers[b'_line'] = line
             elif colon_pos > 0 and line[colon_pos - 1] != 32:
-                name = line[:colon_pos]
-                name_lc = bytes(name.lower())
+                name = bytes(line[:colon_pos].lower())
                 value = line[colon_pos + 1:]
 
                 if value.startswith(b' '):
                     value = value[1:]
 
-                if name_lc in self.headers and isinstance(
-                        self.headers[name_lc], list):
-                    self.headers[name_lc].append(value)
+                if (name in self.headers and
+                        isinstance(self.headers[name], list)):
+                    self.headers[name].append(value)
                 else:
-                    if name_lc in self.headers:
-                        self.headers[name_lc] = [self.headers[name_lc], value]
+                    if name in self.headers:
+                        self.headers[name] = [self.headers[name], value]
                     else:
-                        self.headers[name_lc] = value
+                        self.headers[name] = value
 
-                if name_lc not in excludes:
-                    self._headers.append((name_lc, value))
+                if name not in excludes:
+                    self._headers.append((name, value))
             else:
                 self.is_valid_request = False
                 self.is_valid_response = False
@@ -191,16 +186,8 @@ class ParseHeader:
     def getmessage(self):
         return self.headers.get(b'_message')
 
-    def save(self, body=False):
-        if self._header_size in (None, -1):
-            return self._data
-
-        if body:
-            data = self._data[self._header_size:]
-        else:
-            data = self._data[self._header_size:self._header_size + 4]
-
-        return bytearray(b'\r\n').join(
+    def save(self):
+        return b'\r\n'.join(
             [self.headers.get(b'_line', b'')] +
-            [bytearray(b': ').join(v) for v in self._headers]
-        ) + data
+            [b': '.join(v) for v in self._headers]
+        ) + b'\r\n\r\n' + self._body
