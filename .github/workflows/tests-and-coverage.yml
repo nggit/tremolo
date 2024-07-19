@@ -22,7 +22,7 @@ jobs:
         os: ['ubuntu-20.04', 'windows-latest']
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -63,7 +63,7 @@ jobs:
     needs: ['tests']
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: |
           python -m venv --system-site-packages .local
@@ -76,7 +76,9 @@ jobs:
           python -m coverage combine artifact
           python -m coverage report --show-missing --skip-covered
           python -m coverage xml
-      - uses: codecov/codecov-action@v3
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
       - uses: sonarsource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # needed to get PR information, if any
