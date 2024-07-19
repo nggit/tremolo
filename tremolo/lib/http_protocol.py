@@ -242,8 +242,9 @@ class HTTPProtocol(asyncio.Protocol):
                 await self.response.end(data, keepalive=False)
 
     async def _handle_request(self, data, header_size):
-        header = ParseHeader(data,
-                             header_size=header_size, excludes=[b'proxy'])
+        header = ParseHeader(
+            data, header_size=header_size, excludes=[b'proxy']
+        )
 
         if not header.is_request:
             if self.queue[1] is not None:
@@ -299,11 +300,11 @@ class HTTPProtocol(asyncio.Protocol):
                 # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
-            if self.request.has_body or len(data) > header_size + 4:
+            if self.request.has_body or len(data) > header_size + 2:
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
-                    data[header_size + 4:],
+                    data[header_size + 2:],
                     queue=self.queue[0],
                     transport=self.transport,
                     rate=self.options['upload_rate']
@@ -351,9 +352,9 @@ class HTTPProtocol(asyncio.Protocol):
 
         if self._header_buf is not None:
             self._header_buf.extend(data)
-            header_size = self._header_buf.find(b'\r\n\r\n')
+            header_size = self._header_buf.find(b'\r\n\r\n') + 2
 
-            if -1 < header_size <= self.options['client_max_header_size']:
+            if 1 < header_size <= self.options['client_max_header_size']:
                 # this will keep blocking on bodyless requests forever, unless
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
@@ -366,7 +367,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif header_size > self.options['client_max_header_size']:
                 self.logger.info('request header too large')
                 self.abort()
-            elif not (header_size == -1 and len(self._header_buf) <=
+            elif not (header_size == 1 and len(self._header_buf) <=
                       self.options['client_max_header_size']):
                 self.logger.info('bad request')
                 self.abort()
