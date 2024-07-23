@@ -55,6 +55,23 @@ class HTTPProtocol(asyncio.Protocol):
     def tasks(self):
         return self.context.tasks
 
+    def create_task(self, coro):
+        task = self.loop.create_task(coro)
+
+        self.tasks.add(task)
+        task.add_done_callback(self.handle_task_done)
+
+        return task
+
+    def handle_task_done(self, task):
+        self.tasks.discard(task)
+
+        if not task.cancelled():
+            exc = task.exception()
+
+            if exc:
+                self.print_exception(exc, 'handle_task_done')
+
     def connection_made(self, transport):
         self.transport = transport
         self._pool = self.options['_pool'].get()
@@ -67,11 +84,11 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[0], self.queue[1] = self._pool.queue
         self._waiters['request'] = self.loop.create_future()
 
-        self.tasks.append(self.loop.create_task(self._send_data()).cancel)
-        self.tasks.append(self.loop.create_task(self.set_timeout(
+        self.tasks.add(self.loop.create_task(self._send_data()).cancel)
+        self.create_task(self.set_timeout(
             self._waiters['request'],
             timeout=self.options['request_timeout'],
-            timeout_cb=self.request_timeout))
+            timeout_cb=self.request_timeout)
         )
 
     def abort(self, exc=None):
@@ -332,12 +349,6 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def _receive_data(self, data, waiter):
         await waiter
-
-        try:
-            self.tasks.remove(waiter)
-        except ValueError:
-            pass
-
         await self.put_to_queue(
             data,
             queue=self.queue[0],
@@ -359,9 +370,8 @@ class HTTPProtocol(asyncio.Protocol):
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
 
-                self.tasks.append(
-                    self.loop.create_task(
-                        self._handle_request(self._header_buf, header_size))
+                self.create_task(
+                    self._handle_request(self._header_buf, header_size)
                 )
                 self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
@@ -383,10 +393,9 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             waiter = self._waiters['keepalive']
 
-        self._waiters['receive'] = self.loop.create_task(
+        self._waiters['receive'] = self.create_task(
             self._receive_data(data, waiter)
         )
-        self.tasks.append(self._waiters['receive'])
 
     def eof_received(self):
         self.queue[0].put_nowait(None)
@@ -460,24 +469,6 @@ class HTTPProtocol(asyncio.Protocol):
             )
             return
 
-        i = len(self.tasks)
-
-        while i > 0:
-            i -= 1
-
-            if callable(self.tasks[i]):
-                continue
-
-            try:
-                exc = self.tasks[i].exception()
-
-                if exc:
-                    self.print_exception(exc)
-
-                del self.tasks[i]
-            except asyncio.InvalidStateError:
-                pass
-
         if self.request.http_continue:
             self.request.http_continue = False
         elif self.request.upgraded:
@@ -494,11 +485,10 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._waiters['keepalive'] = self.loop.create_future()
 
-            self.tasks.append(
-                self.loop.create_task(self.set_timeout(
-                    self._waiters['keepalive'],
-                    timeout=self.options['keepalive_timeout'],
-                    timeout_cb=self.keepalive_timeout))
+            self.create_task(self.set_timeout(
+                self._waiters['keepalive'],
+                timeout=self.options['keepalive_timeout'],
+                timeout_cb=self.keepalive_timeout)
             )
 
             while not self.request.has_body and self.queue[0].qsize():
@@ -507,7 +497,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.transport.resume_reading()
 
-    def connection_lost(self, exc):
+    def connection_lost(self, _):
         if self in self.options['_connections']:
             del self.options['_connections'][self]
 
@@ -522,14 +512,9 @@ class HTTPProtocol(asyncio.Protocol):
                     task()
                     continue
 
-                exc = task.exception()
-
-                if exc:
-                    self.print_exception(exc)
-            except asyncio.InvalidStateError:
                 task.cancel()
             except Exception as exc:
-                self.print_exception(exc)
+                self.print_exception(exc, 'connection_lost')
 
         if self._pool is not None:
             for queue in self._pool.queue:
