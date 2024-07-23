@@ -173,9 +173,8 @@ async def coro_acquire(lock):
 
 @app.route('/getlock')
 async def get_lock(**server):
-    loop = server['loop']
+    request = server['request']
     lock = server['lock']
-    tasks = server['context'].tasks
 
     async with lock:
         yield b'Lock'
@@ -183,7 +182,7 @@ async def get_lock(**server):
     async with lock(5):
         yield b' '
 
-    tasks.append(loop.create_task(coro_acquire(lock)))
+    request.protocol.create_task(coro_acquire(lock))
 
     try:
         await asyncio.sleep(0.1)
@@ -283,7 +282,7 @@ async def download(**server):
 
 
 @app.route('/ws')
-async def ws_handler(websocket=None, tasks=None, **_):
+async def ws_handler(websocket=None, **_):
     if websocket.request.query_string == b'close':
         await websocket.accept()
 
@@ -294,11 +293,7 @@ async def ws_handler(websocket=None, tasks=None, **_):
         return True
 
     if websocket.request.query_string == b'ping':
-        # test Tasks.create
-        task = tasks.create(websocket.accept())
-
-        # await websocket.accept()
-        await task
+        await websocket.accept()
 
         # WebSocket.recv automatically sends pong
         await websocket.recv()

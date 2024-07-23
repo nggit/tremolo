@@ -314,7 +314,7 @@ class HTTPResponse(Response):
             handle = open(path, 'rb')
             self._request.context.RESPONSE_SENDFILE_HANDLE = handle
 
-            self._request.context.tasks.append(
+            self._request.context.tasks.add(
                 self._request.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
