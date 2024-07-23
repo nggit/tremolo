@@ -4,7 +4,6 @@ from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
 from .lib.sse import SSE
-from .lib.tasks import ServerTasks
 from .lib.websocket import WebSocket
 
 
@@ -45,10 +44,9 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self._middlewares['connect']:
-            self.context.ON_CONNECT = self.loop.create_task(
+            self.context.ON_CONNECT = self.create_task(
                 self._connection_made()
             )
-            self.tasks.append(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
         if self._middlewares['close']:
@@ -109,9 +107,6 @@ class HTTPServer(HTTPProtocol):
 
             if 'sse' in options:
                 self._server['sse'] = SSE(self.request, self.response)
-
-        if 'tasks' in options:
-            self._server['tasks'] = ServerTasks(self.tasks, loop=self.loop)
 
         if 'status' in options:
             self.response.set_status(*options['status'])
