@@ -187,12 +187,12 @@ class HTTPRequest(Request):
             paused = False
             unread_bytes = 0
 
-            while not buf.startswith(b'0\r\n'):
+            while True:
                 if not paused:
                     try:
                         buf.extend(await agen.__anext__())
                     except StopAsyncIteration as exc:
-                        if b'0\r\n' not in buf:
+                        if b'\r\n\r\n' not in buf:
                             del buf[:]
                             raise BadRequest(
                                 'bad chunked encoding: incomplete read'
@@ -229,6 +229,9 @@ class HTTPRequest(Request):
                     except ValueError as exc:
                         del buf[:]
                         raise BadRequest('bad chunked encoding') from exc
+
+                    if chunk_size < 1:
+                        break
 
                     data = buf[i + 2:i + 2 + chunk_size]
                     unread_bytes = chunk_size - len(data)
