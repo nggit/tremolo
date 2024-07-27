@@ -28,7 +28,7 @@ class ParseHeader:
     def __init__(self, data=None, **kwargs):
         self.parse(data, **kwargs)
 
-    def parse(self, data, header_size=None, excludes=None,
+    def parse(self, data, header_size=None, excludes=(),
               max_lines=100, max_line_size=8190):
         # don't put these in __init__!!!
         self.is_request = False
@@ -48,9 +48,6 @@ class ParseHeader:
 
         if header_size < 2:
             return self
-
-        if excludes is None:
-            excludes = []
 
         header = data[:header_size]
         self._body = data[header_size + 2:]
