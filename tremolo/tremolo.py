@@ -572,6 +572,18 @@ class Tremolo:
         except OSError:
             sock.close()
 
+    def _reload_module(self, app_dir):
+        for module in list(sys.modules.values()):
+            if (hasattr(module, '__file__') and
+                    module.__name__ not in ('__main__',
+                                            '__mp_main__',
+                                            'tremolo') and
+                    not module.__name__.startswith('tremolo.') and
+                    module.__file__ is not None and
+                    module.__file__.startswith(app_dir) and
+                    os.path.exists(module.__file__)):
+                reload_module(module)
+
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
@@ -705,19 +717,7 @@ class Tremolo:
                             print('Reloading...')
 
                             if 'app' not in kwargs:
-                                for module in list(sys.modules.values()):
-                                    if (hasattr(module, '__file__') and
-                                            module.__name__ not in (
-                                                '__main__',
-                                                '__mp_main__',
-                                                'tremolo') and
-                                            not module.__name__.startswith(
-                                                'tremolo.') and
-                                            module.__file__ is not None and
-                                            module.__file__.startswith(
-                                                kwargs['app_dir']) and
-                                            os.path.exists(module.__file__)):
-                                        reload_module(module)
+                                self._reload_module(kwargs['app_dir'])
 
                                 if module_name in sys.modules:
                                     _module = sys.modules[module_name]
