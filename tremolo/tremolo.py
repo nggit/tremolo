@@ -7,6 +7,7 @@ import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
+import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
@@ -29,6 +30,10 @@ _REUSEPORT_OR_REUSEADDR = {
     True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
     False: socket.SO_REUSEADDR
 }
+
+
+def sigterm_handler(signum, frame):
+    raise KeyboardInterrupt
 
 
 class Tremolo:
@@ -496,6 +501,8 @@ class Tremolo:
         asyncio.set_event_loop(self._loop)
         task = self._loop.create_task(self._serve(host, port, **kwargs))
 
+        signal.signal(signal.SIGTERM, sigterm_handler)
+
         try:
             self._loop.run_until_complete(task)
         except KeyboardInterrupt:
@@ -708,6 +715,7 @@ class Tremolo:
                 processes.append((parent_conn, p, args, options))
 
         print('-' * terminal_width)
+        signal.signal(signal.SIGTERM, sigterm_handler)
 
         while True:
             try:
