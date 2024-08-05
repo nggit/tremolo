@@ -501,8 +501,6 @@ class Tremolo:
         asyncio.set_event_loop(self._loop)
         task = self._loop.create_task(self._serve(host, port, **kwargs))
 
-        signal.signal(signal.SIGTERM, sigterm_handler)
-
         try:
             self._loop.run_until_complete(task)
         except KeyboardInterrupt:
