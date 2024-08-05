@@ -39,5 +39,5 @@ if __name__ == '__main__':
     finally:
         for p in processes:
             if p.is_alive():
-                os.kill(p.pid, signal.SIGINT)
+                os.kill(p.pid, signal.SIGTERM)
                 p.join()

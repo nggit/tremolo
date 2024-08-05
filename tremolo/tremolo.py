@@ -7,6 +7,7 @@ import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
+import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
@@ -29,6 +30,10 @@ _REUSEPORT_OR_REUSEADDR = {
     True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
     False: socket.SO_REUSEADDR
 }
+
+
+def sigterm_handler(signum, frame):
+    raise KeyboardInterrupt
 
 
 class Tremolo:
@@ -572,6 +577,18 @@ class Tremolo:
         except OSError:
             sock.close()
 
+    def _reload_module(self, app_dir):
+        for module in list(sys.modules.values()):
+            if (hasattr(module, '__file__') and
+                    module.__name__ not in ('__main__',
+                                            '__mp_main__',
+                                            'tremolo') and
+                    not module.__name__.startswith('tremolo.') and
+                    module.__file__ is not None and
+                    module.__file__.startswith(app_dir) and
+                    os.path.exists(module.__file__)):
+                reload_module(module)
+
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
@@ -696,6 +713,7 @@ class Tremolo:
                 processes.append((parent_conn, p, args, options))
 
         print('-' * terminal_width)
+        signal.signal(signal.SIGTERM, sigterm_handler)
 
         while True:
             try:
@@ -705,19 +723,7 @@ class Tremolo:
                             print('Reloading...')
 
                             if 'app' not in kwargs:
-                                for module in list(sys.modules.values()):
-                                    if (hasattr(module, '__file__') and
-                                            module.__name__ not in (
-                                                '__main__',
-                                                '__mp_main__',
-                                                'tremolo') and
-                                            not module.__name__.startswith(
-                                                'tremolo.') and
-                                            module.__file__ is not None and
-                                            module.__file__.startswith(
-                                                kwargs['app_dir']) and
-                                            os.path.exists(module.__file__)):
-                                        reload_module(module)
+                                self._reload_module(kwargs['app_dir'])
 
                                 if module_name in sys.modules:
                                     _module = sys.modules[module_name]
