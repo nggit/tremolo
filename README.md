@@ -1,6 +1,6 @@
 # Tremolo
 
-[![codecov](https://codecov.io/gh/nggit/tremolo/branch/master/graph/badge.svg?token=SC8NVWN0F1)](https://codecov.io/gh/nggit/tremolo)
+[![codecov](https://codecov.io/gh/nggit/tremolo/branch/main/graph/badge.svg?token=SC8NVWN0F1)](https://codecov.io/gh/nggit/tremolo)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 
 Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
@@ -110,7 +110,7 @@ To see more available options:
 python3 -m tremolo --help
 ```
 
-It's also possible to run the ASGI server programmatically ([example with uvloop](https://github.com/nggit/tremolo/blob/master/example_uvloop.py)):
+It's also possible to run the ASGI server programmatically ([example with uvloop](https://github.com/nggit/tremolo/blob/main/example_uvloop.py)):
 
 ```
 python3 example_uvloop.py
@@ -169,7 +169,7 @@ python3 -m pip install --upgrade tremolo
 ```
 
 ## Testing
-Just run `python3 alltests.py` for all tests. Or individual *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/master/tests) folder, for example `python3 tests/test_cli.py`.
+Just run `python3 alltests.py` for all tests. Or individual *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/main/tests) folder, for example `python3 tests/test_cli.py`.
 
 If you also want measurements with [coverage](https://coverage.readthedocs.io/):
 
