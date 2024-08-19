@@ -61,8 +61,7 @@ class ASGIServer(HTTPProtocol):
         self._scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},
             'http_version': self.request.version.decode('latin-1'),
-            'path': unquote_to_bytes(
-                bytes(self.request.path)).decode('latin-1'),
+            'path': unquote_to_bytes(self.request.path).decode('latin-1'),
             'raw_path': self.request.path,
             'query_string': self.request.query_string,
             'root_path': self.options['_root_path'],
