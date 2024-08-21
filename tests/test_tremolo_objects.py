@@ -193,6 +193,7 @@ class TestTremoloObjects(unittest.TestCase):
         context.set('options', False)
         self.assertEqual(context.get('options'), False)
         self.assertEqual(context.get('opt'), None)
+        self.assertFalse('opt' in context)
 
         with self.assertRaises(AttributeError):
             context['options'] = {}
@@ -201,6 +202,7 @@ class TestTremoloObjects(unittest.TestCase):
 
         self.assertEqual(context['options'], False)
         self.assertEqual(context['opt'], {})
+        self.assertTrue('opt' in context)
 
 
 if __name__ == '__main__':

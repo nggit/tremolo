@@ -30,3 +30,6 @@ class ServerContext:
 
     def __getitem__(self, name):
         return self.__dict__[name]
+
+    def __contains__(self, name):
+        return self.__dict__.__contains__(name)
