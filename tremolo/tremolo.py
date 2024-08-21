@@ -22,7 +22,7 @@ from .utils import (  # noqa: E402
     file_signature, log_date, memory_usage, server_date
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
-from .lib.contexts import ServerContext as WorkerContext  # noqa: E402
+from .lib.contexts import Context as WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 from .lib.pools import ObjectPool  # noqa: E402
 
