@@ -18,8 +18,13 @@ from tremolo.utils import parse_args  # noqa: E402
 STDOUT = sys.stdout
 
 
+def extra(value='', **context):
+    print('Extra:', value)
+    context['options']['extra'] = value
+
+
 def run():
-    parse_args(help=usage, bind=bind)
+    return parse_args(help=usage, bind=bind, extra=extra)
 
 
 class TestCLI(unittest.TestCase):
@@ -240,6 +245,23 @@ class TestCLI(unittest.TestCase):
         sys.stdout = STDOUT
 
         self.assertEqual(self.output.getvalue(), '')
+        self.assertEqual(code, 0)
+
+    def test_cli_extra(self):
+        sys.argv.extend(['--extra', 'foo'])
+
+        code = 0
+        sys.stdout = self.output
+
+        try:
+            self.assertEqual(run()['extra'], 'foo')
+        except SystemExit as exc:
+            if exc.code:
+                code = exc.code
+
+        sys.stdout = STDOUT
+
+        self.assertEqual(self.output.getvalue()[:10], 'Extra: foo')
         self.assertEqual(code, 0)
 
     def test_cli_invalidarg(self):

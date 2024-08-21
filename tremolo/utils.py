@@ -55,22 +55,22 @@ def parse_args(**callbacks):
     context = {'options': options}
 
     for i in range(len(sys.argv)):
+        name = sys.argv[i - 1].lstrip('-').replace('-', '_')
+
         if sys.argv[i - 1] == '--help':
-            if 'help' in callbacks:
-                callbacks['help'](value=sys.argv[i], **context)
+            if name in callbacks:
+                callbacks[name](value=sys.argv[i], **context)
 
             sys.exit()
         elif sys.argv[i - 1] == '--no-ws':
             options['ws'] = False
         elif sys.argv[i - 1] in ('--debug', '--reload'):
-            options[sys.argv[i - 1].lstrip('-').replace('-', '_')] = True
+            options[name] = True
         elif sys.argv[i - 1] in ('--host',
                                  '--log-level',
                                  '--server-name',
                                  '--root-path'):
-            options[
-                sys.argv[i - 1].lstrip('-').replace('-', '_')
-            ] = sys.argv[i]
+            options[name] = sys.argv[i]
         elif sys.argv[i - 1] in ('--port',
                                  '--worker-num',
                                  '--limit-memory',
@@ -89,9 +89,7 @@ def parse_args(**callbacks):
                                  '--app-handler-timeout',
                                  '--app-close-timeout'):
             try:
-                options[
-                    sys.argv[i - 1].lstrip('-').replace('-', '_')
-                ] = int(sys.argv[i])
+                options[name] = int(sys.argv[i])
             except ValueError:
                 print(
                     'Invalid %s value "%s". It must be a number' % (
@@ -99,14 +97,17 @@ def parse_args(**callbacks):
                 )
                 sys.exit(1)
         elif sys.argv[i - 1] == '--bind':
-            if 'bind' in callbacks:
-                callbacks['bind'](value=sys.argv[i], **context)
+            if name in callbacks:
+                callbacks[name](value=sys.argv[i], **context)
         elif sys.argv[i - 1] == '--ssl-cert':
             options['ssl']['cert'] = sys.argv[i]
         elif sys.argv[i - 1] == '--ssl-key':
             options['ssl']['key'] = sys.argv[i]
         elif sys.argv[i - 1].startswith('-'):
-            print('Unrecognized option "%s"' % sys.argv[i - 1])
-            sys.exit(1)
+            if name in callbacks:
+                callbacks[name](value=sys.argv[i], **context)
+            else:
+                print('Unrecognized option "%s"' % sys.argv[i - 1])
+                sys.exit(1)
 
     return options
