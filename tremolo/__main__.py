@@ -67,6 +67,7 @@ def usage(**context):
     print('  --server-name             Set the "Server" field in the response header')  # noqa: E501
     print('  --root-path               Set the ASGI root_path. Defaults to ""')
     print('  --help                    Show this help and exit')
+    sys.exit()
 
 
 def bind(value='', **context):

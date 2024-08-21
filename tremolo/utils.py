@@ -57,12 +57,7 @@ def parse_args(**callbacks):
     for i in range(len(sys.argv)):
         name = sys.argv[i - 1].lstrip('-').replace('-', '_')
 
-        if sys.argv[i - 1] == '--help':
-            if name in callbacks:
-                callbacks[name](value=sys.argv[i], **context)
-
-            sys.exit()
-        elif sys.argv[i - 1] == '--no-ws':
+        if sys.argv[i - 1] == '--no-ws':
             options['ws'] = False
         elif sys.argv[i - 1] in ('--debug', '--reload'):
             options[name] = True
@@ -96,9 +91,6 @@ def parse_args(**callbacks):
                         sys.argv[i - 1], sys.argv[i])
                 )
                 sys.exit(1)
-        elif sys.argv[i - 1] == '--bind':
-            if name in callbacks:
-                callbacks[name](value=sys.argv[i], **context)
         elif sys.argv[i - 1] == '--ssl-cert':
             options['ssl']['cert'] = sys.argv[i]
         elif sys.argv[i - 1] == '--ssl-key':
