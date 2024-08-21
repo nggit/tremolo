@@ -12,11 +12,14 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
+from tremolo.__main__ import usage, bind  # noqa: E402
+from tremolo.utils import parse_args  # noqa: E402
+
 STDOUT = sys.stdout
 
 
 def run():
-    from tremolo import __main__ as _  # noqa: F401
+    return parse_args(help=usage, bind=bind)
 
 
 class TestCLI(unittest.TestCase):
@@ -34,10 +37,6 @@ class TestCLI(unittest.TestCase):
     def tearDown(self):
         self.output.close()
         sys.argv.clear()
-
-        if 'tremolo.__main__' in sys.modules:
-            del sys.modules['tremolo.__main__']
-            del sys.modules['tremolo']
 
     def test_cli_help(self):
         sys.argv.append('--help')
@@ -97,7 +96,7 @@ class TestCLI(unittest.TestCase):
         sys.stdout = self.output
 
         try:
-            run()
+            self.assertEqual(run()['port'], 8000)
         except SystemExit as exc:
             if exc.code:
                 code = exc.code
@@ -114,7 +113,7 @@ class TestCLI(unittest.TestCase):
         sys.stdout = self.output
 
         try:
-            run()
+            self.assertEqual(run()['host'], '127.0.0.1')
         except SystemExit as exc:
             if exc.code:
                 code = exc.code
@@ -148,7 +147,7 @@ class TestCLI(unittest.TestCase):
         sys.stdout = self.output
 
         try:
-            run()
+            self.assertEqual(run()['host'], None)
         except SystemExit as exc:
             if exc.code:
                 code = exc.code
