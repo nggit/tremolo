@@ -15,6 +15,7 @@ from .http_exception import (
 )
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
+from .queue import Queue
 from .websocket import WebSocket
 
 
@@ -25,7 +26,6 @@ class HTTPProtocol(asyncio.Protocol):
                  'logger',
                  'worker',
                  'transport',
-                 '_pool',
                  'queue',
                  'request',
                  'response',
@@ -41,8 +41,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger = logger
         self.worker = worker
         self.transport = None
-        self._pool = None
-        self.queue = [None, None]
+        self.queue = None
         self.request = None
         self.response = None
         self.handler = None
@@ -74,17 +73,21 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self._pool = self.options['_pool'].get()
+        fileno = transport.get_extra_info('socket').fileno()
 
-        if self._pool is None:
-            self.logger.error('pool is empty / max_connections reached')
-            self.abort()
-            return
+        if fileno in self.worker.queues:
+            self.queue = self.worker.queues[fileno]
 
-        self.queue[0], self.queue[1] = self._pool.queue
+            if self.queue[0].qsize() or self.queue[0].qsize():
+                self.logger.error('uncleaned queue in fileno: %d', fileno)
+                self.abort()
+                return
+        else:
+            self.queue = self.worker.queues[fileno] = (Queue(), Queue())
+
         self._waiters['request'] = self.loop.create_future()
 
-        self.tasks.add(self.loop.create_task(self._send_data()).cancel)
+        self.tasks.add(self.loop.create_task(self._send_data()))
         self.create_task(self.set_timeout(
             self._waiters['request'],
             timeout=self.options['request_timeout'],
@@ -167,7 +170,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif self.request.body_size < self.options['client_max_body_size']:
                 transport.resume_reading()
             else:
-                if self.queue[1] is not None:
+                if self.queue is not None:
                     self.request.http_keepalive = False
                     self.queue[1].put_nowait(None)
 
@@ -264,7 +267,7 @@ class HTTPProtocol(asyncio.Protocol):
         )
 
         if not header.is_request:
-            if self.queue[1] is not None:
+            if self.queue is not None:
                 self.queue[1].put_nowait(None)
 
             self.logger.info('bad request: not a request')
@@ -412,7 +415,7 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.set_write_buffer_limits(high=high, low=low)
 
     async def _send_data(self):
-        while self.queue[1] is not None:
+        while self.queue is not None:
             try:
                 data = await self.queue[1].get()
 
@@ -453,7 +456,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.transport.write(data)
             except asyncio.CancelledError:
-                pass
+                continue
             except Exception as exc:
                 self.abort(exc)
 
@@ -516,17 +519,12 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 self.print_exception(exc, 'connection_lost')
 
-        if self._pool is not None:
-            for queue in self._pool.queue:
-                if not queue.clear():
-                    break
-            else:
-                self.options['_pool'].put(self._pool)
-
-            self._pool = None
+        if self.queue is not None:
+            self.queue[0].clear()
+            self.queue[1].clear()
+            self.queue = None
 
         self.transport = None
-        self.queue[0] = self.queue[1] = None
         self.request = None
         self.response = None
         self.handler = None

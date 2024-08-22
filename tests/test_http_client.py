@@ -342,8 +342,8 @@ class TestHTTPClient(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(65536 + 16 * 1024,
-                                                 chunk_size=16 * 1024))
+                    HTTP_PORT, create_dummy_body(65536 + 16384,
+                                                 chunk_size=16384))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -360,8 +360,7 @@ class TestHTTPClient(unittest.TestCase):
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: %d\r\n\r\n\x00' % (
-                    HTTP_PORT, 65536 + 16 * 1024)
+                b'Content-Length: %d\r\n\r\n\x00' % (HTTP_PORT, 65536 + 16384)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
@@ -392,7 +391,7 @@ class TestHTTPClient(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n\x00' % (
-                    HTTP_PORT, 2 * 1048576 + 16 * 1024)
+                    HTTP_PORT, 2 * 1048576 + 16384)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
@@ -845,19 +844,16 @@ class TestHTTPClient(unittest.TestCase):
                                     version='1.0')
 
         self.assertFalse(body1 == b'')
+        body2 = body1
 
         for _ in range(10):
             time.sleep(1)
 
-            try:
-                header, body2 = getcontents(host=HTTP_HOST,
-                                            port=HTTP_PORT,
-                                            method='GET',
-                                            url='/reload',
-                                            version='1.0')
-                break
-            except ConnectionResetError:
-                continue
+            header, body2 = getcontents(host=HTTP_HOST,
+                                        port=HTTP_PORT,
+                                        method='GET',
+                                        url='/reload',
+                                        version='1.0')
 
             self.assertFalse(body2 == b'')
 

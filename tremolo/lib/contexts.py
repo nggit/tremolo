@@ -21,6 +21,17 @@ class Context:
         return self.__dict__.__contains__(name)
 
 
+class WorkerContext(Context):
+    def __init__(self):
+        self.__dict__ = {
+            'queues': {}
+        }
+
+    @property
+    def queues(self):
+        return self.__dict__['queues']
+
+
 class ServerContext(Context):
     def __init__(self):
         self.__dict__ = {
