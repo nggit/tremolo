@@ -56,8 +56,6 @@ def usage(**context):
     print('  --keepalive-timeout       Defaults to 30 (seconds)')
     print('  --keepalive-connections   Maximum number of keep-alive connections')  # noqa: E501
     print('                            Defaults to 512 (connections/worker)')
-    print('  --max-connections         Maximum number of connections (per worker)')  # noqa: E501
-    print('                            Defaults to 1000')
     print('  --app-handler-timeout     Kill the app if it takes too long to finish')  # noqa: E501
     print('                            Upgraded connection/scope will not be affected')  # noqa: E501
     print('                            Defaults to 120 (seconds)')

@@ -80,7 +80,6 @@ def parse_args(**callbacks):
                                  '--request-timeout',
                                  '--keepalive-timeout',
                                  '--keepalive-connections',
-                                 '--max-connections',
                                  '--app-handler-timeout',
                                  '--app-close-timeout'):
             try:
