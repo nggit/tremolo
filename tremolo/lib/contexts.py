@@ -1,15 +1,43 @@
 # Copyright (c) 2023 nggit
 
 
-class ServerContext:
+class Context:
+    def __init__(self):
+        self.__dict__ = {}
+
+    def __repr__(self):
+        return self.__dict__.__repr__()
+
+    def get(self, *args):
+        return self.__dict__.get(*args)
+
+    def __setitem__(self, *args):
+        self.__setattr__(*args)
+
+    def __getitem__(self, name):
+        return self.__dict__[name]
+
+    def __contains__(self, name):
+        return self.__dict__.__contains__(name)
+
+
+class WorkerContext(Context):
+    def __init__(self):
+        self.__dict__ = {
+            'queues': {}
+        }
+
+    @property
+    def queues(self):
+        return self.__dict__['queues']
+
+
+class ServerContext(Context):
     def __init__(self):
         self.__dict__ = {
             'options': {},
             'tasks': set()
         }
-
-    def __repr__(self):
-        return self.__dict__.__repr__()
 
     @property
     def options(self):
@@ -21,15 +49,3 @@ class ServerContext:
 
     def set(self, name, value):
         self.__dict__[name] = value
-
-    def get(self, name, default=None):
-        return self.__dict__.get(name, default)
-
-    def __setitem__(self, *args):
-        self.__setattr__(*args)
-
-    def __getitem__(self, name):
-        return self.__dict__[name]
-
-    def __contains__(self, name):
-        return self.__dict__.__contains__(name)

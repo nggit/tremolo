@@ -101,7 +101,12 @@ def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
                     response_data.endswith(b'\r\n0\r\n\r\n')):
                 break
 
-            buf = sock.recv(4096)
+            try:
+                buf = sock.recv(4096)
+            except ConnectionResetError:
+                print('getcontents: retry:', request_header)
+                return getcontents(host, port, raw=raw)
+
             response_data.extend(buf)
 
             if response_header:
