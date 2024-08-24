@@ -24,8 +24,13 @@ class Context:
 class WorkerContext(Context):
     def __init__(self):
         self.__dict__ = {
+            'options': {},
             'queues': {}
         }
+
+    @property
+    def options(self):
+        return self.__dict__['options']
 
     @property
     def queues(self):
@@ -46,6 +51,3 @@ class ServerContext(Context):
     @property
     def tasks(self):
         return self.__dict__['tasks']
-
-    def set(self, name, value):
-        self.__dict__[name] = value

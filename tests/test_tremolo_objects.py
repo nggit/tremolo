@@ -135,7 +135,7 @@ class TestTremoloObjects(unittest.TestCase):
 
                 self.assertEqual(repr(context), repr(context.__dict__))
 
-                context.set('options', {'server_info': {'name': b'Tremolo'}})
+                context.options.update({'server_info': {'name': b'Tremolo'}})
                 context.protocol = context
                 context.path = b'/invalid">url'
 
@@ -189,9 +189,6 @@ class TestTremoloObjects(unittest.TestCase):
         context = ServerContext()
 
         self.assertEqual(context.get('options'), {})
-
-        context.set('options', False)
-        self.assertEqual(context.get('options'), False)
         self.assertEqual(context.get('opt'), None)
         self.assertFalse('opt' in context)
 
@@ -200,7 +197,6 @@ class TestTremoloObjects(unittest.TestCase):
 
         context['opt'] = {}
 
-        self.assertEqual(context['options'], False)
         self.assertEqual(context['opt'], {})
         self.assertTrue('opt' in context)
 
