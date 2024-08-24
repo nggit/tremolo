@@ -226,6 +226,7 @@ class Tremolo:
 
     async def _serve(self, host, port, **options):
         context = WorkerContext()
+        context.options.update(options)
 
         for func in self.events['worker_start']:
             if (await func(context=context,

@@ -26,6 +26,9 @@ app = Tremolo()
 @app.on_worker_start
 async def worker_start(**worker):
     worker_ctx = worker['context']
+
+    assert worker_ctx.options['client_max_body_size'] == 73728
+
     worker_ctx.shared = 0
     worker_ctx.socket_family = 'AF_UNIX'
 
