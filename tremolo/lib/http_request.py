@@ -89,7 +89,7 @@ class HTTPRequest(Request):
     def client(self):
         if not self._client:
             try:
-                self._client = self.socket.getpeername()[:2]
+                self._client = self.socket.getpeername()[:2] or None
             except TypeError:
                 pass
 
