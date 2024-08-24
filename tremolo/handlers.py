@@ -1,6 +1,6 @@
 # Copyright (c) 2023 nggit
 
-import traceback
+from traceback import TracebackException
 
 from .exceptions import BadRequest
 from .utils import html_escape
@@ -33,8 +33,9 @@ async def error_404(request=None, **_):
 
 async def error_500(request=None, exc=None, **_):
     if request.protocol.options['debug']:
+        te = TracebackException.from_exception(exc)
         return '<ul><li>%s</li></ul>' % '</li><li>'.join(
-            traceback.TracebackException.from_exception(exc).format()
+            html_escape(line) for line in te.format()
         )
 
     return str(exc)
