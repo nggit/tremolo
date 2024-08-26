@@ -225,15 +225,6 @@ class Tremolo:
                     routes[key][i] = (re.compile(pattern), *handler)
 
     async def _serve(self, host, port, **options):
-        context = WorkerContext()
-        context.options.update(options)
-
-        for func in self.events['worker_start']:
-            if (await func(context=context,
-                           loop=self._loop,
-                           logger=self._logger)):
-                break
-
         options['_conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
 
@@ -327,6 +318,15 @@ class Tremolo:
 
             options['app'] = None
             self.compile_routes(options['_routes'])
+
+        context = WorkerContext()
+        context.options.update(options)
+
+        for func in self.events['worker_start']:
+            if (await func(context=context,
+                           loop=self._loop,
+                           logger=self._logger)):
+                break
 
         server_info = {
             'date': server_date(),
