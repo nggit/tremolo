@@ -267,11 +267,19 @@ class Tremolo:
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
+        context = WorkerContext()
+        context.options.update(options)
 
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
             self.compile_routes(options['_routes'])
+
+            for func in self.events['worker_start']:
+                if (await func(context=context,
+                               loop=self._loop,
+                               logger=self._logger)):
+                    break
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
@@ -317,15 +325,6 @@ class Tremolo:
 
             if exc:
                 raise exc
-
-        context = WorkerContext()
-        context.options.update(options)
-
-        for func in self.events['worker_start']:
-            if (await func(context=context,
-                           loop=self._loop,
-                           logger=self._logger)):
-                break
 
         server_info = {
             'date': server_date(),
