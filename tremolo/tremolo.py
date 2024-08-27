@@ -225,15 +225,6 @@ class Tremolo:
                     routes[key][i] = (re.compile(pattern), *handler)
 
     async def _serve(self, host, port, **options):
-        context = WorkerContext()
-        context.options.update(options)
-
-        for func in self.events['worker_start']:
-            if (await func(context=context,
-                           loop=self._loop,
-                           logger=self._logger)):
-                break
-
         options['_conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
 
@@ -276,8 +267,20 @@ class Tremolo:
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
+        context = WorkerContext()
+        context.options.update(options)
 
-        if 'app' in options and isinstance(options['app'], str):
+        if options['app'] is None:
+            from .http_server import HTTPServer as Server
+
+            self.compile_routes(options['_routes'])
+
+            for func in self.events['worker_start']:
+                if (await func(context=context,
+                               loop=self._loop,
+                               logger=self._logger)):
+                    break
+        else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
 
@@ -322,11 +325,6 @@ class Tremolo:
 
             if exc:
                 raise exc
-        else:
-            from .http_server import HTTPServer as Server
-
-            options['app'] = None
-            self.compile_routes(options['_routes'])
 
         server_info = {
             'date': server_date(),
@@ -604,8 +602,10 @@ class Tremolo:
         import __main__
 
         if 'app' in kwargs:
-            if (not isinstance(kwargs['app'], str) and
-                    hasattr(__main__, '__file__')):
+            if not isinstance(kwargs['app'], str):
+                if not hasattr(__main__, '__file__'):
+                    raise RuntimeError('could not find ASGI app')
+
                 for attr_name in dir(__main__):
                     if attr_name.startswith('__'):
                         continue
@@ -619,12 +619,16 @@ class Tremolo:
 
             locks = []
         else:
+            kwargs['app'] = None
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
-            if hasattr(__main__, '__file__'):
-                kwargs['app_dir'], base_name = os.path.split(
-                    os.path.abspath(__main__.__file__))
-                module_name = os.path.splitext(base_name)[0]
+            if not hasattr(__main__, '__file__'):
+                raise RuntimeError('could not set app_dir')
+
+            kwargs['app_dir'], base_name = os.path.split(
+                os.path.abspath(__main__.__file__)
+            )
+            module_name = os.path.splitext(base_name)[0]
 
             if kwargs['log_level'] in ('DEBUG', 'INFO'):
                 print('Routes:')
@@ -720,7 +724,7 @@ class Tremolo:
                         if p.exitcode == 0:
                             print('Reloading...')
 
-                            if 'app' not in kwargs:
+                            if kwargs['app'] is None:
                                 self._reload_module(kwargs['app_dir'])
 
                                 if module_name in sys.modules:
