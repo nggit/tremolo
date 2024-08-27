@@ -11,7 +11,8 @@ from tests.http_server import app, HTTP_HOST, HTTP_PORT
 from tests.asgi_server import app as asgi_app
 from tests.asgi_server import ASGI_HOST, ASGI_PORT
 
-if __name__ == '__main__':
+
+def main():
     mp.set_start_method('spawn')
     processes = []
 
@@ -41,3 +42,6 @@ if __name__ == '__main__':
             if p.is_alive():
                 os.kill(p.pid, signal.SIGTERM)
                 p.join()
+
+if __name__ == '__main__':
+    main()
