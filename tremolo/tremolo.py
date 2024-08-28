@@ -601,7 +601,7 @@ class Tremolo:
 
         import __main__
 
-        if 'app' in kwargs:
+        if 'app' in kwargs and kwargs['app']:
             if not isinstance(kwargs['app'], str):
                 if not hasattr(__main__, '__file__'):
                     raise RuntimeError('could not find ASGI app')
