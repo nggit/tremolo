@@ -601,7 +601,7 @@ class Tremolo:
 
         import __main__
 
-        if 'app' in kwargs:
+        if 'app' in kwargs and kwargs['app']:
             if not isinstance(kwargs['app'], str):
                 if not hasattr(__main__, '__file__'):
                     raise RuntimeError('could not find ASGI app')
@@ -622,13 +622,14 @@ class Tremolo:
             kwargs['app'] = None
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
-            if not hasattr(__main__, '__file__'):
-                raise RuntimeError('could not set app_dir')
-
-            kwargs['app_dir'], base_name = os.path.split(
-                os.path.abspath(__main__.__file__)
-            )
-            module_name = os.path.splitext(base_name)[0]
+            if hasattr(__main__, '__file__'):
+                kwargs['app_dir'], base_name = os.path.split(
+                    os.path.abspath(__main__.__file__)
+                )
+                module_name = os.path.splitext(base_name)[0]
+            else:
+                kwargs['app_dir'] = os.getcwd()
+                module_name = '__main__'
 
             if kwargs['log_level'] in ('DEBUG', 'INFO'):
                 print('Routes:')
