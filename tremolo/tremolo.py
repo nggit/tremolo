@@ -277,6 +277,7 @@ class Tremolo:
 
             for func in self.events['worker_start']:
                 if (await func(context=context,
+                               app=self,
                                loop=self._loop,
                                logger=self._logger)):
                     break
@@ -465,6 +466,7 @@ class Tremolo:
 
                 if (await self.events['worker_stop'][i](
                         context=context,
+                        app=self,
                         loop=self._loop,
                         logger=self._logger)):
                     break
