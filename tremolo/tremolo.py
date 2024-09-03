@@ -65,8 +65,8 @@ class Tremolo:
         }
         self.ports = {}
 
-        self._loop = None
-        self._logger = None
+        self.loop = None
+        self.logger = None
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -263,7 +263,7 @@ class Tremolo:
         if isinstance(host, str):
             host = host.encode('latin-1')
 
-        lock = ServerLock(options['_locks'], loop=self._loop)
+        lock = ServerLock(options['_locks'], loop=self.loop)
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
@@ -278,8 +278,8 @@ class Tremolo:
             for func in self.events['worker_start']:
                 if (await func(context=context,
                                app=self,
-                               loop=self._loop,
-                               logger=self._logger)):
+                               loop=self.loop,
+                               logger=self.logger)):
                     break
         else:
             from .asgi_lifespan import ASGILifespan
@@ -318,9 +318,9 @@ class Tremolo:
             if server_name != b'':
                 server_name += b' (ASGI)'
 
-            lifespan = ASGILifespan(options['app'],
-                                    loop=self._loop, logger=self._logger)
-
+            lifespan = ASGILifespan(
+                options['app'], loop=self.loop, logger=self.logger
+            )
             lifespan.startup()
             exc = await lifespan.exception()
 
@@ -331,9 +331,9 @@ class Tremolo:
             'date': server_date(),
             'name': server_name
         }
-        server = await self._loop.create_server(
-            lambda: Server(loop=self._loop,
-                           logger=self._logger,
+        server = await self.loop.create_server(
+            lambda: Server(loop=self.loop,
+                           logger=self.logger,
                            lock=lock,
                            worker=context,
                            debug=options.get('debug', False),
@@ -432,9 +432,7 @@ class Tremolo:
                                     modules[module] = _sign
                                     continue
 
-                                self._logger.info('reload: %s',
-                                                  module.__file__)
-
+                                self.logger.info('reload: %s', module.__file__)
                                 server.close()
                                 await server.wait_closed()
 
@@ -445,7 +443,7 @@ class Tremolo:
                     if ('limit_memory' in options and
                             options['limit_memory'] > 0 and
                             memory_usage() > options['limit_memory']):
-                        self._logger.error('memory limit exceeded')
+                        self.logger.error('memory limit exceeded')
                         sys.exit(1)
 
                     if options['_conn'].poll():
@@ -467,23 +465,23 @@ class Tremolo:
                 if (await self.events['worker_stop'][i](
                         context=context,
                         app=self,
-                        loop=self._loop,
-                        logger=self._logger)):
+                        loop=self.loop,
+                        logger=self.logger)):
                     break
         else:
             lifespan.shutdown()
             exc = await lifespan.exception()
 
             if exc:
-                self._logger.error(exc)
+                self.logger.error(exc)
 
     async def _stop(self, task):
         await task
-        self._loop.stop()
+        self.loop.stop()
 
     def _worker(self, host, port, **kwargs):
-        self._logger = logging.getLogger(mp.current_process().name)
-        self._logger.setLevel(
+        self.logger = logging.getLogger(mp.current_process().name)
+        self.logger.setLevel(
             getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
 
@@ -493,18 +491,18 @@ class Tremolo:
         )
 
         handler.setFormatter(formatter)
-        self._logger.addHandler(handler)
+        self.logger.addHandler(handler)
 
-        self._loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self._loop)
-        task = self._loop.create_task(self._serve(host, port, **kwargs))
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        task = self.loop.create_task(self._serve(host, port, **kwargs))
 
         try:
-            self._loop.run_until_complete(task)
+            self.loop.run_until_complete(task)
         except KeyboardInterrupt:
-            self._logger.info('Shutting down')
-            self._loop.create_task(self._stop(task))
-            self._loop.run_forever()
+            self.logger.info('Shutting down')
+            self.loop.create_task(self._stop(task))
+            self.loop.run_forever()
         finally:
             try:
                 if task.done():
@@ -512,9 +510,9 @@ class Tremolo:
 
                     # to avoid None, SystemExit, etc. for being printed
                     if isinstance(exc, Exception):
-                        self._logger.error(exc)
+                        self.logger.error(exc)
             finally:
-                self._loop.close()
+                self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
