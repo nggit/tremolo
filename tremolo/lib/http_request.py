@@ -51,15 +51,7 @@ class HTTPRequest(Request):
 
         self.method = header.getmethod().upper()
         self.url = header.geturl()
-        path_size = self.url.find(b'?')
-
-        if path_size == -1:
-            self.path = self.url
-            self.query_string = b''
-        else:
-            self.path = self.url[:path_size]
-            self.query_string = self.url[path_size + 1:]
-
+        self.path, _, self.query_string = self.url.partition(b'?')
         self.version = header.getversion()
 
         if self.version != b'1.0':
