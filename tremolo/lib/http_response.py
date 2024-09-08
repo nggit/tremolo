@@ -24,7 +24,7 @@ KEEPALIVE_OR_UPGRADE = {
 class HTTPResponse(Response):
     __slots__ = ('_headers',
                  'http_chunked',
-                 '_request',
+                 'request',
                  '_status',
                  '_content_type')
 
@@ -34,7 +34,7 @@ class HTTPResponse(Response):
         self._headers = {}
         self.http_chunked = False
 
-        self._request = request
+        self.request = request
         self._status = []
         self._content_type = []
 
@@ -71,11 +71,11 @@ class HTTPResponse(Response):
 
         self.set_header(
             b'Date',
-            self._request.protocol.options['server_info']['date']
+            self.request.protocol.options['server_info']['date']
         )
         self.set_header(
             b'Server',
-            self._request.protocol.options['server_info']['name']
+            self.request.protocol.options['server_info']['name']
         )
 
     def set_cookie(
@@ -177,18 +177,18 @@ class HTTPResponse(Response):
     def close(self, keepalive=False):
         if not keepalive:
             # this will force the TCP connection to be terminated
-            self._request.http_keepalive = False
+            self.request.http_keepalive = False
 
         super().close()
 
     async def send_continue(self):
-        if self._request.http_continue:
-            if (self._request.content_length >
-                    self._request.protocol.options['client_max_body_size']):
+        if self.request.http_continue:
+            if (self.request.content_length >
+                    self.request.protocol.options['client_max_body_size']):
                 raise ExpectationFailed
 
             await self.send(
-                b'HTTP/%s 100 Continue\r\n\r\n' % self._request.version,
+                b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version,
                 throttle=False
             )
             self.close(keepalive=True)
@@ -203,7 +203,7 @@ class HTTPResponse(Response):
             content_length = len(data)
 
             if content_length > 0 and (
-                        self._request.method == b'HEAD' or
+                        self.request.method == b'HEAD' or
                         status[0] in (204, 205, 304) or 100 <= status[0] < 200
                     ):
                 data = b''
@@ -213,12 +213,12 @@ class HTTPResponse(Response):
             await self.send(
                 b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n'
                 b'Connection: %s\r\n%s\r\n\r\n%s' % (
-                    self._request.version,
+                    self.request.version,
                     *status,
                     self.get_content_type(),
                     content_length,
                     KEEPALIVE_OR_CLOSE[
-                        keepalive and self._request.http_keepalive],
+                        keepalive and self.request.http_keepalive],
                     b'\r\n'.join(
                         b'\r\n'.join(v) for k, v in self.headers.items() if
                         k not in excludes),
@@ -243,12 +243,12 @@ class HTTPResponse(Response):
                               100 <= status[0] < 200)
 
                 if chunked is None:
-                    self.http_chunked = (self._request.version == b'1.1' and
+                    self.http_chunked = (self.request.version == b'1.1' and
                                          not no_content)
                 else:
                     self.http_chunked = chunked
 
-                self.headers[b'_line'] = [b'HTTP/%s' % self._request.version,
+                self.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
                                           b'%d' % status[0],
                                           status[1]]
 
@@ -258,14 +258,14 @@ class HTTPResponse(Response):
                 if self.http_chunked:
                     self.set_header(b'Transfer-Encoding', b'chunked')
 
-                if self._request.http_keepalive:
+                if self.request.http_keepalive:
                     if status[0] == 101:
-                        self._request.upgraded = True
+                        self.request.upgraded = True
                     elif not (self.http_chunked or
                               b'content-length' in self.headers):
                         # no chunk, no close, no size.
                         # Assume close to signal end
-                        self._request.http_keepalive = False
+                        self.request.http_keepalive = False
 
                     self.set_header(
                         b'Connection',
@@ -274,13 +274,13 @@ class HTTPResponse(Response):
                 else:
                     self.set_header(b'Connection', b'close')
 
-                if self._request.method == b'HEAD' or no_content:
+                if self.request.method == b'HEAD' or no_content:
                     if status[0] not in (101, 426):
-                        self._request.http_keepalive = False
+                        self.request.http_keepalive = False
 
                     data = None
                 else:
-                    self._request.protocol.set_watermarks(
+                    self.request.protocol.set_watermarks(
                         high=buffer_size * 4,
                         low=kwargs.get('buffer_min_size', buffer_size // 2)
                     )
@@ -292,7 +292,7 @@ class HTTPResponse(Response):
             )
             self.headers_sent(True)
 
-        if (self.http_chunked and not self._request.upgraded and
+        if (self.http_chunked and not self.request.upgraded and
                 data is not None):
             await self.send(b'%X\r\n%s\r\n' % (len(data), data), **kwargs)
         else:
@@ -308,14 +308,14 @@ class HTTPResponse(Response):
         kwargs['buffer_size'] = buffer_size
 
         try:
-            handle = self._request.context.RESPONSE_SENDFILE_HANDLE
+            handle = self.request.context.RESPONSE_SENDFILE_HANDLE
             handle.seek(0)
         except AttributeError:
             handle = open(path, 'rb')
-            self._request.context.RESPONSE_SENDFILE_HANDLE = handle
+            self.request.context.RESPONSE_SENDFILE_HANDLE = handle
 
-            self._request.context.tasks.add(
-                self._request.context.RESPONSE_SENDFILE_HANDLE.close
+            self.request.context.tasks.add(
+                self.request.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
         st = os.stat(path)
@@ -326,10 +326,9 @@ class HTTPResponse(Response):
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
                               time.gmtime(st.st_mtime)).encode('latin-1')
 
-        if (self._request.version == b'1.1' and
-                b'range' in self._request.headers):
-            if (b'if-range' in self._request.headers and
-                    self._request.headers[b'if-range'] != mdate):
+        if self.request.version == b'1.1' and b'range' in self.request.headers:
+            if (b'if-range' in self.request.headers and
+                    self.request.headers[b'if-range'] != mdate):
                 self.set_content_type(content_type)
                 self.set_header(b'Last-Modified', mdate)
                 self.set_header(b'Content-Length', b'%d' % file_size)
@@ -345,7 +344,7 @@ class HTTPResponse(Response):
                 self.close(keepalive=True)
                 return
 
-            _range = self._request.headers[b'range']
+            _range = self.request.headers[b'range']
 
             if isinstance(_range, list):
                 for v in _range:
@@ -414,10 +413,10 @@ class HTTPResponse(Response):
                                      chunked=False, **kwargs)
                     size -= buffer_size
             else:
-                client = self._request.client
+                client = self.request.client
 
                 if client is None:
-                    fileno = self._request.socket.fileno()
+                    fileno = self.request.socket.fileno()
                     client = (str(fileno), fileno)
 
                 ip, port = client
@@ -452,8 +451,8 @@ class HTTPResponse(Response):
                 await self.write(b'--%s--\r\n' % boundary, **kwargs)
                 await self.write(b'', **kwargs)
         else:
-            if (b'if-modified-since' in self._request.headers and
-                    self._request.headers[b'if-modified-since'] == mdate):
+            if (b'if-modified-since' in self.request.headers and
+                    self.request.headers[b'if-modified-since'] == mdate):
                 self.set_status(304, b'Not Modified')
                 await self.write(None)
                 return
@@ -462,7 +461,7 @@ class HTTPResponse(Response):
             self.set_header(b'Last-Modified', mdate)
             self.set_header(b'Content-Length', b'%d' % file_size)
 
-            if self._request.version == b'1.1':
+            if self.request.version == b'1.1':
                 self.set_header(b'Accept-Ranges', b'bytes')
 
             data = True
