@@ -43,6 +43,9 @@ def usage(**context):
     print('                            Defaults to 2 * 1048576, or 2MiB')
     print('  --log-level               Defaults to "DEBUG". See')
     print('                            https://docs.python.org/3/library/logging.html#levels')  # noqa: E501
+    print('  --event-loop-policy       A fully qualified event loop policy name')  # noqa: E501
+    print('                            E.g. "asyncio.DefaultEventLoopPolicy" or "uvloop.EventLoopPolicy"')  # noqa: E501
+    print('                            It expects the respective module to already be present')  # noqa: E501
     print('  --download-rate           Limits the sending speed to the client')
     print('                            Defaults to 1048576, which means 1MiB/s')  # noqa: E501
     print('  --upload-rate             Limits the upload / POST speed')
