@@ -1,6 +1,5 @@
 # Tremolo
-
-[![codecov](https://codecov.io/gh/nggit/tremolo/branch/main/graph/badge.svg?token=SC8NVWN0F1)](https://codecov.io/gh/nggit/tremolo)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 
 Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
