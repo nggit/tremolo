@@ -1,6 +1,5 @@
 # Copyright (c) 2023 nggit
 
-from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
 from .lib.sse import SSE
@@ -11,6 +10,8 @@ class HTTPServer(HTTPProtocol):
     __slots__ = ('_routes', '_middlewares', '_server')
 
     def __init__(self, _routes=None, _middlewares=None, lock=None, **kwargs):
+        super().__init__(**kwargs)
+
         self._routes = _routes
         self._middlewares = _middlewares
         self._server = {
@@ -18,10 +19,8 @@ class HTTPServer(HTTPProtocol):
             'logger': kwargs['logger'],
             'worker': kwargs['worker'],
             'lock': lock,
-            'context': ServerContext()
+            'context': self.context
         }
-
-        super().__init__(self._server['context'], **kwargs)
 
     async def _connection_made(self):
         for func, _ in self._middlewares['connect']:

@@ -11,7 +11,6 @@ from .exceptions import (
     WebSocketServerClosed
 )
 from .handlers import error_400, error_500
-from .lib.contexts import ServerContext
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
@@ -29,13 +28,13 @@ class ASGIServer(HTTPProtocol):
                  '_http_chunked')
 
     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
         self._scope = None
         self._read = None
         self._timer = None
         self._websocket = None
         self._http_chunked = None
-
-        super().__init__(ServerContext(), **kwargs)
 
     def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
