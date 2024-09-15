@@ -15,15 +15,18 @@ async def hello_world(**server):
     yield b'world!'
 ```
 
-You can take advantage of this to serve big files efficiently:
+You can take advantage of this to serve/generate big files efficiently:
 
 ```python
-@app.route('/my/url/big.data')
-async def my_big_data(content_type='application/octet-stream', **server):
+@app.route('/my/url/speedtest.bin')
+async def my_big_data(**server):
+    response = server['response']
     # buffer_size = 16384
     buffer_size = server['context'].options['buffer_size']
 
-    with open('/my/folder/big.data', 'rb') as f:
+    response.set_content_type('application/octet-stream')
+
+    with open('/dev/random', 'rb') as f:
         chunk = True
 
         while chunk:
@@ -156,11 +159,11 @@ app.run('0.0.0.0', 8000)
 
 You can even get higher concurrency with [PyPy](https://www.pypy.org/) or [uvloop](https://magic.io/blog/uvloop-blazing-fast-python-networking/):
 
-```python
-import asyncio
-import uvloop
-asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 ```
+python3 -m tremolo --event-loop-policy uvloop.EventLoopPolicy --log-level ERROR example:app
+```
+
+See: [event_loop_policy](https://nggit.github.io/tremolo-docs/configuration.html#event_loop_policy)
 
 ## Installing
 ```
