@@ -4,6 +4,7 @@ import asyncio
 
 from urllib.parse import quote_from_bytes, unquote_to_bytes
 
+from .contexts import ServerContext
 from .h1parser import ParseHeader
 from .http_exception import (
     HTTPException,
@@ -34,12 +35,12 @@ class HTTPProtocol(asyncio.Protocol):
                  '_header_buf',
                  '_waiters')
 
-    def __init__(self, context, loop=None, logger=None, worker=None, **kwargs):
-        self.context = context
+    def __init__(self, loop=None, logger=None, worker=None, **kwargs):
+        self.context = ServerContext()
         self.options = kwargs
         self.loop = loop
         self.logger = logger
-        self.worker = worker
+        self.worker = worker  # a worker-level context
         self.transport = None
         self.queue = [None, None]
         self.request = None
