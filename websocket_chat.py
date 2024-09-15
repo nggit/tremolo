@@ -78,6 +78,7 @@ async def ws_handler(websocket=None, request=None, stream=False, **_):
     </html>
     """
 
+
 if __name__ == '__main__':
     # don't forget to disable debug and reload on production!
     app.run('0.0.0.0', 8000, debug=True, reload=True)
