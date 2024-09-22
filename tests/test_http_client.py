@@ -584,7 +584,7 @@ class TestHTTPClient(unittest.TestCase):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT + 2,
                                    method='GET',
-                                   url='/download',
+                                   url='/download?executor',
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
