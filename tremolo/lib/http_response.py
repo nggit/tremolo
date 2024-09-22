@@ -1,5 +1,6 @@
 # Copyright (c) 2023 nggit
 
+import asyncio
 import os
 import time
 
@@ -304,14 +305,27 @@ class HTTPResponse(Response):
             file_size=None,
             buffer_size=16 * 1024,
             content_type=b'application/octet-stream',
+            executor=None,
             **kwargs):
         kwargs['buffer_size'] = buffer_size
+        loop = self.request.protocol.loop
+
+        def run_sync(func, *args):
+            if executor is None:
+                return loop.run_in_executor(None, func, *args)
+
+            fut = executor.submit(func, *args)
+
+            if isinstance(fut, asyncio.Future):
+                return fut
+
+            return asyncio.wrap_future(fut, loop=loop)
 
         try:
             handle = self.request.context.RESPONSE_SENDFILE_HANDLE
-            handle.seek(0)
+            await run_sync(handle.seek, 0)
         except AttributeError:
-            handle = open(path, 'rb')
+            handle = await run_sync(open, path, 'rb')
             self.request.context.RESPONSE_SENDFILE_HANDLE = handle
 
             self.request.context.tasks.add(
@@ -337,7 +351,7 @@ class HTTPResponse(Response):
                 data = True
 
                 while data:
-                    data = handle.read(buffer_size)
+                    data = await run_sync(handle.read, buffer_size)
 
                     await self.write(data, chunked=False, **kwargs)
 
@@ -406,11 +420,13 @@ class HTTPResponse(Response):
                     b'Content-Range', b'bytes %d-%d/%d' % (
                         start, end, file_size)
                 )
-                handle.seek(start)
+                await run_sync(handle.seek, start)
 
                 while size > 0:
-                    await self.write(handle.read(min(size, buffer_size)),
-                                     chunked=False, **kwargs)
+                    await self.write(
+                        await run_sync(handle.read, min(size, buffer_size)),
+                        chunked=False, **kwargs
+                    )
                     size -= buffer_size
             else:
                 client = self.request.client
@@ -438,11 +454,13 @@ class HTTPResponse(Response):
                             boundary, content_type, start, end, file_size),
                         **kwargs
                     )
-                    handle.seek(start)
+                    await run_sync(handle.seek, start)
 
                     while size > 0:
                         await self.write(
-                            handle.read(min(size, buffer_size)), **kwargs
+                            await run_sync(handle.read,
+                                           min(size, buffer_size)),
+                            **kwargs
                         )
                         size -= buffer_size
 
@@ -467,7 +485,7 @@ class HTTPResponse(Response):
             data = True
 
             while data:
-                data = handle.read(buffer_size)
+                data = await run_sync(handle.read, buffer_size)
 
                 await self.write(data, chunked=False, **kwargs)
 

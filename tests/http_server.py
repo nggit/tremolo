@@ -3,6 +3,7 @@
 __all__ = ('app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE')
 
 import asyncio  # noqa: E402
+import concurrent.futures  # noqa: E402
 import os  # noqa: E402
 import sys  # noqa: E402
 
@@ -280,8 +281,14 @@ async def upload_multipart(stream=False, **server):
 
 
 @app.route('/download')
-async def download(**server):
-    await server['response'].sendfile(TEST_FILE, content_type=b'text/plain')
+async def download(request=None, response=None, **_):
+    if request.query_string == b'executor':
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            await response.sendfile(
+                TEST_FILE, content_type=b'text/plain', executor=executor
+            )
+    else:
+        await response.sendfile(TEST_FILE, content_type=b'text/plain')
 
 
 @app.route('/ws')
