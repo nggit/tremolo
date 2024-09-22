@@ -79,17 +79,8 @@ class HTTPResponse(Response):
             self.request.protocol.options['server_info']['name']
         )
 
-    def set_cookie(
-            self,
-            name,
-            value='',
-            expires=0,
-            path='/',
-            domain=None,
-            secure=False,
-            httponly=False,
-            samesite=None
-            ):
+    def set_cookie(self, name, value='', expires=0, path='/', domain=None,
+                   secure=False, httponly=False, samesite=None):
         if isinstance(name, str):
             name = name.encode('latin-1')
 
