@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
-from .http_exception import (
+from .http_exceptions import (
     BadRequest, ExpectationFailed, InternalServerError, RangeNotSatisfiable
 )
 from .response import Response

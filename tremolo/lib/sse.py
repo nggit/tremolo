@@ -1,6 +1,6 @@
 # Copyright (c) 2023 nggit
 
-from .http_exception import InternalServerError
+from .http_exceptions import InternalServerError
 
 
 class SSE:
