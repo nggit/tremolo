@@ -285,7 +285,7 @@ async def download(request=None, response=None, **_):
     if request.query_string == b'executor':
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             await response.sendfile(
-                TEST_FILE, content_type=b'text/plain', executor=executor
+                TEST_FILE, content_type='text/plain', executor=executor
             )
     else:
         await response.sendfile(TEST_FILE, content_type=b'text/plain')

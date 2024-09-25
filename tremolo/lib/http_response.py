@@ -298,6 +298,9 @@ class HTTPResponse(Response):
             content_type=b'application/octet-stream',
             executor=None,
             **kwargs):
+        if isinstance(content_type, str):
+            content_type = content_type.encode('latin-1')
+
         kwargs['buffer_size'] = buffer_size
         loop = self.request.protocol.loop
 
