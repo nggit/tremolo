@@ -4,7 +4,7 @@ import base64
 import hashlib
 import os
 
-from .http_exception import WebSocketClientClosed, WebSocketServerClosed
+from .http_exceptions import WebSocketClientClosed, WebSocketServerClosed
 
 
 class WebSocket:
