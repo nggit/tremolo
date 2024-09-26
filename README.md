@@ -161,10 +161,10 @@ app.run('0.0.0.0', 8000)
 You can even get higher concurrency with [PyPy](https://www.pypy.org/) or [uvloop](https://magic.io/blog/uvloop-blazing-fast-python-networking/):
 
 ```
-python3 -m tremolo --event-loop-policy uvloop.EventLoopPolicy --log-level ERROR example:app
+python3 -m tremolo --loop uvloop --log-level ERROR example:app
 ```
 
-See: [event_loop_policy](https://nggit.github.io/tremolo-docs/configuration.html#event_loop_policy)
+See: [--loop](https://nggit.github.io/tremolo-docs/configuration.html#loop)
 
 ## Installing
 ```
