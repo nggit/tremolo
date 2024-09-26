@@ -63,7 +63,7 @@ def parse_args(**callbacks):
             options[name] = True
         elif sys.argv[i - 1] in ('--host',
                                  '--log-level',
-                                 '--event-loop-policy',
+                                 '--loop',
                                  '--server-name',
                                  '--root-path'):
             options[name] = sys.argv[i]

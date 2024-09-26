@@ -492,15 +492,17 @@ class Tremolo:
 
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+        loop_name = kwargs.get('loop', 'asyncio.')
 
-        # 'asyncio', '.', 'DefaultEventLoopPolicy'
-        module_name, _, class_name = kwargs.get(
-            'event_loop_policy', 'asyncio.DefaultEventLoopPolicy'
-        ).rpartition('.')
-        module = import_module(module_name)
-        asyncio.set_event_loop_policy(getattr(module, class_name)())
+        if '.' not in loop_name:
+            loop_name += '.'
 
-        self.loop = asyncio.new_event_loop()
+        # 'asyncio', '.', ''
+        # 'asyncio', '.', 'SelectorEventLoop'
+        module_name, _, class_name = loop_name.rpartition('.')
+        module = import_module(module_name or 'asyncio')
+        self.loop = getattr(module, class_name or 'new_event_loop')()
+
         asyncio.set_event_loop(self.loop)
         task = self.loop.create_task(self._serve(host, port, **kwargs))
 
