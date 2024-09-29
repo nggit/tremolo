@@ -23,7 +23,7 @@ def main():
                     debug=False,
                     reload=True,
                     loop='asyncio.SelectorEventLoop',
-                    limit_memory=65536,  # 64MiB
+                    limit_memory=102400,  # 100MiB
                     client_max_body_size=73728,  # 72KiB
                     ws_max_payload_size=73728))
     )
