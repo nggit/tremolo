@@ -207,7 +207,7 @@ async def trigger_memory_leak(**server):
 
     data = bytearray()
 
-    while initial_memory_usage + len(data) < 64 * 1048576:
+    while initial_memory_usage + len(data) < 100 * 1048576:
         data.extend(b' ' * 1048576)
 
     await asyncio.sleep(10)

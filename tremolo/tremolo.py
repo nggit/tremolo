@@ -233,16 +233,9 @@ class Tremolo:
             sock = socket.fromshare(options['_conn'].recv())
             sock.listen(backlog)
         else:
-            try:
-                # Linux 'fork'
-                sock = socket.fromfd(options['_conn'].recv(),
-                                     options['_sa_family'],
-                                     socket.SOCK_STREAM)
-                sock.listen(backlog)
-            except OSError:
-                # Linux 'spawn'
-                sock = self.create_sock(host, port, options['reuse_port'])
-                sock.listen(backlog)
+            # Linux
+            sock = self.create_sock(host, port, options['reuse_port'])
+            sock.listen(backlog)
 
         if ('ssl' in options and options['ssl'] and
                 isinstance(options['ssl'], dict)):
@@ -679,6 +672,7 @@ class Tremolo:
         socks = {}
 
         print('Options:')
+        mp.get_start_method() == 'spawn' or mp.set_start_method('spawn')
 
         for (_host, _port), options in self.ports.items():
             if _host is None:
@@ -709,7 +703,6 @@ class Tremolo:
                     kwargs=dict(options,
                                 _locks=locks,
                                 _conn=child_conn,
-                                _sa_family=socks[args].family,
                                 _routes=self.routes,
                                 _middlewares=self.middlewares)
                 )
@@ -719,8 +712,6 @@ class Tremolo:
 
                 if hasattr(socks[args], 'share'):
                     parent_conn.send(socks[args].share(child_pid))
-                else:
-                    parent_conn.send(socks[args].fileno())
 
                 processes.append((parent_conn, p, args, options))
 
@@ -770,7 +761,6 @@ class Tremolo:
                             kwargs=dict(options,
                                         _locks=locks,
                                         _conn=child_conn,
-                                        _sa_family=socks[args].family,
                                         _routes=self.routes,
                                         _middlewares=self.middlewares)
                         )
@@ -780,8 +770,6 @@ class Tremolo:
 
                         if hasattr(socks[args], 'share'):
                             parent_conn.send(socks[args].share(child_pid))
-                        else:
-                            parent_conn.send(socks[args].fileno())
 
                         processes[i] = (parent_conn, p, args, options)
 
