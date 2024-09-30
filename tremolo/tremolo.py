@@ -231,11 +231,11 @@ class Tremolo:
         if hasattr(socket, 'fromshare'):
             # Windows
             sock = socket.fromshare(options['_conn'].recv())
-            sock.listen(backlog)
         else:
             # Linux
             sock = self.create_sock(host, port, options['reuse_port'])
-            sock.listen(backlog)
+
+        sock.listen(backlog)
 
         if ('ssl' in options and options['ssl'] and
                 isinstance(options['ssl'], dict)):
@@ -672,7 +672,7 @@ class Tremolo:
         socks = {}
 
         print('Options:')
-        mp.get_start_method() == 'spawn' or mp.set_start_method('spawn')
+        mp.set_start_method('spawn', force=True)
 
         for (_host, _port), options in self.ports.items():
             if _host is None:
