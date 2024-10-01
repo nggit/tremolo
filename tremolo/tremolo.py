@@ -311,11 +311,11 @@ class Tremolo:
             if server_name != b'':
                 server_name += b' (ASGI)'
 
-            lifespan = ASGILifespan(
+            context.options['_lifespan'] = ASGILifespan(
                 options['app'], loop=self.loop, logger=self.logger
             )
-            lifespan.startup()
-            exc = await lifespan.exception()
+            context.options['_lifespan'].startup()
+            exc = await context.options['_lifespan'].exception()
 
             if exc:
                 raise exc
@@ -383,6 +383,7 @@ class Tremolo:
                  if not options['app_dir'].startswith(path)]
         modules = {}
         process_num = 1
+        limit_memory = options.get('limit_memory', 0)
 
         # serve forever
         while process_num:
@@ -428,15 +429,17 @@ class Tremolo:
                                 self.logger.info('reload: %s', module.__file__)
                                 server.close()
                                 await server.wait_closed()
+                                await self._worker_stop(context)
 
                                 # essentially means sys.exit(0)
                                 # to trigger a reload
                                 return
 
-                    if ('limit_memory' in options and
-                            options['limit_memory'] > 0 and
-                            memory_usage() > options['limit_memory']):
+                    if limit_memory > 0 and memory_usage() > limit_memory:
                         self.logger.error('memory limit exceeded')
+                        server.close()
+                        await server.wait_closed()
+                        await self._worker_stop(context)
                         sys.exit(1)
 
                     if options['_conn'].poll():
@@ -448,8 +451,10 @@ class Tremolo:
 
         server.close()
         await server.wait_closed()
+        await self._worker_stop(context)
 
-        if options['app'] is None:
+    async def _worker_stop(self, context):
+        if context.options['app'] is None:
             i = len(self.events['worker_stop'])
 
             while i > 0:
@@ -462,8 +467,8 @@ class Tremolo:
                         logger=self.logger)):
                     break
         else:
-            lifespan.shutdown()
-            exc = await lifespan.exception()
+            context.options['_lifespan'].shutdown()
+            exc = await context.options['_lifespan'].exception()
 
             if exc:
                 self.logger.error(exc)
