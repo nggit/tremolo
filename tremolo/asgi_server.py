@@ -77,22 +77,6 @@ class ASGIServer(HTTPProtocol):
         else:
             self._handle_http()
 
-        # the current task is done
-        # update the handler with the ASGI main task
-        self.handler = self.loop.create_task(self.main())
-
-    async def handle_error_500(self, exc):
-        return await error_500(
-            request=self.request, response=self.response, exc=exc
-        )
-
-    def connection_lost(self, exc):
-        if self.handler is not None and not self.handler.done():
-            self._set_app_close_timeout()
-
-        super().connection_lost(exc)
-
-    async def main(self):
         try:
             await self.options['_app'](self._scope, self.receive, self.send)
 
@@ -104,6 +88,18 @@ class ASGIServer(HTTPProtocol):
                 exc = WebSocketServerClosed(cause=exc)
 
             await self.handle_exception(exc)
+
+    async def handle_error_500(self, exc):
+        return await error_500(
+            request=self.request, response=self.response, exc=exc
+        )
+
+    def connection_lost(self, exc):
+        if self.handler is not None and not self.handler.done():
+            self._set_app_close_timeout()
+
+        self._scope = None
+        super().connection_lost(exc)
 
     def _set_app_close_timeout(self):
         if self._timer is None:
