@@ -9,11 +9,11 @@ on:
 
 jobs:
   tests:
-    name: Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    name: Python ${{ matrix.python_version }} on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version:
+        python_version:
           - '3.12'
           - '3.11'
           - '3.9'
@@ -29,7 +29,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.python_version }}
 
       - name: Install dependencies
         run: |
@@ -42,18 +42,18 @@ jobs:
           python -m bandit --recursive tremolo/
           python -m pip install --upgrade flake8
           python -m flake8 .
-        if: ${{ matrix.os == 'ubuntu-20.04' && matrix.python-version == '3.12' }}
+        if: ${{ matrix.os == 'ubuntu-20.04' && matrix.python_version == '3.12' }}
 
       - name: Run tests
         run: python alltests.py
-        if: ${{ matrix.python-version != '3.12' }}
+        if: ${{ matrix.python_version != '3.12' }}
 
       - name: Run tests with coverage
         run: |
           python -m coverage run alltests.py
           python -m coverage combine
           mkdir artifact && mv .coverage artifact/.coverage.${{ matrix.os }}
-        if: ${{ matrix.python-version == '3.12' && !startsWith(matrix.os, 'windows-') }}
+        if: ${{ matrix.python_version == '3.12' && !startsWith(matrix.os, 'windows-') }}
 
       - name: Run tests with coverage on Windows
         run: |
@@ -61,13 +61,13 @@ jobs:
           python -m coverage combine
           mkdir artifact && move .coverage artifact\.coverage.windows
         shell: cmd
-        if: ${{ matrix.python-version == '3.12' && startsWith(matrix.os, 'windows-') }}
+        if: ${{ matrix.python_version == '3.12' && startsWith(matrix.os, 'windows-') }}
 
       - uses: actions/upload-artifact@v3
         with:
           path: artifact
           include-hidden-files: true
-        if: ${{ matrix.python-version == '3.12' }}
+        if: ${{ matrix.python_version == '3.12' }}
 
   report:
     name: Upload coverage to SonarCloud Scan
