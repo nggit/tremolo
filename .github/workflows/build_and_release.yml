@@ -1,0 +1,64 @@
+name: Build and Release
+
+on:
+  push:
+    branches: ['build', 'release']
+  pull_request:
+    branches: ['main', 'master']
+  workflow_dispatch:
+
+jobs:
+  build:
+    if: |
+      startsWith(github.ref_name, 'build') ||
+      startsWith(github.ref_name, 'release')
+    name: Build sdist and wheels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          python -m venv --system-site-packages .local
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          python -m pip install --upgrade pip build setuptools
+
+      - name: Build and verify its integrity
+        run: |
+          python -m build --no-isolation
+          for f in dist/tremolo-*.tar.gz; do
+              gzip -t "$f"
+          done
+          for f in dist/tremolo-*.whl; do
+              unzip -t "$f"
+          done
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist/tremolo-*
+
+  release:
+    if: |
+      startsWith(github.ref_name, 'build') ||
+      startsWith(github.ref_name, 'release')
+    name: Upload release to PyPI
+    needs: ['build']
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/tremolo
+    permissions:
+      id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: dist
+        path: dist
+
+    - run: |
+        tree -L 2
+
+    - name: Publish to PyPI
+      if: ${{ startsWith(github.ref_name, 'release') }}
+      uses: pypa/gh-action-pypi-publish@release/v1
