@@ -5,7 +5,7 @@ import asyncio
 from urllib.parse import quote_from_bytes, unquote_to_bytes
 
 from .contexts import ServerContext
-from .h1parser import ParseHeader
+from .http_parser import ParseHeader
 from .http_exceptions import (
     HTTPException,
     BadRequest,

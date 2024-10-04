@@ -26,11 +26,6 @@ class ParseHeader:
                  '_body')
 
     def __init__(self, data=None, **kwargs):
-        self.parse(data, **kwargs)
-
-    def parse(self, data, header_size=None, excludes=(),
-              max_lines=100, max_line_size=8190):
-        # don't put these in __init__!!!
         self.is_request = False
         self.is_response = False
         self.is_valid_request = False
@@ -40,15 +35,26 @@ class ParseHeader:
         self._headers = []
         self._body = b''
 
+        self.parse(data, **kwargs)
+
+    def parse(self, data, header_size=-1, excludes=(),
+              max_lines=100, max_line_size=8190):
         if data is None:
             return self
 
-        if header_size is None:
+        if header_size == -1:
             header_size = data.find(b'\r\n\r\n') + 2
 
         if header_size < 2:
             return self
 
+        self.is_request = False
+        self.is_response = False
+        self.is_valid_request = False
+        self.is_valid_response = False
+
+        self.headers.clear()
+        self._headers.clear()
         self._body = data[header_size + 2:]
         start = 0
 
@@ -64,13 +70,14 @@ class ParseHeader:
             if max_lines < 0 or end - start > max_line_size or b'\n' in line:
                 self.is_valid_request = False
                 self.is_valid_response = False
-
                 return self
 
             colon_pos = line.find(b':', 1)
 
             if start == 0:
-                if line.startswith(b'HTTP/'):
+                http_pos = line.find(b'HTTP/')
+
+                if http_pos == 0:
                     self.is_response = True
 
                     try:
@@ -86,23 +93,20 @@ class ParseHeader:
                         self.headers[b'_version'] = b''
                         self.headers[b'_status'] = 0
                         self.headers[b'_message'] = b''
-                else:
-                    url_end_pos = line.find(b' HTTP/')
+                elif http_pos > 1 and line[http_pos - 1] == 32:
+                    self.is_request = True
 
-                    if url_end_pos > 0:
-                        self.is_request = True
-
-                        try:
-                            (
-                                self.headers[b'_method'],
-                                self.headers[b'_url']
-                            ) = line[:url_end_pos].split(b' ', 1)
-                            self.headers[b'_version'] = line[url_end_pos + 6:]
-                            self.is_valid_request = True
-                        except ValueError:
-                            self.headers[b'_method'] = b''
-                            self.headers[b'_url'] = b''
-                            self.headers[b'_version'] = b''
+                    try:
+                        (
+                            self.headers[b'_method'],
+                            self.headers[b'_url']
+                        ) = line[:http_pos - 1].split(b' ', 1)
+                        self.headers[b'_version'] = line[http_pos + 5:]
+                        self.is_valid_request = True
+                    except ValueError:
+                        self.headers[b'_method'] = b''
+                        self.headers[b'_url'] = b''
+                        self.headers[b'_version'] = b''
 
                 self.headers[b'_line'] = line
             elif colon_pos > 0 and line[colon_pos - 1] != 32:
@@ -126,7 +130,6 @@ class ParseHeader:
             else:
                 self.is_valid_request = False
                 self.is_valid_response = False
-
                 break
 
             start = end + 2
