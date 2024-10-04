@@ -51,14 +51,14 @@ jobs:
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
     steps:
-    - uses: actions/download-artifact@v3
-      with:
-        name: dist
-        path: dist
+      - uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist
 
-    - run: |
-        tree -L 2
+      - run: |
+          tree -L 2
 
-    - name: Publish to PyPI
-      if: ${{ startsWith(github.ref_name, 'release') }}
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Publish to PyPI
+        if: ${{ startsWith(github.ref_name, 'release') }}
+        uses: pypa/gh-action-pypi-publish@release/v1

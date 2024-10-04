@@ -85,6 +85,9 @@ jobs:
 
       - uses: actions/download-artifact@v3
 
+      - run: |
+          tree -L 2
+
       - name: Combine and view report
         run: |
           python -m coverage combine artifact
