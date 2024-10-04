@@ -11,7 +11,7 @@ sys.path.insert(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 )
 
-from tremolo.lib.h1parser import ParseHeader  # noqa: E402
+from tremolo.lib.http_parser import ParseHeader  # noqa: E402
 
 
 def decode_dict(data, encoding='latin-1'):

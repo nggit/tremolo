@@ -42,7 +42,7 @@ class HTTPRequest(Request):
         self._is_secure = None
         self._scheme = None
         self.header = header
-        self.headers = header.headers
+        self.headers = header.headers.copy()
         self.is_valid = header.is_valid_request
         self.host = header.gethost()
 
