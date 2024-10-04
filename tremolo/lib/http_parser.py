@@ -2,6 +2,9 @@
 
 
 class Headers(dict):
+    def copy(self):
+        return self.__class__(self)
+
     def getlist(self, name):
         values = self.get(name, [])
 
