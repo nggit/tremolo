@@ -5,7 +5,6 @@ import asyncio
 from urllib.parse import quote_from_bytes, unquote_to_bytes
 
 from .contexts import ServerContext
-from .http_parser import ParseHeader
 from .http_exceptions import (
     HTTPException,
     BadRequest,
@@ -14,6 +13,7 @@ from .http_exceptions import (
     WebSocketException,
     WebSocketServerClosed
 )
+from .http_parser import ParseHeader
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .queue import Queue

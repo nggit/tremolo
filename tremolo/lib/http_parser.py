@@ -40,13 +40,13 @@ class ParseHeader:
 
         self.parse(data, **kwargs)
 
-    def parse(self, data, header_size=-1, excludes=(),
+    def parse(self, data, header_size=-1, header_max_size=65536, excludes=(),
               max_lines=100, max_line_size=8190):
         if data is None:
             return self
 
         if header_size == -1:
-            header_size = data.find(b'\r\n\r\n') + 2
+            header_size = data.find(b'\r\n\r\n', 0, header_max_size) + 2
 
         if header_size < 2:
             return self
