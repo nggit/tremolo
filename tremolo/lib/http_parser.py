@@ -78,7 +78,7 @@ class ParseHeader:
             colon_pos = line.find(b':', 1)
 
             if start == 0:
-                http_pos = line.find(b'HTTP/')
+                http_pos = line.rfind(b'HTTP/')
 
                 if http_pos == 0:
                     self.is_response = True
