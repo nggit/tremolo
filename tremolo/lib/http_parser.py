@@ -22,8 +22,7 @@ class Headers(dict):
 class ParseHeader:
     __slots__ = ('is_request',
                  'is_response',
-                 'is_valid_request',
-                 'is_valid_response',
+                 'is_valid',
                  'headers',
                  '_headers',
                  '_body')
@@ -31,8 +30,7 @@ class ParseHeader:
     def __init__(self, data=None, **kwargs):
         self.is_request = False
         self.is_response = False
-        self.is_valid_request = False
-        self.is_valid_response = False
+        self.is_valid = False
 
         self.headers = Headers()
         self._headers = []
@@ -53,8 +51,7 @@ class ParseHeader:
 
         self.is_request = False
         self.is_response = False
-        self.is_valid_request = False
-        self.is_valid_response = False
+        self.is_valid = False
 
         self.headers.clear()
         self._headers.clear()
@@ -71,8 +68,7 @@ class ParseHeader:
             line = bytes(data[start:end])
 
             if max_lines < 0 or end - start > max_line_size or b'\n' in line:
-                self.is_valid_request = False
-                self.is_valid_response = False
+                self.is_valid = False
                 return self
 
             colon_pos = line.find(b':', 1)
@@ -91,7 +87,7 @@ class ParseHeader:
                             self.headers[b'_message']
                         ) = line.replace(b'/', b' ').split(b' ', 3)
                         self.headers[b'_status'] = int(_status)
-                        self.is_valid_response = True
+                        self.is_valid = True
                     except ValueError:
                         self.headers[b'_version'] = b''
                         self.headers[b'_status'] = 0
@@ -105,7 +101,7 @@ class ParseHeader:
                             self.headers[b'_url']
                         ) = line[:http_pos - 1].split(b' ', 1)
                         self.headers[b'_version'] = line[http_pos + 5:]
-                        self.is_valid_request = True
+                        self.is_valid = True
                     except ValueError:
                         self.headers[b'_method'] = b''
                         self.headers[b'_url'] = b''
@@ -131,8 +127,7 @@ class ParseHeader:
                 if name not in excludes:
                     self._headers.append((name, value))
             else:
-                self.is_valid_request = False
-                self.is_valid_response = False
+                self.is_valid = False
                 break
 
             start = end + 2
@@ -140,8 +135,8 @@ class ParseHeader:
         if self.is_request and b'host' not in self.headers:
             self.headers[b'host'] = b''
 
-            if self.is_valid_request and self.headers[b'_version'] == b'1.1':
-                self.is_valid_request = False
+            if self.is_valid and self.headers[b'_version'] == b'1.1':
+                self.is_valid = False
 
         return self
 

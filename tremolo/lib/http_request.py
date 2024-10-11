@@ -43,7 +43,7 @@ class HTTPRequest(Request):
         self._scheme = None
         self.header = header
         self.headers = header.headers.copy()
-        self.is_valid = header.is_valid_request
+        self.is_valid = header.is_valid
         self.host = header.gethost()
 
         if isinstance(self.host, list):
