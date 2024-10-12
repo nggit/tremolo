@@ -6,10 +6,7 @@ import sys
 import unittest
 
 # makes imports relative from the repo directory
-sys.path.insert(
-    0,
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
@@ -24,13 +21,7 @@ app = Tremolo()
 
 class TestTremoloObjects(unittest.TestCase):
     def setUp(self):
-        try:
-            sys.modules['__main__'].tests_run += 1
-        except AttributeError:
-            sys.modules['__main__'].tests_run = 1
-
-        print('\r\033[2K{0:d}. {1:s}'.format(sys.modules['__main__'].tests_run,
-                                             self.id()))
+        print('\r\n[', self.id(), ']')
 
     def test_000run_host_none(self):
         with self.assertRaises(ValueError):

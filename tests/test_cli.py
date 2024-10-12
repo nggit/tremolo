@@ -7,10 +7,7 @@ import unittest
 from io import StringIO
 
 # makes imports relative from the repo directory
-sys.path.insert(
-    0,
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tremolo.__main__ import usage, bind  # noqa: E402
 from tremolo.utils import parse_args  # noqa: E402
@@ -24,13 +21,7 @@ def run():
 
 class TestCLI(unittest.TestCase):
     def setUp(self):
-        try:
-            sys.modules['__main__'].tests_run += 1
-        except AttributeError:
-            sys.modules['__main__'].tests_run = 1
-
-        print('\r\033[2K{0:d}. {1:s}'.format(sys.modules['__main__'].tests_run,
-                                             self.id()))
+        print('\r\n[', self.id(), ']')
 
         self.output = StringIO()
 
