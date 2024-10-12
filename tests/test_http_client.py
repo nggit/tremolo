@@ -8,10 +8,7 @@ import time
 import unittest
 
 # makes imports relative from the repo directory
-sys.path.insert(
-    0,
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tremolo.lib.websocket import WebSocket  # noqa: E402
 from tests.http_server import (  # noqa: E402
@@ -34,13 +31,7 @@ from tests.utils import (  # noqa: E402
 
 class TestHTTPClient(unittest.TestCase):
     def setUp(self):
-        try:
-            sys.modules['__main__'].tests_run += 1
-        except AttributeError:
-            sys.modules['__main__'].tests_run = 1
-
-        print('\r\033[2K{0:d}. {1:s}'.format(sys.modules['__main__'].tests_run,
-                                             self.id()))
+        print('\r\n[', self.id(), ']')
 
     def test_get_middleware_11(self):
         header, body = getcontents(host=HTTP_HOST,

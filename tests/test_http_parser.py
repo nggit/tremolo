@@ -6,10 +6,7 @@ import os
 import sys
 
 # makes imports relative from the repo directory
-sys.path.insert(
-    0,
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tremolo.lib.http_parser import ParseHeader  # noqa: E402
 
@@ -32,13 +29,8 @@ def decode_dict(data, encoding='latin-1'):
 
 class TestParseHeader(unittest.TestCase):
     def setUp(self):
-        try:
-            sys.modules['__main__'].tests_run += 1
-        except AttributeError:
-            sys.modules['__main__'].tests_run = 1
+        print('\r\n[', self.id(), ']')
 
-        print('\r\033[2K{0:d}. {1:s}'.format(sys.modules['__main__'].tests_run,
-                                             self.id()))
         self.obj = ParseHeader()
 
     def tearDown(self):

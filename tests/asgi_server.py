@@ -6,10 +6,7 @@ import os  # noqa: E402
 import sys  # noqa: E402
 
 # makes imports relative from the repo directory
-sys.path.insert(
-    0,
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tremolo  # noqa: E402
 
