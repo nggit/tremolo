@@ -29,7 +29,7 @@ from tests.utils import (  # noqa: E402
 )
 
 
-class TestHTTPClient(unittest.TestCase):
+class TestHTTPServer(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
