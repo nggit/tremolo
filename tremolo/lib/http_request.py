@@ -409,9 +409,10 @@ class HTTPRequest(Request):
                 paused = False
 
                 if len(body) >= max_file_size > boundary_size + 4:
-                    part['data'] = body[:-boundary_size - 4]
-                    part['eof'] = False
-                    yield part
+                    sub_part = part.copy()
+                    sub_part['data'] = body[:-boundary_size - 4]
+                    sub_part['eof'] = False
+                    yield sub_part
 
                     content_length = max(
                         content_length - (len(body) - boundary_size - 4), 0
