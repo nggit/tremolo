@@ -406,8 +406,6 @@ class HTTPRequest(Request):
             body_size = body.find(b'\r\n--%s' % boundary, content_length)
 
             if body_size == -1:
-                paused = False
-
                 if len(body) >= max_file_size > boundary_size + 4:
                     sub_part = part.copy()
                     sub_part['data'] = body[:-boundary_size - 4]
@@ -419,6 +417,7 @@ class HTTPRequest(Request):
                     )
                     del body[:-boundary_size - 4]
 
+                paused = False
                 continue
 
             part['data'] = body[:body_size]
