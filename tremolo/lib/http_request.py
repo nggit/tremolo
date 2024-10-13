@@ -341,6 +341,7 @@ class HTTPRequest(Request):
         header_size = 0
         body_size = 0
         content_length = 0
+        part = {}  # represents a file received in a multipart request
         paused = False
 
         if self._read_instance is None:
@@ -372,7 +373,6 @@ class HTTPRequest(Request):
                     paused = False
                 else:
                     body.extend(self._read_buf[header_size + 2:])
-                    info = {}
 
                     if header_size <= 8192 and self._read_buf.startswith(
                             b'--%s\r\n' % boundary):
@@ -386,16 +386,16 @@ class HTTPRequest(Request):
                                     header[b'content-disposition']
                                     .replace(b'; ', b'&').replace(b';', b'&')
                                     .decode('latin-1'), max_num_fields=100):
-                                info[k] = v.strip('"')
+                                part[k] = v.strip('"')
 
                         if b'content-length' in header:
                             content_length = int(
                                 b'+' + header[b'content-length']
                             )
-                            info['length'] = content_length
+                            part['length'] = content_length
 
                         if b'content-type' in header:
-                            info['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
+                            part['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
                     else:
                         header = {}
 
@@ -408,11 +408,13 @@ class HTTPRequest(Request):
                 paused = False
                 continue
 
-            yield info, body[:body_size]
+            part['data'] = body[:body_size]
+            yield part
 
             self._read_buf[:] = body[body_size + 2:]
             header = None
             content_length = 0
+            part = {}
             paused = True
             limit -= 1
 

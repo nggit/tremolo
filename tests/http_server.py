@@ -249,6 +249,7 @@ async def upload(content_type=b'application/octet-stream', **server):
 
 @app.route('/upload/multipart')
 async def upload_multipart(stream=False, **server):
+    request = server['request']
     server['response'].set_content_type(b'text/csv')
 
     # should be ignored
@@ -260,19 +261,19 @@ async def upload_multipart(stream=False, **server):
     yield b''
 
     # stream multipart file upload then send it back as csv
-    async for info, data in server['request'].files(1):
-        yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
-                                    info['length'],
-                                    info['type'].encode(),
-                                    (data[:5] + data[-3:]))
+    async for part in request.files(1):
+        yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
+                                    part['length'],
+                                    part['type'].encode(),
+                                    (part['data'][:5] + part['data'][-3:]))
 
-    async for info, data in server['request'].files():
-        yield b'%s,%d,%s,%s\r\n' % (info['name'].encode(),
-                                    info['length'],
-                                    info['type'].encode(),
-                                    (data[:5] + data[-3:]))
+    async for part in request.files():
+        yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
+                                    part['length'],
+                                    part['type'].encode(),
+                                    (part['data'][:5] + part['data'][-3:]))
 
-    async for info, data in server['request'].files():
+    async for part in request.files():
         # should not raised
         raise Exception('EOF!!!')
 
