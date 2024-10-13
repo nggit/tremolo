@@ -298,7 +298,7 @@ class HTTPRequest(Request):
 
             return self.params['cookies']
 
-    async def form(self, limit=8 * 1048576, max_fields=100):
+    async def form(self, max_size=8 * 1048576, max_fields=100):
         try:
             return self.params['post']
         except KeyError as exc:
@@ -309,10 +309,10 @@ class HTTPRequest(Request):
                 async for data in self.stream():
                     self._body.extend(data)
 
-                    if self.body_size > limit:
-                        raise ValueError('form limit reached') from exc
+                    if self.body_size > max_size:
+                        raise ValueError('form size limit reached') from exc
 
-                if 2 < self.body_size <= limit:
+                if 2 < self.body_size <= max_size:
                     self.params['post'] = parse_qs(
                         self._body.decode('latin-1'),
                         max_num_fields=max_fields
@@ -320,7 +320,7 @@ class HTTPRequest(Request):
 
             return self.params['post']
 
-    async def files(self, limit=1024):
+    async def files(self, max_files=1024, max_file_size=100 * 1048576):
         if self.eof():
             return
 
@@ -332,6 +332,7 @@ class HTTPRequest(Request):
 
         try:
             boundary = ct['boundary'][0].encode('latin-1')
+            boundary_size = len(boundary)
         except KeyError as exc:
             raise BadRequest('missing boundary') from exc
 
@@ -347,7 +348,7 @@ class HTTPRequest(Request):
         if self._read_instance is None:
             self._read_instance = self.stream()
 
-        while limit > 0 and self._read_buf != b'--%s--\r\n' % boundary:
+        while max_files > 0 and self._read_buf != b'--%s--\r\n' % boundary:
             data = b''
 
             if not paused:
@@ -406,9 +407,21 @@ class HTTPRequest(Request):
 
             if body_size == -1:
                 paused = False
+
+                if len(body) >= max_file_size > boundary_size + 4:
+                    part['data'] = body[:-boundary_size - 4]
+                    part['eof'] = False
+                    yield part
+
+                    content_length = max(
+                        content_length - (len(body) - boundary_size - 4), 0
+                    )
+                    del body[:-boundary_size - 4]
+
                 continue
 
             part['data'] = body[:body_size]
+            part['eof'] = True
             yield part
 
             self._read_buf[:] = body[body_size + 2:]
@@ -416,6 +429,6 @@ class HTTPRequest(Request):
             content_length = 0
             part = {}
             paused = True
-            limit -= 1
+            max_files -= 1
 
             del body[:]

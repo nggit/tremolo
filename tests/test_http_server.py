@@ -315,7 +315,7 @@ class TestHTTPServer(unittest.TestCase):
                     create_chunked_body(create_multipart_body(
                         boundary,
                         file1=create_dummy_data(4096),
-                        file2=create_dummy_data(65536))))
+                        file2=create_dummy_data(1048576))))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -324,7 +324,8 @@ class TestHTTPServer(unittest.TestCase):
             read_chunked(body) if chunked_detected(header) else body,
             b'name,length,type,data\r\n'
             b'file1,4096,application/octet-stream,BEGINEND\r\n'
-            b'file2,65536,application/octet-stream,BEGINEND\r\n'
+            b'file2,1048576,application/octet-stream,BEGIN---\r\n'
+            b'file2,1048576,application/octet-stream,-----END\r\n'
         )
 
     def test_post_upload_payloadtoolarge_11(self):
@@ -333,7 +334,7 @@ class TestHTTPServer(unittest.TestCase):
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(65536 + 16384,
+                    HTTP_PORT, create_dummy_body(1048576 + 8192,
                                                  chunk_size=16384))
         )
 
@@ -351,7 +352,8 @@ class TestHTTPServer(unittest.TestCase):
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: %d\r\n\r\n\x00' % (HTTP_PORT, 65536 + 16384)
+                b'Content-Length: %d\r\n\r\n\x00' % (
+                    HTTP_PORT, 1048576 + 8192)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
@@ -865,7 +867,7 @@ if __name__ == '__main__':
                     reload=True,
                     loop='asyncio.SelectorEventLoop',
                     limit_memory=102400,  # 100MiB
-                    client_max_body_size=73728,  # 72KiB
+                    client_max_body_size=1048576,  # 1MiB
                     ws_max_payload_size=73728)
     )
 

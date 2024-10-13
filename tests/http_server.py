@@ -25,7 +25,7 @@ app = Tremolo()
 async def worker_start(**worker):
     worker_ctx = worker['context']
 
-    assert worker_ctx.options['client_max_body_size'] == 73728
+    assert worker_ctx.options['client_max_body_size'] == 1048576
 
     worker_ctx.shared = 0
     worker_ctx.socket_family = 'AF_UNIX'
@@ -217,7 +217,7 @@ async def trigger_memory_leak(**server):
 async def post_form(**server):
     request = server['request']
 
-    await request.form(limit=8192)
+    await request.form(max_size=8192)
 
     data = []
 
@@ -261,13 +261,18 @@ async def upload_multipart(stream=False, **server):
     yield b''
 
     # stream multipart file upload then send it back as csv
-    async for part in request.files(1):
+    async for part in request.files(max_files=1):
         yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
                                     part['length'],
                                     part['type'].encode(),
                                     (part['data'][:5] + part['data'][-3:]))
 
-    async for part in request.files():
+    async for part in request.files(max_file_size=524288):
+        if part['eof']:
+            part['data'] = b'-----' + part['data'][-3:]
+        else:
+            part['data'] = part['data'][:5] + b'---'
+
         yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
                                     part['length'],
                                     part['type'].encode(),
@@ -356,10 +361,10 @@ app.listen(HTTP_PORT + 2, app_handler_timeout=1)
 
 # test unix socket
 # 'tremolo-test.sock'
-app.listen('tremolo-test', debug=False, client_max_body_size=73728)
+app.listen('tremolo-test', debug=False, client_max_body_size=1048576)
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, debug=True, reload=True,
-            client_max_body_size=73728, ws_max_payload_size=73728)
+            client_max_body_size=1048576, ws_max_payload_size=73728)
 
 # END
