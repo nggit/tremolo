@@ -298,7 +298,7 @@ class HTTPRequest(Request):
 
             return self.params['cookies']
 
-    async def form(self, limit=8 * 1048576, max_fields=100):
+    async def form(self, max_size=8 * 1048576, max_fields=100):
         try:
             return self.params['post']
         except KeyError as exc:
@@ -309,10 +309,10 @@ class HTTPRequest(Request):
                 async for data in self.stream():
                     self._body.extend(data)
 
-                    if self.body_size > limit:
-                        raise ValueError('form limit reached') from exc
+                    if self.body_size > max_size:
+                        raise ValueError('form size limit reached') from exc
 
-                if 2 < self.body_size <= limit:
+                if 2 < self.body_size <= max_size:
                     self.params['post'] = parse_qs(
                         self._body.decode('latin-1'),
                         max_num_fields=max_fields
@@ -320,7 +320,7 @@ class HTTPRequest(Request):
 
             return self.params['post']
 
-    async def files(self, limit=1024):
+    async def files(self, max_files=1024, max_file_size=100 * 1048576):
         if self.eof():
             return
 
@@ -332,6 +332,7 @@ class HTTPRequest(Request):
 
         try:
             boundary = ct['boundary'][0].encode('latin-1')
+            boundary_size = len(boundary)
         except KeyError as exc:
             raise BadRequest('missing boundary') from exc
 
@@ -341,12 +342,13 @@ class HTTPRequest(Request):
         header_size = 0
         body_size = 0
         content_length = 0
+        part = {}  # represents a file received in a multipart request
         paused = False
 
         if self._read_instance is None:
             self._read_instance = self.stream()
 
-        while limit > 0 and self._read_buf != b'--%s--\r\n' % boundary:
+        while max_files > 0 and self._read_buf != b'--%s--\r\n' % boundary:
             data = b''
 
             if not paused:
@@ -372,7 +374,6 @@ class HTTPRequest(Request):
                     paused = False
                 else:
                     body.extend(self._read_buf[header_size + 2:])
-                    info = {}
 
                     if header_size <= 8192 and self._read_buf.startswith(
                             b'--%s\r\n' % boundary):
@@ -386,16 +387,16 @@ class HTTPRequest(Request):
                                     header[b'content-disposition']
                                     .replace(b'; ', b'&').replace(b';', b'&')
                                     .decode('latin-1'), max_num_fields=100):
-                                info[k] = v.strip('"')
+                                part[k] = v.strip('"')
 
                         if b'content-length' in header:
                             content_length = int(
                                 b'+' + header[b'content-length']
                             )
-                            info['length'] = content_length
+                            part['length'] = content_length
 
                         if b'content-type' in header:
-                            info['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
+                            part['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
                     else:
                         header = {}
 
@@ -406,14 +407,28 @@ class HTTPRequest(Request):
 
             if body_size == -1:
                 paused = False
+
+                if len(body) >= max_file_size > boundary_size + 4:
+                    part['data'] = body[:-boundary_size - 4]
+                    part['eof'] = False
+                    yield part
+
+                    content_length = max(
+                        content_length - (len(body) - boundary_size - 4), 0
+                    )
+                    del body[:-boundary_size - 4]
+
                 continue
 
-            yield info, body[:body_size]
+            part['data'] = body[:body_size]
+            part['eof'] = True
+            yield part
 
             self._read_buf[:] = body[body_size + 2:]
             header = None
             content_length = 0
+            part = {}
             paused = True
-            limit -= 1
+            max_files -= 1
 
             del body[:]

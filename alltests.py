@@ -24,7 +24,7 @@ def main():
                     reload=True,
                     loop='asyncio.SelectorEventLoop',
                     limit_memory=102400,  # 100MiB
-                    client_max_body_size=73728,  # 72KiB
+                    client_max_body_size=1048576,  # 1MiB
                     ws_max_payload_size=73728))
     )
     processes.append(mp.Process(
