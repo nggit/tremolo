@@ -135,14 +135,8 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(
-            self,
-            data,
-            queue=None,
-            transport=None,
-            rate=1048576,
-            buffer_size=16 * 1024
-            ):
+    async def put_to_queue(self, data, queue=None, transport=None,
+                           rate=1048576, buffer_size=16 * 1024):
         mv = memoryview(data)
 
         while mv and queue is not None:
@@ -203,14 +197,13 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def handle_exception(self, exc):
         if (self.request is None or self.response is None or
-                (self.response.headers_sent() and
-                 not self.request.upgraded)):
+                (self.response.headers_sent() and not self.request.upgraded)):
             # it's here for redundancy
             self.abort(exc)
             return
 
         self.print_exception(
-            exc, quote_from_bytes(unquote_to_bytes(bytes(self.request.path)))
+            exc, quote_from_bytes(unquote_to_bytes(self.request.path))
         )
 
         if isinstance(exc, WebSocketException):
@@ -241,10 +234,7 @@ class HTTPProtocol(asyncio.Protocol):
             data = b''
 
             try:
-                data = await self.handle_error_500(exc)
-
-                if data is None:
-                    data = b''
+                data = await self.handle_error_500(exc) or data
             finally:
                 if isinstance(data, str):
                     encoding = 'utf-8'
@@ -253,11 +243,7 @@ class HTTPProtocol(asyncio.Protocol):
                         v = v.lstrip()
 
                         if v.startswith('charset='):
-                            charset = v[len('charset='):].strip()
-
-                            if charset != '':
-                                encoding = charset
-
+                            encoding = v[8:].strip() or encoding
                             break
 
                     data = data.encode(encoding)
