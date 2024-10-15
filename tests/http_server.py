@@ -21,7 +21,7 @@ TEST_FILE = __file__
 app = Tremolo()
 
 
-@app.on_worker_start
+@app.on_worker_start  # priority=999 (low)
 async def worker_start(**worker):
     worker_ctx = worker['context']
 
@@ -31,14 +31,14 @@ async def worker_start(**worker):
     worker_ctx.socket_family = 'AF_UNIX'
 
 
-@app.on_worker_start()
+@app.on_worker_start(priority=1)  # high
 async def worker_start2(**worker):
-    pass
+    assert worker['app'].events['worker_start'][0][1] is worker_start2
 
 
-@app.on_worker_stop()
+@app.on_worker_stop(priority=1)
 async def worker_stop2(**worker):
-    pass
+    assert worker['app'].events['worker_stop'][-1][1] is worker_stop2
 
 
 @app.on_worker_stop
@@ -65,14 +65,19 @@ async def on_close(**server):
     return True
 
 
+@app.on_request(priority=1000)
+async def on_request2(**server):
+    assert server['request'].protocol.options['max_queue_size'] == 123
+
+
 @app.on_request
-async def my_request_middleware(**server):
+async def on_request(**server):
     request = server['request']
     response = server['response']
     worker_ctx = server['worker']
     worker_ctx.shared += 1
     worker_ctx.socket_family = request.socket.family.name
-    request.protocol.options['max_queue_size'] = 128
+    request.protocol.options['max_queue_size'] = 123
 
     assert request.ctx.foo == 'bar'
 
@@ -91,7 +96,7 @@ async def my_request_middleware(**server):
 
 
 @app.on_response
-async def my_response_middleware(**server):
+async def on_response(**server):
     response = server['response']
 
     assert response.headers[b'x-foo'] == [b'X-Foo: bar']
