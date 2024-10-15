@@ -111,63 +111,67 @@ class Tremolo:
 
         return decorator
 
-    def event(self, name):
+    def event(self, name, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.events[name].append(wrapper)
+            self.events[name].append((priority, wrapper))
+            self.events[name].sort(key=lambda item: item[0],
+                                   reverse=name == 'worker_stop')
             return wrapper
 
         return decorator
 
-    def on_worker_start(self, *args):
+    def on_worker_start(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.event('worker_start')(args[0])
 
-        return self.event('worker_start')
+        return self.event('worker_start', **kwargs)
 
-    def on_worker_stop(self, *args):
+    def on_worker_stop(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.event('worker_stop')(args[0])
 
-        return self.event('worker_stop')
+        return self.event('worker_stop', **kwargs)
 
-    def middleware(self, name):
+    def middleware(self, name, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_middleware(wrapper, name, self.getoptions(func))
+            self.add_middleware(
+                wrapper, name, priority, self.getoptions(func)
+            )
             return wrapper
 
         return decorator
 
-    def on_connect(self, *args):
+    def on_connect(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.middleware('connect')(args[0])
 
-        return self.middleware('connect')
+        return self.middleware('connect', **kwargs)
 
-    def on_close(self, *args):
+    def on_close(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.middleware('close')(args[0])
 
-        return self.middleware('close')
+        return self.middleware('close', **kwargs)
 
-    def on_request(self, *args):
+    def on_request(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.middleware('request')(args[0])
 
-        return self.middleware('request')
+        return self.middleware('request', **kwargs)
 
-    def on_response(self, *args):
+    def on_response(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
             return self.middleware('response')(args[0])
 
-        return self.middleware('response')
+        return self.middleware('response', **kwargs)
 
     def getoptions(self, func):
         options = {}
@@ -182,12 +186,16 @@ class Tremolo:
 
         return options
 
-    def add_middleware(self, func, name='request', kwargs=None):
+    def add_middleware(self, func, name='request', priority=999, kwargs=None):
         if name not in self.middlewares:
             raise ValueError('%s is not one of the: %s' %
                              (name, ', '.join(self.middlewares)))
 
-        self.middlewares[name].append((func, kwargs or self.getoptions(func)))
+        self.middlewares[name].append(
+            (priority, func, kwargs or self.getoptions(func))
+        )
+        self.middlewares[name].sort(key=lambda item: item[0],
+                                    reverse=name in ('close', 'response'))
 
     def add_route(self, func, path='/', kwargs=None):
         if not kwargs:
@@ -268,7 +276,7 @@ class Tremolo:
 
             self.compile_routes(options['_routes'])
 
-            for func in self.events['worker_start']:
+            for _, func in self.events['worker_start']:
                 if (await func(context=context,
                                app=self,
                                loop=self.loop,
@@ -460,7 +468,7 @@ class Tremolo:
             while i > 0:
                 i -= 1
 
-                if (await self.events['worker_stop'][i](
+                if (await self.events['worker_stop'][i][1](
                         context=context,
                         app=self,
                         loop=self.loop,

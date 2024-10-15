@@ -23,7 +23,7 @@ class HTTPServer(HTTPProtocol):
         }
 
     async def _connection_made(self):
-        for func, _ in self._middlewares['connect']:
+        for _, func, _ in self._middlewares['connect']:
             if await func(**self._server):
                 break
 
@@ -34,7 +34,7 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
 
-                if await self._middlewares['close'][i][0](**self._server):
+                if await self._middlewares['close'][i][1](**self._server):
                     break
         finally:
             super().connection_lost(exc)
@@ -173,8 +173,8 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
                 options = await self._handle_middleware(
-                    self._middlewares['response'][i][0],
-                    {**self._middlewares['response'][i][1], **options}
+                    self._middlewares['response'][i][1],
+                    {**self._middlewares['response'][i][2], **options}
                 )
 
                 if not isinstance(options, dict):
@@ -237,8 +237,8 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
                 options = await self._handle_middleware(
-                    self._middlewares['response'][i][0],
-                    {**self._middlewares['response'][i][1], **options}
+                    self._middlewares['response'][i][1],
+                    {**self._middlewares['response'][i][2], **options}
                 )
 
                 if not isinstance(options, dict):
@@ -267,8 +267,8 @@ class HTTPServer(HTTPProtocol):
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(
-                middleware[0],
-                {**middleware[1], **options}
+                middleware[1],
+                {**middleware[2], **options}
             )
 
             if not isinstance(options, dict):
