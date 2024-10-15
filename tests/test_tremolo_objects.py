@@ -12,7 +12,7 @@ from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import ServerContext  # noqa: E402
-from tests import handlers, middlewares  # noqa: E402
+from tests import handlers, middlewares, hooks  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
 from tests.utils import function  # noqa: E402
 
@@ -107,9 +107,13 @@ class TestTremoloObjects(unittest.TestCase):
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})
 
-    def test_invalidmiddleware(self):
+    def test_middleware_invalid(self):
         with self.assertRaises(ValueError):
             app.add_middleware(middlewares.on_request, 'invalid')
+
+    def test_hook_invalid(self):
+        with self.assertRaises(ValueError):
+            app.add_hook(hooks.on_worker_start, 'invalid')
 
     @function
     async def test_handler(self):

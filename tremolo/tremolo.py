@@ -59,7 +59,7 @@ class Tremolo:
             'request': [],
             'response': []
         }
-        self.events = {
+        self.hooks = {
             'worker_start': [],
             'worker_stop': []
         }
@@ -111,30 +111,28 @@ class Tremolo:
 
         return decorator
 
-    def event(self, name, priority=999):
+    def hook(self, name, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.events[name].append((priority, wrapper))
-            self.events[name].sort(key=lambda item: item[0],
-                                   reverse=name == 'worker_stop')
+            self.add_hook(wrapper, name, priority)
             return wrapper
 
         return decorator
 
     def on_worker_start(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
-            return self.event('worker_start')(args[0])
+            return self.hook('worker_start')(args[0])
 
-        return self.event('worker_start', **kwargs)
+        return self.hook('worker_start', **kwargs)
 
     def on_worker_stop(self, *args, **kwargs):
         if len(args) == 1 and callable(args[0]):
-            return self.event('worker_stop')(args[0])
+            return self.hook('worker_stop')(args[0])
 
-        return self.event('worker_stop', **kwargs)
+        return self.hook('worker_stop', **kwargs)
 
     def middleware(self, name, priority=999):
         def decorator(func):
@@ -185,6 +183,15 @@ class Tremolo:
             options[name] = func.__defaults__[i]
 
         return options
+
+    def add_hook(self, func, name='worker_start', priority=999):
+        if name not in self.hooks:
+            raise ValueError('%s is not one of the: %s' %
+                             (name, ', '.join(self.hooks)))
+
+        self.hooks[name].append((priority, func))
+        self.hooks[name].sort(key=lambda item: item[0],
+                              reverse=name == 'worker_stop')
 
     def add_middleware(self, func, name='request', priority=999, kwargs=None):
         if name not in self.middlewares:
@@ -276,7 +283,7 @@ class Tremolo:
 
             self.compile_routes(options['_routes'])
 
-            for _, func in self.events['worker_start']:
+            for _, func in self.hooks['worker_start']:
                 if (await func(context=context,
                                app=self,
                                loop=self.loop,
@@ -463,12 +470,12 @@ class Tremolo:
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
-            i = len(self.events['worker_stop'])
+            i = len(self.hooks['worker_stop'])
 
             while i > 0:
                 i -= 1
 
-                if (await self.events['worker_stop'][i][1](
+                if (await self.hooks['worker_stop'][i][1](
                         context=context,
                         app=self,
                         loop=self.loop,
