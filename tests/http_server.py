@@ -33,12 +33,12 @@ async def worker_start(**worker):
 
 @app.on_worker_start(priority=1)  # high
 async def worker_start2(**worker):
-    assert worker['app'].events['worker_start'][0][1] is worker_start2
+    assert worker['app'].hooks['worker_start'][0][1] is worker_start2
 
 
 @app.on_worker_stop(priority=1)
 async def worker_stop2(**worker):
-    assert worker['app'].events['worker_stop'][-1][1] is worker_stop2
+    assert worker['app'].hooks['worker_stop'][-1][1] is worker_stop2
 
 
 @app.on_worker_stop
