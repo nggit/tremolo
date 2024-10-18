@@ -55,6 +55,9 @@ class HTTPProtocol(asyncio.Protocol):
     def tasks(self):
         return self.context.tasks
 
+    def add_close_callback(self, callback):
+        self.tasks.add(callback)
+
     def create_task(self, coro):
         task = self.loop.create_task(coro)
 
@@ -498,9 +501,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             try:
                 if callable(task):
-                    # even if you put callable objects in self.tasks,
-                    # they will be executed when the client is disconnected.
-                    # this is useful for the cleanup mechanism.
+                    # a close callback
                     task()
                     continue
 

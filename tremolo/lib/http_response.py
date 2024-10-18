@@ -322,7 +322,7 @@ class HTTPResponse(Response):
             handle = await run_sync(open, path, 'rb')
             self.request.context.RESPONSE_SENDFILE_HANDLE = handle
 
-            self.request.context.tasks.add(
+            self.request.protocol.add_close_callback(
                 self.request.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
