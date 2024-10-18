@@ -620,6 +620,7 @@ class Tremolo:
                 sys.platform)
         )
         print('-' * terminal_width)
+        mp.set_start_method('spawn', force=True)
 
         import __main__
 
@@ -692,7 +693,6 @@ class Tremolo:
         socks = {}
 
         print('Options:')
-        mp.set_start_method('spawn', force=True)
 
         for (_host, _port), options in self.ports.items():
             if _host is None:
