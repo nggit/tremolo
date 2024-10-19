@@ -2,7 +2,7 @@
 
 import sys
 
-from tremolo import Tremolo
+from tremolo import __version__, Tremolo
 from tremolo.utils import parse_args
 
 server = Tremolo()
@@ -67,6 +67,7 @@ def usage(**context):
     print('                            Defaults to 30 (seconds)')
     print('  --server-name             Set the "Server" field in the response header')  # noqa: E501
     print('  --root-path               Set the ASGI root_path. Defaults to ""')
+    print('  --version                 Print the tremolo version and exit')
     print('  --help                    Show this help and exit')
     sys.exit()
 
@@ -86,8 +87,18 @@ def bind(value='', **context):
         sys.exit(1)
 
 
+def version(**context):
+    print(
+        'tremolo %s (%s %d.%d.%d, %s)' % (__version__,
+                                          sys.implementation.name,
+                                          *sys.version_info[:3],
+                                          sys.platform)
+    )
+    sys.exit()
+
+
 if __name__ == '__main__':
-    options = parse_args(help=usage, bind=bind)
+    options = parse_args(help=usage, bind=bind, version=version)
 
     if sys.argv[-1] != sys.argv[0] and not sys.argv[-1].startswith('-'):
         options['app'] = sys.argv[-1]

@@ -9,14 +9,14 @@ from io import StringIO
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tremolo.__main__ import usage, bind  # noqa: E402
+from tremolo.__main__ import usage, bind, version  # noqa: E402
 from tremolo.utils import parse_args  # noqa: E402
 
 STDOUT = sys.stdout
 
 
 def run():
-    return parse_args(help=usage, bind=bind)
+    return parse_args(help=usage, bind=bind, version=version)
 
 
 class TestCLI(unittest.TestCase):
@@ -28,6 +28,23 @@ class TestCLI(unittest.TestCase):
     def tearDown(self):
         self.output.close()
         sys.argv.clear()
+
+    def test_cli_version(self):
+        sys.argv.append('--version')
+
+        code = 0
+        sys.stdout = self.output
+
+        try:
+            run()
+        except SystemExit as exc:
+            if exc.code:
+                code = exc.code
+
+        sys.stdout = STDOUT
+
+        self.assertEqual(self.output.getvalue()[:8], 'tremolo ')
+        self.assertEqual(code, 0)
 
     def test_cli_help(self):
         sys.argv.append('--help')
