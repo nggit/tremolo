@@ -69,7 +69,7 @@ def usage(**context):
     print('  --root-path               Set the ASGI root_path. Defaults to ""')
     print('  --version                 Print the tremolo version and exit')
     print('  --help                    Show this help and exit')
-    sys.exit()
+    return 0
 
 
 def bind(value='', **context):
@@ -84,7 +84,7 @@ def bind(value='', **context):
                 server.listen(bind)
     except ValueError:
         print('Invalid --bind value "%s"' % value)
-        sys.exit(1)
+        return 1
 
 
 def version(**context):
@@ -94,7 +94,7 @@ def version(**context):
                                           *sys.version_info[:3],
                                           sys.platform)
     )
-    sys.exit()
+    return 0
 
 
 if __name__ == '__main__':
