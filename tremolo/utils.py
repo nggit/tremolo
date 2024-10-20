@@ -97,7 +97,10 @@ def parse_args(**callbacks):
             options['ssl']['key'] = sys.argv[i]
         elif sys.argv[i - 1].startswith('-'):
             if name in callbacks:
-                callbacks[name](value=sys.argv[i], **context)
+                code = callbacks[name](value=sys.argv[i], **context)
+
+                if code is not None:
+                    sys.exit(code)
             else:
                 print('Unrecognized option "%s"' % sys.argv[i - 1])
                 sys.exit(1)
