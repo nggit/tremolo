@@ -28,7 +28,6 @@ class HTTPRequest(Request):
                  'http_continue',
                  'http_keepalive',
                  '_upgraded',
-                 'params',
                  '_eof',
                  '_read_instance',
                  '_read_buf')
@@ -64,8 +63,6 @@ class HTTPRequest(Request):
         self.http_continue = False
         self.http_keepalive = False
         self._upgraded = False
-        self.params = {}
-
         self._eof = False
         self._read_instance = None
         self._read_buf = bytearray()
@@ -259,6 +256,10 @@ class HTTPRequest(Request):
     def upgraded(self, value):
         self.clear_body()
         self._upgraded = value
+
+    @property
+    def params(self):
+        return self.protocol.context
 
     @property
     def query(self):
