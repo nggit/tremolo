@@ -337,8 +337,7 @@ class HTTPProtocol(asyncio.Protocol):
             try:
                 await self.handler
             finally:
-                if self.options['_app'] is None:
-                    timer.cancel()
+                timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
             await self.handle_exception(exc)
 
