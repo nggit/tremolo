@@ -332,7 +332,8 @@ class HTTPProtocol(asyncio.Protocol):
             self.handler = self.loop.create_task(self.headers_received())
             timer = self.loop.call_at(
                 self.loop.time() + self.options['app_handler_timeout'],
-                self.handler_timeout)
+                self.handler_timeout
+            )
 
             try:
                 await self.handler

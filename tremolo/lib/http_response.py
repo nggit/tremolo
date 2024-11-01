@@ -290,14 +290,9 @@ class HTTPResponse(Response):
         else:
             await self.send(data, **kwargs)
 
-    async def sendfile(
-            self,
-            path,
-            file_size=None,
-            buffer_size=16 * 1024,
-            content_type=b'application/octet-stream',
-            executor=None,
-            **kwargs):
+    async def sendfile(self, path, file_size=None, buffer_size=16 * 1024,
+                       content_type=b'application/octet-stream', executor=None,
+                       **kwargs):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
