@@ -81,7 +81,7 @@ class HTTPServer(HTTPProtocol):
         encoding = ('utf-8',)
 
         if isinstance(data, tuple):
-            data, *encoding = (*data, 'utf-8')
+            data, *encoding = data + encoding
 
         if isinstance(data, str):
             data = data.encode(encoding[0])
@@ -220,7 +220,7 @@ class HTTPServer(HTTPProtocol):
             encoding = ('utf-8',)
 
             if isinstance(data, tuple):
-                data, *encoding = (*data, 'utf-8')
+                data, *encoding = data + encoding
 
             if isinstance(data, str):
                 data = data.encode(encoding[0])
