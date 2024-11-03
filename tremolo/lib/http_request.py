@@ -139,7 +139,7 @@ class HTTPRequest(Request):
             int.to_bytes(os.getpid() % 0x7fffffff + port * 32768,
                          4, byteorder='big') +
             int(time.time() * 1e7).to_bytes(8, byteorder='big')
-        )  # 12 bytes
+        )  # 12 Bytes
 
         return urlsafe_b64encode(
             prefix +
