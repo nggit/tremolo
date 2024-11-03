@@ -15,14 +15,8 @@ class Response:
 
         self.send_nowait(None)
 
-    async def send(
-            self,
-            data,
-            throttle=True,
-            rate=1048576,
-            buffer_size=16 * 1024,
-            buffer_min_size=None
-            ):
+    async def send(self, data, throttle=True, rate=1048576,
+                   buffer_size=16 * 1024, buffer_min_size=None):
         if data is None:
             __class__.close(self)
             return

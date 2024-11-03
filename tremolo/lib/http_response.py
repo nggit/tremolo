@@ -290,14 +290,9 @@ class HTTPResponse(Response):
         else:
             await self.send(data, **kwargs)
 
-    async def sendfile(
-            self,
-            path,
-            file_size=None,
-            buffer_size=16 * 1024,
-            content_type=b'application/octet-stream',
-            executor=None,
-            **kwargs):
+    async def sendfile(self, path, file_size=None, buffer_size=16 * 1024,
+                       content_type=b'application/octet-stream', executor=None,
+                       **kwargs):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
@@ -423,19 +418,7 @@ class HTTPResponse(Response):
                     )
                     size -= buffer_size
             else:
-                client = self.request.client
-
-                if client is None:
-                    fileno = self.request.socket.fileno()
-                    client = (str(fileno), fileno)
-
-                ip, port = client
-                boundary = b'----Boundary%x%x%x%x' % (hash(ip),
-                                                      port,
-                                                      os.getpid(),
-                                                      int.from_bytes(
-                                                          os.urandom(4),
-                                                          byteorder='big'))
+                boundary = b'----Boundary%s' % self.request.uid()
 
                 self.set_content_type(
                     b'multipart/byteranges; boundary=%s' % boundary

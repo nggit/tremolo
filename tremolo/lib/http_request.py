@@ -1,5 +1,9 @@
 # Copyright (c) 2023 nggit
 
+import os
+import time
+
+from base64 import urlsafe_b64encode
 from urllib.parse import parse_qs, parse_qsl
 
 from .http_exceptions import BadRequest, PayloadTooLarge
@@ -124,6 +128,23 @@ class HTTPRequest(Request):
     def has_body(self):
         return (b'content-length' in self.headers or
                 b'transfer-encoding' in self.headers)
+
+    def uid(self, length=32):
+        if self.client is None:
+            port = self.socket.fileno()
+        else:
+            port = self.client[1]  # 0 - 65535
+
+        prefix = (
+            int.to_bytes(os.getpid() % 0x7fffffff + port * 32768,
+                         4, byteorder='big') +
+            int(time.time() * 1e7).to_bytes(8, byteorder='big')
+        )  # 12 Bytes
+
+        return urlsafe_b64encode(
+            prefix +
+            os.urandom(max(6, length // 4 * 3 - len(prefix)))
+        )
 
     def clear_body(self):
         del self._body[:]

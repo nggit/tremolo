@@ -43,16 +43,15 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self._middlewares['connect']:
-            self.context.ON_CONNECT = self.create_task(
-                self._connection_made()
-            )
+            self.context.ON_CONNECT = self.create_task(self._connection_made())
 
     def connection_lost(self, exc):
         if self._middlewares['close']:
             task = self.loop.create_task(self._connection_lost(exc))
             self.loop.call_at(
                 self.loop.time() + self.options['_app_close_timeout'],
-                task.cancel)
+                task.cancel
+            )
         else:
             super().connection_lost(exc)
 
@@ -61,8 +60,7 @@ class HTTPServer(HTTPProtocol):
         self.context.options.update(options)
 
         data = await func(**self._server,
-                          request=self.request,
-                          response=self.response)
+                          request=self.request, response=self.response)
 
         if data is None:
             return options
@@ -81,7 +79,7 @@ class HTTPServer(HTTPProtocol):
         encoding = ('utf-8',)
 
         if isinstance(data, tuple):
-            data, *encoding = (*data, 'utf-8')
+            data, *encoding = data + encoding
 
         if isinstance(data, str):
             data = data.encode(encoding[0])
@@ -220,7 +218,7 @@ class HTTPServer(HTTPProtocol):
             encoding = ('utf-8',)
 
             if isinstance(data, tuple):
-                data, *encoding = (*data, 'utf-8')
+                data, *encoding = data + encoding
 
             if isinstance(data, str):
                 data = data.encode(encoding[0])
