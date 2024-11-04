@@ -4,6 +4,7 @@ import asyncio
 import os
 import time
 
+from base64 import urlsafe_b64encode as b64encode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
@@ -418,7 +419,7 @@ class HTTPResponse(Response):
                     )
                     size -= buffer_size
             else:
-                boundary = b'----Boundary%s' % self.request.uid()
+                boundary = b'----Boundary%s' % b64encode(self.request.uid(24))
 
                 self.set_content_type(
                     b'multipart/byteranges; boundary=%s' % boundary
