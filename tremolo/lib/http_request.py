@@ -3,7 +3,6 @@
 import os
 import time
 
-from base64 import urlsafe_b64encode
 from urllib.parse import parse_qs, parse_qsl
 
 from .http_exceptions import BadRequest, PayloadTooLarge
@@ -141,10 +140,7 @@ class HTTPRequest(Request):
             int(time.time() * 1e7).to_bytes(8, byteorder='big')
         )  # 12 Bytes
 
-        return urlsafe_b64encode(
-            prefix +
-            os.urandom(max(6, length // 4 * 3 - len(prefix)))
-        )
+        return prefix + os.urandom(max(4, length - len(prefix)))
 
     def clear_body(self):
         del self._body[:]
