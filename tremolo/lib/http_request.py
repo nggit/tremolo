@@ -135,7 +135,7 @@ class HTTPRequest(Request):
             port = self.client[1]  # 0 - 65535
 
         prefix = (
-            int.to_bytes(os.getpid() % 0x7fffffff + port * 32768,
+            int.to_bytes((port << 16) | (os.getpid() & 0xffff),
                          4, byteorder='big') +
             int(time.time() * 1e7).to_bytes(8, byteorder='big')
         )  # 12 Bytes
