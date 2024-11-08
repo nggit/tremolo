@@ -21,7 +21,11 @@ class Request:
 
     @property
     def transport(self):
-        return self.protocol.transport
+        return self.protocol.context.transport
+
+    @property
+    def socket(self):
+        return self.protocol.context.socket
 
     def clear_body(self):
         self.body_size = 0

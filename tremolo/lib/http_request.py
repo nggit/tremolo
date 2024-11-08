@@ -10,8 +10,7 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('_socket',
-                 '_client',
+    __slots__ = ('_client',
                  '_ip',
                  '_is_secure',
                  '_scheme',
@@ -38,7 +37,6 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
-        self._socket = None
         self._client = None
         self._ip = None
         self._is_secure = None
@@ -69,13 +67,6 @@ class HTTPRequest(Request):
         self._eof = False
         self._read_instance = None
         self._read_buf = bytearray()
-
-    @property
-    def socket(self):
-        if not self._socket:
-            self._socket = self.transport.get_extra_info('socket')
-
-        return self._socket
 
     @property
     def client(self):

@@ -11,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tremolo import Tremolo  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
-from tremolo.lib.contexts import ServerContext  # noqa: E402
+from tremolo.lib.contexts import ConnectionContext  # noqa: E402
 from tests import handlers, middlewares, hooks  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
 from tests.utils import function  # noqa: E402
@@ -126,7 +126,7 @@ class TestTremoloObjects(unittest.TestCase):
                     await handler[1]()
 
             elif handler[0] == 404:
-                context = ServerContext()
+                context = ConnectionContext()
 
                 self.assertEqual(repr(context), repr(context.__dict__))
 
@@ -180,8 +180,8 @@ class TestTremoloObjects(unittest.TestCase):
 
         self.assertEqual(list(conn.values()), [2, 3])
 
-    def test_servercontext(self):
-        context = ServerContext()
+    def test_connectioncontext(self):
+        context = ConnectionContext()
 
         self.assertEqual(context.get('options'), {})
         self.assertEqual(context.get('opt'), None)
@@ -192,8 +192,8 @@ class TestTremoloObjects(unittest.TestCase):
 
         context['opt'] = {}
 
-        self.assertEqual(context['opt'], {})
         self.assertTrue('opt' in context)
+        self.assertEqual(context['opt'], {})
 
 
 if __name__ == '__main__':
