@@ -37,7 +37,7 @@ class WorkerContext(Context):
         return self.__dict__['queues']
 
 
-class ServerContext(Context):
+class ConnectionContext(Context):
     def __init__(self):
         self.__dict__ = {
             'options': {},

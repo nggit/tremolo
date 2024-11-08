@@ -4,7 +4,7 @@ import asyncio
 
 from urllib.parse import quote_from_bytes, unquote_to_bytes
 
-from .contexts import ServerContext
+from .contexts import ConnectionContext
 from .http_exceptions import (
     HTTPException,
     BadRequest,
@@ -36,7 +36,7 @@ class HTTPProtocol(asyncio.Protocol):
                  '_waiters')
 
     def __init__(self, loop=None, logger=None, worker=None, **kwargs):
-        self.context = ServerContext()
+        self.context = ConnectionContext()
         self.options = kwargs
         self.loop = loop
         self.logger = logger
