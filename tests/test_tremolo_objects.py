@@ -192,8 +192,8 @@ class TestTremoloObjects(unittest.TestCase):
 
         context['opt'] = {}
 
-        self.assertEqual(context['opt'], {})
         self.assertTrue('opt' in context)
+        self.assertEqual(context['opt'], {})
 
 
 if __name__ == '__main__':

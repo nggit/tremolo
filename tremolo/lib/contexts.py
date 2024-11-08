@@ -8,8 +8,11 @@ class Context:
     def __repr__(self):
         return self.__dict__.__repr__()
 
-    def get(self, *args):
-        return self.__dict__.get(*args)
+    def get(self, key, default=None):
+        return self.__dict__.get(key, default)
+
+    def update(self, *args, **kwargs):
+        return self.__dict__.update(*args, **kwargs)
 
     def __setitem__(self, *args):
         self.__setattr__(*args)
@@ -40,9 +43,22 @@ class WorkerContext(Context):
 class ConnectionContext(Context):
     def __init__(self):
         self.__dict__ = {
+            'transport': None,
+            'socket': None,
             'options': {},
             'tasks': set()
         }
+
+    @property
+    def transport(self):
+        return self.__dict__['transport']
+
+    @property
+    def socket(self):
+        if not self.__dict__['socket'] and self.transport is not None:
+            self.__dict__['socket'] = self.transport.get_extra_info('socket')
+
+        return self.__dict__['socket']
 
     @property
     def options(self):

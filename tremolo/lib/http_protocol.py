@@ -21,12 +21,11 @@ from .websocket import WebSocket
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('context',
-                 'options',
+    __slots__ = ('options',
                  'loop',
                  'logger',
                  'worker',
-                 'transport',
+                 'context',
                  'queue',
                  'request',
                  'response',
@@ -36,12 +35,11 @@ class HTTPProtocol(asyncio.Protocol):
                  '_waiters')
 
     def __init__(self, loop=None, logger=None, worker=None, **kwargs):
-        self.context = ConnectionContext()
         self.options = kwargs
         self.loop = loop
         self.logger = logger
         self.worker = worker  # a worker-level context
-        self.transport = None
+        self.context = ConnectionContext()
         self.queue = [None, None]
         self.request = None
         self.response = None
@@ -50,6 +48,10 @@ class HTTPProtocol(asyncio.Protocol):
         self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
         self._waiters = {}
+
+    @property
+    def transport(self):
+        return self.context.transport
 
     @property
     def tasks(self):
@@ -76,8 +78,8 @@ class HTTPProtocol(asyncio.Protocol):
                 self.print_exception(exc, 'handle_task_done')
 
     def connection_made(self, transport):
-        self.transport = transport
-        fileno = transport.get_extra_info('socket').fileno()
+        self.context.update(transport=transport)
+        fileno = self.context.socket.fileno()
 
         if fileno in self.worker.queues:
             self.queue[0], self.queue[1] = self.worker.queues[fileno]
@@ -517,7 +519,7 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             self.queue[0] = self.queue[1] = None
 
-        self.transport = None
+        self.context.update(transport=None, socket=None)
         self.request = None
         self.response = None
         self.handler = None
