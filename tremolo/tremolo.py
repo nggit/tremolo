@@ -284,7 +284,8 @@ class Tremolo:
             self.compile_routes(options['_routes'])
 
             for _, func in self.hooks['worker_start']:
-                if (await func(context=context,
+                if (await func(globals=context,
+                               context=context,
                                app=self,
                                loop=self.loop,
                                logger=self.logger)):
@@ -340,10 +341,10 @@ class Tremolo:
             'name': server_name
         }
         server = await self.loop.create_server(
-            lambda: Server(loop=self.loop,
+            lambda: Server(context,
+                           loop=self.loop,
                            logger=self.logger,
                            lock=lock,
-                           worker=context,
                            debug=options.get('debug', False),
                            ws=options.get('ws', True),
                            ws_max_payload_size=options.get(
@@ -476,6 +477,7 @@ class Tremolo:
                 i -= 1
 
                 if (await self.hooks['worker_stop'][i][1](
+                        globals=context,
                         context=context,
                         app=self,
                         loop=self.loop,

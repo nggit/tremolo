@@ -9,17 +9,17 @@ from .lib.websocket import WebSocket
 class HTTPServer(HTTPProtocol):
     __slots__ = ('_routes', '_middlewares', '_server')
 
-    def __init__(self, _routes=None, _middlewares=None, lock=None, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, context, _routes=None, _middlewares=None, **kwargs):
+        super().__init__(context, **kwargs)
 
         self._routes = _routes
         self._middlewares = _middlewares
         self._server = {
+            'globals': context,
+            'context': self.context,
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
-            'worker': kwargs['worker'],
-            'lock': lock,
-            'context': self.context
+            'lock': kwargs['lock']
         }
 
     async def _connection_made(self):

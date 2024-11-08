@@ -27,8 +27,8 @@ class ASGIServer(HTTPProtocol):
                  '_websocket',
                  '_http_chunked')
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, context, **kwargs):
+        super().__init__(context, **kwargs)
 
         self._scope = None
         self._read = None

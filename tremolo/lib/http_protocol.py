@@ -21,11 +21,11 @@ from .websocket import WebSocket
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('options',
+    __slots__ = ('globals',
+                 'context',
+                 'options',
                  'loop',
                  'logger',
-                 'worker',
-                 'context',
                  'queue',
                  'request',
                  'response',
@@ -34,12 +34,12 @@ class HTTPProtocol(asyncio.Protocol):
                  '_header_buf',
                  '_waiters')
 
-    def __init__(self, loop=None, logger=None, worker=None, **kwargs):
+    def __init__(self, context, loop=None, logger=None, **kwargs):
+        self.globals = context  # a worker-level context
+        self.context = ConnectionContext()
         self.options = kwargs
         self.loop = loop
         self.logger = logger
-        self.worker = worker  # a worker-level context
-        self.context = ConnectionContext()
         self.queue = [None, None]
         self.request = None
         self.response = None
@@ -81,8 +81,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.context.update(transport=transport)
         fileno = self.context.socket.fileno()
 
-        if fileno in self.worker.queues:
-            self.queue[0], self.queue[1] = self.worker.queues[fileno]
+        if fileno in self.globals.queues:
+            self.queue[0], self.queue[1] = self.globals.queues[fileno]
 
             if self.queue[0].qsize() or self.queue[0].qsize():
                 self.logger.error('uncleaned queue in fileno: %d', fileno)
@@ -91,7 +91,7 @@ class HTTPProtocol(asyncio.Protocol):
         else:
             self.queue[0] = Queue()
             self.queue[1] = Queue()
-            self.worker.queues[fileno] = tuple(self.queue)
+            self.globals.queues[fileno] = tuple(self.queue)
 
         self._waiters['request'] = self.loop.create_future()
 

@@ -74,7 +74,7 @@ async def on_request2(**server):
 async def on_request(**server):
     request = server['request']
     response = server['response']
-    worker_ctx = server['worker']
+    worker_ctx = server['globals']
     worker_ctx.shared += 1
     worker_ctx.socket_family = request.socket.family.name
     request.protocol.options['max_queue_size'] = 123
