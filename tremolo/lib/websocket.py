@@ -6,6 +6,8 @@ import os
 
 from .http_exceptions import WebSocketClientClosed, WebSocketServerClosed
 
+_MAGIC = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
+
 
 class WebSocket:
     def __init__(self, request, response):
@@ -23,10 +25,9 @@ class WebSocket:
         return await self.receive()
 
     async def accept(self):
-        magic_string = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
         sha1_hash = hashlib.sha1(  # nosec B303, B324
-            self.request.headers[b'sec-websocket-key'] +
-            magic_string).digest()
+            self.request.headers[b'sec-websocket-key'] + _MAGIC
+        ).digest()
         accept_key = base64.b64encode(sha1_hash)
 
         self.response.set_status(101, b'Switching Protocols')
@@ -42,11 +43,15 @@ class WebSocket:
                 'connection closed: recv failed'
             ) from exc
 
-        # we don't use FIN
-        # fin = (first_byte & 0x80) >> 7
+        fin = (first_byte & 0x80) >> 7
         opcode = first_byte & 0x0f
         is_masked = (second_byte & 0x80) >> 7
         payload_length = second_byte & 0x7f
+
+        if fin == 0 or opcode == 0:
+            raise WebSocketServerClosed(
+                'continuation frames are not supported', code=1003
+            )
 
         if payload_length == 126:
             payload_length = int.from_bytes(await self.request.recv(2),

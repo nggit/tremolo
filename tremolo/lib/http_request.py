@@ -98,7 +98,9 @@ class HTTPRequest(Request):
     @property
     def is_secure(self):
         if self._is_secure is None:
-            self._is_secure = self.transport.get_extra_info('sslcontext') is not None  # noqa: E501
+            self._is_secure = (
+                self.transport.get_extra_info('sslcontext') is not None
+            )
 
         return self._is_secure
 
@@ -405,7 +407,9 @@ class HTTPRequest(Request):
                             part['length'] = content_length
 
                         if b'content-type' in header:
-                            part['type'] = header[b'content-type'].decode('latin-1')  # noqa: E501
+                            part['type'] = (
+                                header[b'content-type'].decode('latin-1')
+                            )
                     else:
                         header = {}
 
