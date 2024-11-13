@@ -804,6 +804,20 @@ class TestHTTPServer(unittest.TestCase):
 
             self.assertEqual(body[:7], data_out[:7])
 
+    def test_websocket_continuation(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    HTTP_PORT,
+                    WebSocket.create_frame('Hello, ', fin=0))
+        )
+
+        self.assertEqual(body, b'\x88\x02\x03\xeb')
+
     def test_sse(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,

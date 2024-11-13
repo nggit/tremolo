@@ -43,11 +43,15 @@ class WebSocket:
                 'connection closed: recv failed'
             ) from exc
 
-        # we don't use FIN
-        # fin = (first_byte & 0x80) >> 7
+        fin = (first_byte & 0x80) >> 7
         opcode = first_byte & 0x0f
         is_masked = (second_byte & 0x80) >> 7
         payload_length = second_byte & 0x7f
+
+        if fin == 0 or opcode == 0:
+            raise WebSocketServerClosed(
+                'continuation frames are not supported', code=1003
+            )
 
         if payload_length == 126:
             payload_length = int.from_bytes(await self.request.recv(2),
