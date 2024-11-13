@@ -203,8 +203,7 @@ class HTTPProtocol(asyncio.Protocol):
     async def handle_exception(self, exc):
         if (self.request is None or self.response is None or
                 (self.response.headers_sent() and not self.request.upgraded)):
-            # it's here for redundancy
-            self.abort(exc)
+            self.abort(exc)  # it's here for redundancy
             return
 
         self.print_exception(
@@ -283,13 +282,17 @@ class HTTPProtocol(asyncio.Protocol):
                 # assuming a request with a body, such as POST
                 if b'content-type' in self.request.headers:
                     # don't lower() content-type, as it may contain a boundary
-                    self.request.content_type = self.request.headers[b'content-type']  # noqa: E501
+                    self.request.content_type = (
+                        self.request.headers[b'content-type']
+                    )
 
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
                         raise BadRequest
 
-                    self.request.transfer_encoding = self.request.headers[b'transfer-encoding'].lower()  # noqa: E501
+                    self.request.transfer_encoding = (
+                        self.request.headers[b'transfer-encoding'].lower()
+                    )
 
                 if b'content-length' in self.request.headers:
                     self.request.content_length = int(
@@ -314,7 +317,7 @@ class HTTPProtocol(asyncio.Protocol):
                 # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
-            if self.request.has_body or len(data) > header_size + 2:
+            if len(data) > header_size + 2:
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
