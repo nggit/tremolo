@@ -36,21 +36,21 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_route(self):
         app.route('/hello')(handlers.hello)
-        pattern, func, options = app.routes[b'2#hello'][-1]
+        pattern, func, options = app.routes[b'\x01hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello!')
         self.assertEqual(options, {})
 
         app.route('/hello/world')(handlers.hello_world)
-        pattern, func, options = app.routes[b'3#hello'][-1]
+        pattern, func, options = app.routes[b'\x02hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello/world(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello, World!')
         self.assertEqual(options, {'a': 1, 'b': 2})
 
         app.route('/hello/python')(handlers.hello_python)
-        pattern, func, options = app.routes[b'3#hello'][-1]
+        pattern, func, options = app.routes[b'\x02hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello/python(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello, Python!')

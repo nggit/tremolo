@@ -280,14 +280,13 @@ class HTTPServer(HTTPProtocol):
             )
             return
 
-        _path = self.request.path.strip(b'/')
+        path = self.request.path.strip(b'/')
 
-        if _path == b'':
+        if path == b'':
             key = 1
         else:
-            key = b'%d#%s' % (
-                _path.count(b'/') + 2, _path[:(_path + b'/').find(b'/')]
-            )
+            parts = path.split(b'/', 254)
+            key = bytes([len(parts)]) + parts[0]
 
         if key in self._routes:
             for (pattern, func, kwargs) in self._routes[key]:
