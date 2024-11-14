@@ -67,7 +67,8 @@ class ParseHeader:
             max_lines -= 1
             line = bytes(data[start:end])
 
-            if max_lines < 0 or end - start > max_line_size or b'\n' in line:
+            if (max_lines < 0 or end - start > max_line_size or
+                    b'\r' in line or b'\n' in line or 0 in line):
                 self.is_valid = False
                 return self
 
