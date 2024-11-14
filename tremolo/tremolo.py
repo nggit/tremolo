@@ -212,19 +212,16 @@ class Tremolo:
             pattern = path.encode('latin-1')
             self.routes[-1].append((pattern, func, kwargs))
         else:
-            _path = path.split('?', 1)[0].strip('/')
+            path = path.split('?', 1)[0].strip('/').encode('latin-1')
 
-            if _path == '':
+            if path == b'':
                 key = 1
                 pattern = self.routes[1][0][0]
                 self.routes[key] = [(pattern, func, kwargs)]
             else:
-                key = '{:d}#{:s}'.format(
-                    _path.count('/') + 2, _path[:(_path + '/').find('/')]
-                ).encode('latin-1')
-                pattern = r'^/+{:s}(?:/+)?(?:\?.*)?$'.format(
-                    _path
-                ).encode('latin-1')
+                parts = path.split(b'/', 254)
+                key = bytes([len(parts)]) + parts[0]
+                pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
 
                 if key in self.routes:
                     self.routes[key].append((pattern, func, kwargs))
