@@ -2,10 +2,10 @@
 
 import time
 
-from tremolo import Tremolo
+from tremolo import Application
 from tremolo.exceptions import BadRequest
 
-app = Tremolo()
+app = Application()
 
 
 @app.on_request
@@ -21,7 +21,7 @@ async def middleware_handler(**server):
 async def ws_handler(websocket=None, request=None, stream=False, **_):
     """A hybrid handler.
 
-    Normally, you should separate http:// and ws:// respectively.
+    Normally, you should separate the http:// and ws:// handlers individually.
     """
     if websocket is not None:
         # an upgrade request is received.
@@ -32,8 +32,8 @@ async def ws_handler(websocket=None, request=None, stream=False, **_):
             message = await websocket.receive()
             # send back the received message
             await websocket.send(
-                '[{:s}] Guest{:d}: {:s}'.format(
-                    time.strftime('%H:%M:%S'), request.client[1], message)
+                '[%s] Guest%s: %s' % (time.strftime('%H:%M:%S'),
+                                      request.client[1], message)
             )
 
     # not an upgrade request. show the html page
@@ -51,7 +51,7 @@ async def ws_handler(websocket=None, request=None, stream=False, **_):
     ws_scheme = b'ws'
 
     if request.scheme == b'https':
-        ws_scheme = b'wss'
+        ws_scheme += b's'
 
     yield b"\
         var socket = new WebSocket('%s://%s/');" % (ws_scheme, request.host)
