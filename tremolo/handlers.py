@@ -14,7 +14,7 @@ async def error_400(**_):
     raise BadRequest
 
 
-async def error_404(request=None, **_):
+async def error_404(request, **_):
     yield (
         b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
         b'content="width=device-width, initial-scale=1.0" />'
@@ -31,7 +31,7 @@ async def error_404(request=None, **_):
     )
 
 
-async def error_500(request=None, exc=None, **_):
+async def error_500(request, exc=None, **_):
     if request.protocol.options['debug']:
         te = TracebackException.from_exception(exc)
         return '<ul><li>%s</li></ul>' % '</li><li>'.join(
