@@ -19,6 +19,8 @@ from .http_response import HTTPResponse
 from .queue import Queue
 from .websocket import WebSocket
 
+_DEFAULT_QUEUE = (None, None)
+
 
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('globals',
@@ -26,6 +28,7 @@ class HTTPProtocol(asyncio.Protocol):
                  'options',
                  'loop',
                  'logger',
+                 'fileno',
                  'queue',
                  'request',
                  'response',
@@ -40,7 +43,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.options = kwargs
         self.loop = loop
         self.logger = logger
-        self.queue = [None, None]
+        self.fileno = -1
+        self.queue = _DEFAULT_QUEUE
         self.request = None
         self.response = None
         self.handler = None
@@ -79,19 +83,12 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.context.update(transport=transport)
-        fileno = self.context.socket.fileno()
+        self.fileno = self.context.socket.fileno()
 
-        if fileno in self.globals.queues:
-            self.queue[0], self.queue[1] = self.globals.queues[fileno]
-
-            if self.queue[0].qsize() or self.queue[0].qsize():
-                self.logger.error('uncleaned queue in fileno: %d', fileno)
-                self.abort()
-                return
-        else:
-            self.queue[0] = Queue()
-            self.queue[1] = Queue()
-            self.globals.queues[fileno] = tuple(self.queue)
+        try:
+            self.queue = self.globals.queues.pop(self.fileno)
+        except KeyError:
+            self.queue = [Queue(), Queue()]
 
         self._waiters['request'] = self.loop.create_future()
 
@@ -514,13 +511,11 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 self.print_exception(exc, 'connection_lost')
 
-        for queue in self.queue:
-            if queue is None:
-                break
+        if self.queue is not _DEFAULT_QUEUE:
+            if self.queue[0].clear() and self.queue[1].clear():
+                self.globals.queues[self.fileno] = self.queue
 
-            queue.clear()
-        else:
-            self.queue[0] = self.queue[1] = None
+            self.queue = _DEFAULT_QUEUE
 
         self.context.update(transport=None, socket=None)
         self.request = None

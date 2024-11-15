@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-from tremolo import Tremolo
+from tremolo import Application
 
-app = Tremolo()
+app = Application()
 
 
 @app.route('/hello')

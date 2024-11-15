@@ -21,8 +21,7 @@ You can take advantage of this to serve/generate big files efficiently:
 @app.route('/my/url/speedtest.bin')
 async def my_big_data(**server):
     response = server['response']
-    # buffer_size = 16384
-    buffer_size = server['context'].options['buffer_size']
+    buffer_size = 16384
 
     response.set_content_type('application/octet-stream')
 
@@ -55,9 +54,9 @@ With only **3k** lines of code, with **no dependencies** other than the [Python 
 Here is a complete *hello world* example in case you missed the usual `return`.
 
 ```python
-from tremolo import Tremolo
+from tremolo import Application
 
-app = Tremolo()
+app = Application()
 
 @app.route('/hello')
 async def hello_world(**server):

@@ -8,7 +8,7 @@ import unittest
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tremolo import Tremolo  # noqa: E402
+from tremolo import Application  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import ConnectionContext  # noqa: E402
@@ -16,7 +16,7 @@ from tests import handlers, middlewares, hooks  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
 from tests.utils import function  # noqa: E402
 
-app = Tremolo()
+app = Application()
 
 
 class TestTremoloObjects(unittest.TestCase):

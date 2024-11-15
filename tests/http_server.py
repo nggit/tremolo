@@ -10,7 +10,7 @@ import sys  # noqa: E402
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tremolo import Tremolo  # noqa: E402
+from tremolo import Application  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.utils import memory_usage  # noqa: E402
 
@@ -18,7 +18,7 @@ HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
 TEST_FILE = __file__
 
-app = Tremolo()
+app = Application()
 
 
 @app.on_worker_start  # priority=999 (low)
