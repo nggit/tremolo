@@ -224,32 +224,31 @@ class HTTPProtocol(asyncio.Protocol):
         elif not isinstance(exc, HTTPException):
             exc = InternalServerError(cause=exc)
 
-        if self.request is not None and self.response is not None:
-            if self.response.headers_sent():
-                self.response.close()
-                return
+        if self.response.headers_sent():
+            self.response.close()
+            return
 
-            self.response.headers.clear()
-            self.response.set_status(exc.code, exc.message)
-            self.response.set_content_type(exc.content_type)
-            data = b''
+        self.response.headers.clear()
+        self.response.set_status(exc.code, exc.message)
+        self.response.set_content_type(exc.content_type)
+        data = b''
 
-            try:
-                data = await self.handle_error_500(exc) or data
-            finally:
-                if isinstance(data, str):
-                    encoding = 'utf-8'
+        try:
+            data = await self.handle_error_500(exc) or data
+        finally:
+            if isinstance(data, str):
+                encoding = 'utf-8'
 
-                    for v in exc.content_type.split(';', 100):
-                        v = v.lstrip()
+                for v in exc.content_type.split(';', 100):
+                    v = v.lstrip()
 
-                        if v.startswith('charset='):
-                            encoding = v[8:].strip() or encoding
-                            break
+                    if v.startswith('charset='):
+                        encoding = v[8:].strip() or encoding
+                        break
 
-                    data = data.encode(encoding)
+                data = data.encode(encoding)
 
-                await self.response.end(data, keepalive=False)
+            await self.response.end(data, keepalive=False)
 
     async def _handle_request(self, data, header_size):
         header = ParseHeader(
