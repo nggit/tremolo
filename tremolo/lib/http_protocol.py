@@ -198,8 +198,7 @@ class HTTPProtocol(asyncio.Protocol):
         )
 
     async def handle_exception(self, exc):
-        if (self.request is None or self.response is None or
-                (self.response.headers_sent() and not self.request.upgraded)):
+        if self.request is None or self.response is None:
             self.abort(exc)  # it's here for redundancy
             return
 
@@ -207,26 +206,27 @@ class HTTPProtocol(asyncio.Protocol):
             exc, quote_from_bytes(unquote_to_bytes(self.request.path))
         )
 
+        # WebSocket
         if isinstance(exc, WebSocketException):
             if isinstance(exc, WebSocketServerClosed):
-                await self.response.send(
-                    WebSocket.create_frame(
-                        exc.code.to_bytes(2, byteorder='big'),
-                        opcode=8)
+                data = WebSocket.create_frame(
+                    exc.code.to_bytes(2, byteorder='big'), opcode=8
                 )
+                await self.response.send(data)
 
             if self.response is not None:
                 self.response.close(keepalive=True)
+            return
+
+        # HTTP
+        if self.response.headers_sent():
+            self.response.close()
             return
 
         if isinstance(exc, TimeoutError):
             exc = RequestTimeout(cause=exc)
         elif not isinstance(exc, HTTPException):
             exc = InternalServerError(cause=exc)
-
-        if self.response.headers_sent():
-            self.response.close()
-            return
 
         self.response.headers.clear()
         self.response.set_status(exc.code, exc.message)
