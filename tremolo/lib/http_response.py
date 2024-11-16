@@ -312,14 +312,14 @@ class HTTPResponse(Response):
             return asyncio.wrap_future(fut, loop=loop)
 
         try:
-            handle = self.request.context.RESPONSE_SENDFILE_HANDLE
+            handle = self.request.protocol.context.RESPONSE_SENDFILE_HANDLE
             await run_sync(handle.seek, 0)
         except AttributeError:
             handle = await run_sync(open, path, 'rb')
-            self.request.context.RESPONSE_SENDFILE_HANDLE = handle
+            self.request.protocol.context.RESPONSE_SENDFILE_HANDLE = handle
 
             self.request.protocol.add_close_callback(
-                self.request.context.RESPONSE_SENDFILE_HANDLE.close
+                self.request.protocol.context.RESPONSE_SENDFILE_HANDLE.close
             )
 
         st = os.stat(path)

@@ -45,7 +45,6 @@ class ConnectionContext(Context):
         self.__dict__ = {
             'transport': None,
             'socket': None,
-            'options': {},
             'tasks': set()
         }
 
@@ -61,9 +60,16 @@ class ConnectionContext(Context):
         return self.__dict__['socket']
 
     @property
-    def options(self):
-        return self.__dict__['options']
-
-    @property
     def tasks(self):
         return self.__dict__['tasks']
+
+
+class RequestContext(Context):
+    def __init__(self):
+        self.__dict__ = {
+            'options': {}
+        }
+
+    @property
+    def options(self):
+        return self.__dict__['options']

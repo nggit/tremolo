@@ -269,7 +269,7 @@ class HTTPRequest(Request):
 
     @property
     def params(self):
-        return self.protocol.context
+        return self.context
 
     @property
     def query(self):

@@ -66,8 +66,9 @@ async def on_close(**server):
 
 
 @app.on_request(priority=1000)
-async def on_request2(**server):
-    assert server['request'].protocol.options['max_queue_size'] == 123
+async def on_request2(request, **_):
+    assert request.protocol.options['max_queue_size'] == 123
+    assert request.ctx.foo == 'baz'
 
 
 @app.on_request
@@ -78,8 +79,7 @@ async def on_request(**server):
     worker_ctx.shared += 1
     worker_ctx.socket_family = request.socket.family.name
     request.protocol.options['max_queue_size'] = 123
-
-    assert request.ctx.foo == 'bar'
+    request.ctx.foo = 'baz'
 
     if not request.is_valid:
         raise BadRequest
