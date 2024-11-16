@@ -2,22 +2,21 @@
 
 import asyncio
 
+from .contexts import RequestContext
+
 
 class Request:
-    __slots__ = ('protocol', 'body_size', 'body_consumed')
+    __slots__ = ('protocol', 'context', 'body_size', 'body_consumed')
 
     def __init__(self, protocol):
         self.protocol = protocol
+        self.context = RequestContext()
         self.body_size = 0
         self.body_consumed = 0
 
     @property
-    def context(self):
-        return self.protocol.context
-
-    @property
     def ctx(self):
-        return self.protocol.context
+        return self.context
 
     @property
     def transport(self):

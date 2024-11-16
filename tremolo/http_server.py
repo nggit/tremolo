@@ -55,9 +55,9 @@ class HTTPServer(HTTPProtocol):
         else:
             super().connection_lost(exc)
 
-    async def _handle_middleware(self, func, options={}):
+    async def _handle_middleware(self, func, options):
         self.response.set_base_header()
-        self.context.options.update(options)
+        self.request.context.options.update(options)
 
         data = await func(request=self.request, response=self.response,
                           **self._server)
@@ -93,7 +93,7 @@ class HTTPServer(HTTPProtocol):
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
             self._server['websocket'] = WebSocket(self.request, self.response)
 
-    async def _handle_response(self, func, options={}):
+    async def _handle_response(self, func, options):
         options['rate'] = options.get('rate', self.options['download_rate'])
         options['buffer_size'] = options.get('buffer_size',
                                              self.options['buffer_size'])
@@ -112,7 +112,7 @@ class HTTPServer(HTTPProtocol):
             self.response.set_content_type(options['content_type'])
 
         self.response.set_base_header()
-        self.context.options.update(options)
+        self.request.context.options.update(options)
 
         agen = func(request=self.request, response=self.response,
                     **self._server)
@@ -261,7 +261,7 @@ class HTTPServer(HTTPProtocol):
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
-        options = {}
+        options = self.request.context.options
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(
