@@ -289,7 +289,7 @@ async def upload_multipart(stream=False, **server):
 
 
 @app.route('/download')
-async def download(request=None, response=None, **_):
+async def download(request, response, **_):
     if request.query_string == b'executor':
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             await response.sendfile(
@@ -341,7 +341,7 @@ async def sse_handler(sse=None, **_):
 
 
 @app.route('/timeouts')
-async def timeouts(request=None, **_):
+async def timeouts(request, **_):
     if request.query_string == b'recv':
         # attempt to read body on a GET request
         # should raise a TimeoutError and ended up with a RequestTimeout
@@ -351,7 +351,7 @@ async def timeouts(request=None, **_):
 
 
 @app.route('/reload')
-async def reload(request=None, **_):
+async def reload(request, **_):
     yield b'%d' % hash(app)
 
     if request.query_string != b'':

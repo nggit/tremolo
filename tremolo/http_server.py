@@ -59,8 +59,8 @@ class HTTPServer(HTTPProtocol):
         self.response.set_base_header()
         self.context.options.update(options)
 
-        data = await func(**self._server,
-                          request=self.request, response=self.response)
+        data = await func(request=self.request, response=self.response,
+                          **self._server)
 
         if data is None:
             return options
@@ -114,8 +114,8 @@ class HTTPServer(HTTPProtocol):
         self.response.set_base_header()
         self.context.options.update(options)
 
-        agen = func(**self._server,
-                    request=self.request, response=self.response)
+        agen = func(request=self.request, response=self.response,
+                    **self._server)
         next_data = getattr(agen, '__anext__', False)
 
         if next_data:

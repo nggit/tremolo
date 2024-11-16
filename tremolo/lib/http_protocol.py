@@ -198,8 +198,7 @@ class HTTPProtocol(asyncio.Protocol):
         )
 
     async def handle_exception(self, exc):
-        if (self.request is None or self.response is None or
-                (self.response.headers_sent() and not self.request.upgraded)):
+        if self.request is None or self.response is None:
             self.abort(exc)  # it's here for redundancy
             return
 
@@ -207,16 +206,21 @@ class HTTPProtocol(asyncio.Protocol):
             exc, quote_from_bytes(unquote_to_bytes(self.request.path))
         )
 
+        # WebSocket
         if isinstance(exc, WebSocketException):
             if isinstance(exc, WebSocketServerClosed):
-                await self.response.send(
-                    WebSocket.create_frame(
-                        exc.code.to_bytes(2, byteorder='big'),
-                        opcode=8)
+                data = WebSocket.create_frame(
+                    exc.code.to_bytes(2, byteorder='big'), opcode=8
                 )
+                await self.response.send(data)
 
             if self.response is not None:
                 self.response.close(keepalive=True)
+            return
+
+        # HTTP
+        if self.response.headers_sent():
+            self.response.close()
             return
 
         if isinstance(exc, TimeoutError):
@@ -224,32 +228,27 @@ class HTTPProtocol(asyncio.Protocol):
         elif not isinstance(exc, HTTPException):
             exc = InternalServerError(cause=exc)
 
-        if self.request is not None and self.response is not None:
-            if self.response.headers_sent():
-                self.response.close()
-                return
+        self.response.headers.clear()
+        self.response.set_status(exc.code, exc.message)
+        self.response.set_content_type(exc.content_type)
+        data = b''
 
-            self.response.headers.clear()
-            self.response.set_status(exc.code, exc.message)
-            self.response.set_content_type(exc.content_type)
-            data = b''
+        try:
+            data = await self.handle_error_500(exc) or data
+        finally:
+            if isinstance(data, str):
+                encoding = 'utf-8'
 
-            try:
-                data = await self.handle_error_500(exc) or data
-            finally:
-                if isinstance(data, str):
-                    encoding = 'utf-8'
+                for v in exc.content_type.split(';', 100):
+                    v = v.lstrip()
 
-                    for v in exc.content_type.split(';', 100):
-                        v = v.lstrip()
+                    if v.startswith('charset='):
+                        encoding = v[8:].strip() or encoding
+                        break
 
-                        if v.startswith('charset='):
-                            encoding = v[8:].strip() or encoding
-                            break
+                data = data.encode(encoding)
 
-                    data = data.encode(encoding)
-
-                await self.response.end(data, keepalive=False)
+            await self.response.end(data, keepalive=False)
 
     async def _handle_request(self, data, header_size):
         header = ParseHeader(
