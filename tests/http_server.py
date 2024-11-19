@@ -23,12 +23,14 @@ app = Application()
 
 @app.on_worker_start  # priority=999 (low)
 async def worker_start(**worker):
-    worker_ctx = worker['context']
+    g = worker['context']
+    # or:
+    # g = worker['globals']
 
-    assert worker_ctx.options['client_max_body_size'] == 1048576
+    assert g.options['client_max_body_size'] == 1048576
 
-    worker_ctx.shared = 0
-    worker_ctx.socket_family = 'AF_UNIX'
+    g.shared = 0
+    g.socket_family = 'AF_UNIX'
 
 
 @app.on_worker_start(priority=1)  # high
@@ -43,12 +45,12 @@ async def worker_stop2(**worker):
 
 @app.on_worker_stop
 async def worker_stop(**worker):
-    worker_ctx = worker['context']
+    g = worker['context']
 
-    if worker_ctx.socket_family == 'AF_UNIX':
-        assert worker_ctx.shared == 0
+    if g.socket_family == 'AF_UNIX':
+        assert g.shared == 0
     else:
-        assert worker_ctx.shared > 0
+        assert g.shared > 0
 
 
 @app.on_connect
@@ -75,9 +77,9 @@ async def on_request2(request, **_):
 async def on_request(**server):
     request = server['request']
     response = server['response']
-    worker_ctx = server['globals']
-    worker_ctx.shared += 1
-    worker_ctx.socket_family = request.socket.family.name
+    g = server['globals']
+    g.shared += 1
+    g.socket_family = request.socket.family.name
     request.protocol.options['max_queue_size'] = 123
     request.ctx.foo = 'baz'
 
