@@ -7,17 +7,16 @@ import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
-import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
-import time  # noqa: E402
 
 from functools import wraps  # noqa: E402
 from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__, handlers  # noqa: E402
+from .managers import ProcessManager  # noqa: E402
 from .utils import (  # noqa: E402
     file_signature, log_date, memory_usage, server_date
 )
@@ -29,10 +28,6 @@ _REUSEPORT_OR_REUSEADDR = {
     True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
     False: socket.SO_REUSEADDR
 }
-
-
-def sigterm_handler(signum, frame):
-    raise KeyboardInterrupt
 
 
 class Tremolo:
@@ -64,7 +59,7 @@ class Tremolo:
             'worker_stop': []
         }
         self.ports = {}
-
+        self.manager = ProcessManager()
         self.loop = None
         self.logger = None
 
@@ -237,12 +232,11 @@ class Tremolo:
                     routes[key][i] = (re.compile(pattern), *handler)
 
     async def _serve(self, host, port, **options):
-        options['_conn'].send(os.getpid())
         backlog = options.get('backlog', 100)
 
         if hasattr(socket, 'fromshare'):
             # Windows
-            sock = socket.fromshare(options['_conn'].recv())
+            sock = socket.fromshare(options['_sock'].share(os.getpid()))
         else:
             # Linux
             sock = self.create_sock(host, port, options['reuse_port'])
@@ -308,7 +302,6 @@ class Tremolo:
                 options['app_dir'] = os.getcwd()
 
             sys.path.insert(0, options['app_dir'])
-
             options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
@@ -395,71 +388,55 @@ class Tremolo:
         paths = [path for path in sys.path
                  if not options['app_dir'].startswith(path)]
         modules = {}
-        process_num = 1
         limit_memory = options.get('limit_memory', 0)
 
         # serve forever
-        while process_num:
-            try:
-                # ping parent process
-                options['_conn'].send(None)
+        while True:
+            await asyncio.sleep(1)
 
-                for _ in range(2 * process_num):
-                    await asyncio.sleep(1)
+            # update server date
+            server_info['date'] = server_date()
 
-                    # update server date
-                    server_info['date'] = server_date()
+            # detect code changes
+            if 'reload' in options and options['reload']:
+                for module in (dict(modules) or sys.modules.values()):
+                    if not hasattr(module, '__file__'):
+                        continue
 
-                    # detect code changes
-                    if 'reload' in options and options['reload']:
-                        for module in (dict(modules) or sys.modules.values()):
-                            if not hasattr(module, '__file__'):
+                    for path in paths:
+                        if (module.__file__ is None or
+                                module.__file__.startswith(path)):
+                            break
+                    else:
+                        if not os.path.exists(module.__file__):
+                            if module in modules:
+                                del modules[module]
+
+                            continue
+
+                        _sign = file_signature(module.__file__)
+
+                        if module in modules:
+                            if modules[module] == _sign:
+                                # file not modified
                                 continue
 
-                            for path in paths:
-                                if (module.__file__ is None or
-                                        module.__file__.startswith(path)):
-                                    break
-                            else:
-                                if not os.path.exists(module.__file__):
-                                    if module in modules:
-                                        del modules[module]
+                            modules[module] = _sign
+                        else:
+                            modules[module] = _sign
+                            continue
 
-                                    continue
-
-                                _sign = file_signature(module.__file__)
-
-                                if module in modules:
-                                    if modules[module] == _sign:
-                                        # file not modified
-                                        continue
-
-                                    modules[module] = _sign
-                                else:
-                                    modules[module] = _sign
-                                    continue
-
-                                self.logger.info('reload: %s', module.__file__)
-                                server.close()
-                                await server.wait_closed()
-                                await self._worker_stop(context)
-
-                                # essentially means sys.exit(0)
-                                # to trigger a reload
-                                return
-
-                    if limit_memory > 0 and memory_usage() > limit_memory:
-                        self.logger.error('memory limit exceeded')
+                        self.logger.info('reload: %s', module.__file__)
                         server.close()
                         await server.wait_closed()
                         await self._worker_stop(context)
-                        sys.exit(1)
 
-                    if options['_conn'].poll():
-                        break
+                        # essentially means sys.exit(0)
+                        # to trigger a reload
+                        return
 
-                process_num = options['_conn'].recv()
-            except (BrokenPipeError, ConnectionResetError, EOFError):
+            if limit_memory > 0 and memory_usage() > limit_memory:
+                self.logger.error('memory limit exceeded')
                 break
 
         server.close()
@@ -594,17 +571,61 @@ class Tremolo:
         except OSError:
             sock.close()
 
-    def _reload_module(self, app_dir):
-        for module in list(sys.modules.values()):
-            if (hasattr(module, '__file__') and
-                    module.__name__ not in ('__main__',
-                                            '__mp_main__',
-                                            'tremolo') and
-                    not module.__name__.startswith('tremolo.') and
-                    module.__file__ is not None and
-                    module.__file__.startswith(app_dir) and
-                    os.path.exists(module.__file__)):
-                reload_module(module)
+    def _handle_reload(self, **info):
+        args = info['args']
+        kwargs = info['kwargs']
+        process = info['process']
+
+        if process.exitcode == 0:
+            print('Reloading...')
+
+            if kwargs['app'] is None:
+                for module in list(sys.modules.values()):
+                    if (hasattr(module, '__file__') and
+                            module.__name__ not in ('__main__',
+                                                    '__mp_main__',
+                                                    'tremolo') and
+                            not module.__name__.startswith('tremolo.') and
+                            module.__file__ is not None and
+                            module.__file__.startswith(kwargs['app_dir']) and
+                            os.path.exists(module.__file__)):
+                        reload_module(module)
+
+                if kwargs['module_name'] in sys.modules:
+                    _module = sys.modules[kwargs['module_name']]
+                else:
+                    _module = import_module(kwargs['module_name'])
+
+                # we need to update/rebind objects like
+                # routes, middleware, etc.
+                for attr_name in dir(_module):
+                    if attr_name.startswith('__'):
+                        continue
+
+                    attr = getattr(_module, attr_name)
+
+                    if isinstance(attr, self.__class__):
+                        self.__dict__.update(attr.__dict__)
+        elif process.exitcode > 0:
+            print(
+                'A worker process died (%d). Restarting...' % process.exitcode
+            )
+
+        if process.exitcode < 0:
+            print('pid %d terminated (%d)' % (process.pid, process.exitcode))
+        else:
+            # this is a workaround, especially on Windows
+            # to trigger renew socket
+            kwargs['_sock'] = None
+
+            # update some references
+            kwargs['_routes'] = self.routes
+            kwargs['_middlewares'] = self.middlewares
+
+            self.manager.spawn(
+                self._worker, args=args, kwargs=kwargs,
+                exit_cb=self._handle_reload
+            )
 
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
@@ -619,7 +640,6 @@ class Tremolo:
                 sys.platform)
         )
         print('-' * terminal_width)
-        mp.set_start_method('spawn', force=True)
 
         import __main__
 
@@ -648,10 +668,10 @@ class Tremolo:
                 kwargs['app_dir'], base_name = os.path.split(
                     os.path.abspath(__main__.__file__)
                 )
-                module_name = os.path.splitext(base_name)[0]
+                kwargs['module_name'] = os.path.splitext(base_name)[0]
             else:
                 kwargs['app_dir'] = os.getcwd()
-                module_name = '__main__'
+                kwargs['module_name'] = '__main__'
 
             if kwargs['log_level'] in ('DEBUG', 'INFO'):
                 print('Routes:')
@@ -688,9 +708,7 @@ class Tremolo:
         except AttributeError:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
-        processes = []
         socks = {}
-
         print('Options:')
 
         for (_host, _port), options in self.ports.items():
@@ -701,7 +719,6 @@ class Tremolo:
                 _port = port
 
             options = {**kwargs, **options}
-
             print(
                 '  run(host=%s, port=%d, worker_num=%d, %s)' % (
                     _host,
@@ -714,106 +731,17 @@ class Tremolo:
             socks[args] = self.create_sock(_host, _port, options['reuse_port'])
 
             for _ in range(options.get('worker_num', worker_num)):
-                parent_conn, child_conn = mp.Pipe()
-
-                p = mp.Process(
-                    target=self._worker,
+                self.manager.spawn(
+                    self._worker,
                     args=args,
-                    kwargs=dict(options,
-                                _locks=locks,
-                                _conn=child_conn,
+                    kwargs=dict(options, _locks=locks, _sock=socks[args],
                                 _routes=self.routes,
-                                _middlewares=self.middlewares)
+                                _middlewares=self.middlewares),
+                    exit_cb=self._handle_reload
                 )
 
-                p.start()
-                child_pid = parent_conn.recv()
-
-                if hasattr(socks[args], 'share'):
-                    parent_conn.send(socks[args].share(child_pid))
-
-                processes.append((parent_conn, p, args, options))
-
         print('-' * terminal_width)
-        signal.signal(signal.SIGTERM, sigterm_handler)
-
-        while True:
-            try:
-                for i, (parent_conn, p, args, options) in enumerate(processes):
-                    if not p.is_alive():
-                        if p.exitcode == 0:
-                            print('Reloading...')
-
-                            if kwargs['app'] is None:
-                                self._reload_module(kwargs['app_dir'])
-
-                                if module_name in sys.modules:
-                                    _module = sys.modules[module_name]
-                                else:
-                                    _module = import_module(module_name)
-
-                                # we need to update/rebind objects like
-                                # routes, middleware, etc.
-                                for attr_name in dir(_module):
-                                    if attr_name.startswith('__'):
-                                        continue
-
-                                    attr = getattr(_module, attr_name)
-
-                                    if isinstance(attr, self.__class__):
-                                        self.__dict__.update(attr.__dict__)
-                        else:
-                            print('A worker process died. Restarting...')
-
-                        if p.exitcode != 0 or hasattr(socks[args], 'share'):
-                            # renew socket
-                            # this is a workaround, especially on Windows
-                            socks[args] = self.create_sock(
-                                *args, options['reuse_port']
-                            )
-
-                        parent_conn.close()
-                        parent_conn, child_conn = mp.Pipe()
-                        p = mp.Process(
-                            target=self._worker,
-                            args=args,
-                            kwargs=dict(options,
-                                        _locks=locks,
-                                        _conn=child_conn,
-                                        _routes=self.routes,
-                                        _middlewares=self.middlewares)
-                        )
-
-                        p.start()
-                        child_pid = parent_conn.recv()
-
-                        if hasattr(socks[args], 'share'):
-                            parent_conn.send(socks[args].share(child_pid))
-
-                        processes[i] = (parent_conn, p, args, options)
-
-                    # response ping from child
-                    while True:
-                        try:
-                            if not parent_conn.poll():
-                                break
-
-                            parent_conn.recv()
-                            parent_conn.send(len(processes))
-                        except BrokenPipeError:
-                            break
-
-                    time.sleep(1)
-            except KeyboardInterrupt:
-                break
-
-        for parent_conn, p, *_ in processes:
-            # stopping serve forever
-            parent_conn.send(0)
-            parent_conn.close()
-            p.join()
-
-            print('pid %d terminated' % p.pid)
+        self.manager.wait()
 
         for sock in socks.values():
             self.close_sock(sock)

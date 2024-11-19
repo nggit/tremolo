@@ -13,7 +13,7 @@ from tests.asgi_server import ASGI_HOST, ASGI_PORT
 
 
 def main():
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn', force=True)
     processes = []
 
     processes.append(mp.Process(
