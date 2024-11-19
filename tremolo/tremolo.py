@@ -234,7 +234,7 @@ class Tremolo:
     async def _serve(self, host, port, **options):
         backlog = options.get('backlog', 100)
 
-        if hasattr(socket, 'fromshare'):
+        if hasattr(options['_sock'], 'share'):
             # Windows
             sock = socket.fromshare(options['_sock'].share(os.getpid()))
         else:
