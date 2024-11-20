@@ -26,6 +26,7 @@ class ProcessManager:
                     break
             except EOFError:  # parent has exited
                 os.kill(os.getpid(), signal.SIGTERM)
+                return
             except OSError:  # handle is closed
                 break
 
