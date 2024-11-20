@@ -414,16 +414,16 @@ class Tremolo:
 
                             continue
 
-                        _sign = file_signature(module.__file__)
+                        sign = file_signature(module.__file__)
 
                         if module in modules:
-                            if modules[module] == _sign:
+                            if modules[module] == sign:
                                 # file not modified
                                 continue
 
-                            modules[module] = _sign
+                            modules[module] = sign
                         else:
-                            modules[module] = _sign
+                            modules[module] = sign
                             continue
 
                         self.logger.info('reload: %s', module.__file__)
@@ -442,6 +442,8 @@ class Tremolo:
         server.close()
         await server.wait_closed()
         await self._worker_stop(context)
+
+        sys.exit(1)
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
