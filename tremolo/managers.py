@@ -72,25 +72,23 @@ class ProcessManager:
                         conn.recv()
                     except EOFError:  # a child has exited, clean up
                         for name in self.processes:
-                            if self.processes[name]['parent_conn'] is not conn:
-                                continue
+                            if self.processes[name]['parent_conn'] is conn:
+                                info = self.processes.pop(name)
 
-                            info = self.processes.pop(name)
-                            exit_cb = info['exit_cb']
+                                info['process'].join()
+                                conn.close()
 
-                            info['process'].join()
+                                if callable(info['exit_cb']):
+                                    info['exit_cb'](**info)
 
-                            if callable(exit_cb):
-                                exit_cb(**info)
-
-                            break
+                                break
             except KeyboardInterrupt:
                 while self.processes:
                     _, info = self.processes.popitem()
-                    exit_cb = info['exit_cb']
 
-                    info['parent_conn'].close()
+                    os.kill(info['process'].pid, signal.SIGTERM)
                     info['process'].join()
+                    info['parent_conn'].close()
 
-                    if callable(exit_cb):
-                        exit_cb(**info)
+                    if callable(info['exit_cb']):
+                        info['exit_cb'](**info)
