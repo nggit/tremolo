@@ -604,12 +604,12 @@ class Tremolo:
                 # update some references
                 kwargs['_routes'] = self.routes
                 kwargs['_middlewares'] = self.middlewares
-        elif process.exitcode not in (-15, 0):
+        elif process.exitcode not in (-15, 0, 15):
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
             )
 
-        if process.exitcode in (-15, 0):
+        if process.exitcode in (-15, 0, 15):
             print('pid %d terminated (%d)' % (process.pid, process.exitcode))
         else:
             # this is a workaround, especially on Windows
