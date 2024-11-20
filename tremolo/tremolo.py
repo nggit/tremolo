@@ -433,8 +433,8 @@ class Tremolo:
                 if limit_memory > 0 and memory_usage() > limit_memory:
                     self.logger.error('memory limit exceeded')
                     sys.exit(1)
-        except asyncio.CancelledError:
-            sys.exit(0)  # shutdown
+        except asyncio.CancelledError:  # shutdown
+            pass
         finally:
             server.close()
             await server.wait_closed()

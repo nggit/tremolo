@@ -86,7 +86,9 @@ class ProcessManager:
                 while self.processes:
                     _, info = self.processes.popitem()
 
-                    os.kill(info['process'].pid, signal.SIGTERM)
+                    if info['process'].is_alive():
+                        os.kill(info['process'].pid, signal.SIGTERM)
+
                     info['process'].join()
                     info['parent_conn'].close()
 
