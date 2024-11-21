@@ -15,9 +15,9 @@ from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.utils import memory_usage  # noqa: E402
 
 if sys.implementation.name == 'cpython' and sys.platform == 'linux':
-    LIMIT_MEMORY=51200  # 50MiB
+    LIMIT_MEMORY = 51200  # 50MiB
 else:
-    LIMIT_MEMORY=0
+    LIMIT_MEMORY = 0
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
