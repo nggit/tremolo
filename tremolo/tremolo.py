@@ -371,7 +371,7 @@ class Tremolo:
         print(log_date(), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(
-            b'%s (pid %d) is started at ' % (server_name, os.getpid())
+            b'%s worker (pid %d) is started at ' % (server_name, os.getpid())
         )
 
         if sock.family.name == 'AF_UNIX':
@@ -384,7 +384,6 @@ class Tremolo:
             sys.stdout.buffer.write(b' (https)')
 
         print()
-
         paths = [path for path in sys.path
                  if not options['app_dir'].startswith(path)]
         modules = {}
@@ -433,7 +432,7 @@ class Tremolo:
                 if limit_memory > 0 and memory_usage() > limit_memory:
                     self.logger.error('memory limit exceeded')
                     sys.exit(1)
-        except asyncio.CancelledError:  # shutdown
+        except asyncio.CancelledError:  # shutdown (exit code 0)
             pass
         finally:
             server.close()
@@ -624,10 +623,12 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting Tremolo v%s (%s %d.%d.%d, %s)' % (
+            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' % (
+                server_name,
                 __version__,
                 sys.implementation.name,
                 *sys.version_info[:3],
@@ -735,6 +736,7 @@ class Tremolo:
                 )
 
         print('-' * terminal_width)
+        print('%s main (pid %d) is running ' % (server_name, os.getpid()))
         self.manager.wait()
 
         for sock in socks.values():
