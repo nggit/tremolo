@@ -28,7 +28,8 @@ class WorkerContext(Context):
     def __init__(self):
         self.__dict__ = {
             'options': {},
-            'queues': {}
+            'queues': {},
+            'tasks': set()
         }
 
     @property
@@ -38,6 +39,10 @@ class WorkerContext(Context):
     @property
     def queues(self):
         return self.__dict__['queues']
+
+    @property
+    def tasks(self):
+        return self.__dict__['tasks']
 
 
 class ConnectionContext(Context):

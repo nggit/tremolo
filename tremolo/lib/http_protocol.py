@@ -64,6 +64,14 @@ class HTTPProtocol(asyncio.Protocol):
     def add_close_callback(self, callback):
         self.tasks.add(callback)
 
+    def create_background_task(self, coro):
+        task = self.loop.create_task(coro)
+
+        self.globals.tasks.add(task)
+        task.add_done_callback(self.globals.tasks.discard)
+
+        return task
+
     def create_task(self, coro):
         task = self.loop.create_task(coro)
 
@@ -92,11 +100,13 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._waiters['request'] = self.loop.create_future()
 
-        self.tasks.add(self.loop.create_task(self._send_data()))
-        self.create_task(self.set_timeout(
-            self._waiters['request'],
-            timeout=self.options['request_timeout'],
-            timeout_cb=self.request_timeout)
+        self.add_close_callback(
+            self.create_background_task(self._send_data()).cancel
+        )
+        self.create_task(
+            self.set_timeout(self._waiters['request'],
+                             timeout=self.options['request_timeout'],
+                             timeout_cb=self.request_timeout)
         )
 
     def abort(self, exc=None):
@@ -366,7 +376,7 @@ class HTTPProtocol(asyncio.Protocol):
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
 
-                self.create_task(
+                self.create_background_task(
                     self._handle_request(self._header_buf, header_size)
                 )
                 self._header_buf = None
@@ -449,7 +459,8 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.transport.write(data)
             except asyncio.CancelledError:
-                continue
+                if self.transport is None or self.transport.is_closing():
+                    break
             except Exception as exc:
                 self.abort(exc)
 
@@ -481,10 +492,10 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._waiters['keepalive'] = self.loop.create_future()
 
-            self.create_task(self.set_timeout(
-                self._waiters['keepalive'],
-                timeout=self.options['keepalive_timeout'],
-                timeout_cb=self.keepalive_timeout)
+            self.create_task(
+                self.set_timeout(self._waiters['keepalive'],
+                                 timeout=self.options['keepalive_timeout'],
+                                 timeout_cb=self.keepalive_timeout)
             )
 
             while not self.request.has_body and self.queue[0].qsize():

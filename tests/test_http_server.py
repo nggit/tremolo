@@ -15,7 +15,8 @@ from tests.http_server import (  # noqa: E402
     app,
     HTTP_HOST,
     HTTP_PORT,
-    TEST_FILE
+    TEST_FILE,
+    LIMIT_MEMORY
 )
 from tests.utils import (  # noqa: E402
     getcontents,
@@ -877,10 +878,10 @@ if __name__ == '__main__':
         target=app.run,
         kwargs=dict(host=HTTP_HOST,
                     port=HTTP_PORT,
+                    limit_memory=LIMIT_MEMORY,
                     debug=False,
                     reload=True,
                     loop='asyncio.SelectorEventLoop',
-                    limit_memory=102400,  # 100MiB
                     client_max_body_size=1048576,  # 1MiB
                     ws_max_payload_size=73728)
     )

@@ -426,6 +426,9 @@ class Tremolo:
                                 modules[module] = sign
                                 continue
 
+                            while context.tasks:
+                                await context.tasks.pop()
+
                             self.logger.info('reload: %s', module.__file__)
                             sys.exit(3)
 
@@ -433,7 +436,8 @@ class Tremolo:
                     self.logger.error('memory limit exceeded')
                     sys.exit(1)
         except asyncio.CancelledError:  # shutdown (exit code 0)
-            pass
+            while context.tasks:
+                await context.tasks.pop()
         finally:
             server.close()
             await server.wait_closed()
@@ -494,8 +498,10 @@ class Tremolo:
         except KeyboardInterrupt:
             self.logger.info('Shutting down')
             task.cancel()
-            self.loop.run_forever()
         finally:
+            if not task.done():
+                self.loop.run_forever()
+
             if not task.cancelled():
                 exc = task.exception()
 
