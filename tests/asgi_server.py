@@ -12,7 +12,7 @@ import tremolo  # noqa: E402
 
 from tests.http_server import HTTP_PORT, TEST_FILE  # noqa: E402
 
-if sys.version_info[:2] < (3, 8):
+if sys.version_info[:2] < (3, 8) or sys.implementation.name != 'cpython':
     # on Windows, Python versions below 3.8 don't properly support
     # dual-stack IPv4/6. https://github.com/python/cpython/issues/73701
     ASGI_HOST = '0.0.0.0'
