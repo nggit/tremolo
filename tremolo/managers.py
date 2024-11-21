@@ -19,14 +19,21 @@ class ProcessManager:
 
     @classmethod
     def _wait_main(cls, conn):
-        try:
-            conn.recv()
-        except EOFError:
-            os.kill(os.getpid(), signal.SIGTERM)
+        while True:
+            try:
+                if conn.poll(1):
+                    conn.recv()
+                    continue
+            except EOFError:  # parent has exited
+                conn.close()
+                os.kill(os.getpid(), signal.SIGTERM)
+                return
+            except OSError:  # handle is closed
+                break
 
     @classmethod
     def _target(cls, conn, func, *args, **kwargs):
-        t = Thread(target=cls._wait_main, args=(conn,), daemon=True)
+        t = Thread(target=cls._wait_main, args=(conn,))
         t.start()
 
         try:
@@ -34,14 +41,15 @@ class ProcessManager:
 
             return func(*args, **kwargs)
         finally:
-            conn.send(mp.current_process().name)  # exited, send name to parent
-            conn.close()
+            conn.close()  # trigger handle is closed
+            t.join()
 
     def spawn(self, target, args=(), kwargs={}, name=None, exit_cb=None):
         parent_conn, child_conn = mp.Pipe()
         process = mp.Process(target=self._target, name=name,
                              args=(child_conn, target, *args), kwargs=kwargs)
         process.start()
+        child_conn.close()
 
         self.processes[process.name] = {
             'target': target,
@@ -61,29 +69,29 @@ class ProcessManager:
             try:
                 connections = [info['parent_conn'] for info in
                                self.processes.values()]
-                for conn in mp.connection.wait(connections, 1):
-                    # a child has exited, receive its name, clean up
-                    try:
-                        name = conn.recv()
-                    except EOFError:
-                        for name in self.processes:
-                            if self.processes[name]['parent_conn'] is conn:
-                                break
+                for conn in mp.connection.wait(connections):
+                    # a child has exited, clean up
+                    # there is no need to call recv() since EOF is expected
+                    for name in self.processes:
+                        if self.processes[name]['parent_conn'] is conn:
+                            info = self.processes.pop(name)
 
-                    info = self.processes.pop(name)
-                    exit_cb = info['exit_cb']
+                            info['process'].join()
+                            conn.close()
 
-                    info['process'].join()
+                            if callable(info['exit_cb']):
+                                info['exit_cb'](**info)
 
-                    if callable(exit_cb):
-                        exit_cb(**info)
+                            break
             except KeyboardInterrupt:
                 while self.processes:
                     _, info = self.processes.popitem()
-                    exit_cb = info['exit_cb']
 
-                    info['parent_conn'].close()
+                    if info['process'].is_alive():
+                        os.kill(info['process'].pid, signal.SIGTERM)
+
                     info['process'].join()
+                    info['parent_conn'].close()
 
-                    if callable(exit_cb):
-                        exit_cb(**info)
+                    if callable(info['exit_cb']):
+                        info['exit_cb'](**info)

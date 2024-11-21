@@ -371,7 +371,7 @@ class Tremolo:
         print(log_date(), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(
-            b'%s (pid %d) is started at ' % (server_name, os.getpid())
+            b'%s worker (pid %d) is started at ' % (server_name, os.getpid())
         )
 
         if sock.family.name == 'AF_UNIX':
@@ -384,64 +384,62 @@ class Tremolo:
             sys.stdout.buffer.write(b' (https)')
 
         print()
-
         paths = [path for path in sys.path
                  if not options['app_dir'].startswith(path)]
         modules = {}
         limit_memory = options.get('limit_memory', 0)
 
-        # serve forever
-        while True:
-            await asyncio.sleep(1)
+        try:
+            # serve forever
+            while True:
+                await asyncio.sleep(1)
 
-            # update server date
-            server_info['date'] = server_date()
+                # update server date
+                server_info['date'] = server_date()
 
-            # detect code changes
-            if 'reload' in options and options['reload']:
-                for module in (dict(modules) or sys.modules.values()):
-                    if not hasattr(module, '__file__'):
-                        continue
-
-                    for path in paths:
-                        if (module.__file__ is None or
-                                module.__file__.startswith(path)):
-                            break
-                    else:
-                        if not os.path.exists(module.__file__):
-                            if module in modules:
-                                del modules[module]
-
+                # detect code changes
+                if 'reload' in options and options['reload']:
+                    for module in (dict(modules) or sys.modules.values()):
+                        if not hasattr(module, '__file__'):
                             continue
 
-                        _sign = file_signature(module.__file__)
+                        for path in paths:
+                            if (module.__file__ is None or
+                                    module.__file__.startswith(path)):
+                                break
+                        else:
+                            if not os.path.exists(module.__file__):
+                                if module in modules:
+                                    del modules[module]
 
-                        if module in modules:
-                            if modules[module] == _sign:
-                                # file not modified
                                 continue
 
-                            modules[module] = _sign
-                        else:
-                            modules[module] = _sign
-                            continue
+                            sign = file_signature(module.__file__)
 
-                        self.logger.info('reload: %s', module.__file__)
-                        server.close()
-                        await server.wait_closed()
-                        await self._worker_stop(context)
+                            if module in modules:
+                                if modules[module] == sign:
+                                    # file not modified
+                                    continue
 
-                        # essentially means sys.exit(0)
-                        # to trigger a reload
-                        return
+                                modules[module] = sign
+                            else:
+                                modules[module] = sign
+                                continue
 
-            if limit_memory > 0 and memory_usage() > limit_memory:
-                self.logger.error('memory limit exceeded')
-                break
+                            self.logger.info('reload: %s', module.__file__)
+                            sys.exit(3)
 
-        server.close()
-        await server.wait_closed()
-        await self._worker_stop(context)
+                if limit_memory > 0 and memory_usage() > limit_memory:
+                    self.logger.error('memory limit exceeded')
+                    sys.exit(1)
+        except asyncio.CancelledError:  # shutdown (exit code 0)
+            pass
+        finally:
+            server.close()
+            await server.wait_closed()
+            await self._worker_stop(context)
+
+            self.loop.stop()
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
@@ -463,10 +461,6 @@ class Tremolo:
 
             if exc:
                 self.logger.error(exc)
-
-    async def _stop(self, task):
-        await task
-        self.loop.stop()
 
     def _worker(self, host, port, **kwargs):
         self.logger = logging.getLogger(mp.current_process().name)
@@ -499,18 +493,17 @@ class Tremolo:
             self.loop.run_until_complete(task)
         except KeyboardInterrupt:
             self.logger.info('Shutting down')
-            self.loop.create_task(self._stop(task))
+            task.cancel()
             self.loop.run_forever()
         finally:
-            try:
-                if task.done():
-                    exc = task.exception()
+            if not task.cancelled():
+                exc = task.exception()
 
-                    # to avoid None, SystemExit, etc. for being printed
-                    if isinstance(exc, Exception):
-                        self.logger.error(exc)
-            finally:
-                self.loop.close()
+                # to avoid None, SystemExit, etc. for being printed
+                if isinstance(exc, Exception):
+                    self.logger.error(exc)
+
+            self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
@@ -576,7 +569,7 @@ class Tremolo:
         kwargs = info['kwargs']
         process = info['process']
 
-        if process.exitcode == 0:
+        if process.exitcode == 3:
             print('Reloading...')
 
             if kwargs['app'] is None:
@@ -606,21 +599,21 @@ class Tremolo:
 
                     if isinstance(attr, self.__class__):
                         self.__dict__.update(attr.__dict__)
-        elif process.exitcode > 0:
+
+                # update some references
+                kwargs['_routes'] = self.routes
+                kwargs['_middlewares'] = self.middlewares
+        elif process.exitcode not in (-15, 0, 15):
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
             )
 
-        if process.exitcode < 0:
+        if process.exitcode in (-15, 0, 15):
             print('pid %d terminated (%d)' % (process.pid, process.exitcode))
         else:
             # this is a workaround, especially on Windows
             # to trigger renew socket
             kwargs['_sock'] = None
-
-            # update some references
-            kwargs['_routes'] = self.routes
-            kwargs['_middlewares'] = self.middlewares
 
             self.manager.spawn(
                 self._worker, args=args, kwargs=kwargs,
@@ -630,10 +623,12 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting Tremolo v%s (%s %d.%d.%d, %s)' % (
+            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' % (
+                server_name,
                 __version__,
                 sys.implementation.name,
                 *sys.version_info[:3],
@@ -741,6 +736,7 @@ class Tremolo:
                 )
 
         print('-' * terminal_width)
+        print('%s main (pid %d) is running ' % (server_name, os.getpid()))
         self.manager.wait()
 
         for sock in socks.values():
