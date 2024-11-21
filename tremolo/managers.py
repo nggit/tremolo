@@ -71,7 +71,7 @@ class ProcessManager:
                                self.processes.values()]
                 for conn in mp.connection.wait(connections):
                     # a child has exited, clean up
-                    # there is no need to call recv() because EOF is expected
+                    # there is no need to call recv() since EOF is expected
                     for name in self.processes:
                         if self.processes[name]['parent_conn'] is conn:
                             info = self.processes.pop(name)
