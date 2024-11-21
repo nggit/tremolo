@@ -23,8 +23,9 @@ class ProcessManager:
             try:
                 if conn.poll(1):
                     conn.recv()
-                    break
+                    continue
             except EOFError:  # parent has exited
+                conn.close()
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
             except OSError:  # handle is closed
@@ -48,6 +49,7 @@ class ProcessManager:
         process = mp.Process(target=self._target, name=name,
                              args=(child_conn, target, *args), kwargs=kwargs)
         process.start()
+        child_conn.close()
 
         self.processes[process.name] = {
             'target': target,
@@ -67,21 +69,20 @@ class ProcessManager:
             try:
                 connections = [info['parent_conn'] for info in
                                self.processes.values()]
-                for conn in mp.connection.wait(connections, 1):
-                    try:
-                        conn.recv()
-                    except EOFError:  # a child has exited, clean up
-                        for name in self.processes:
-                            if self.processes[name]['parent_conn'] is conn:
-                                info = self.processes.pop(name)
+                for conn in mp.connection.wait(connections):
+                    # a child has exited, clean up
+                    # there is no need to call recv() because EOF is expected
+                    for name in self.processes:
+                        if self.processes[name]['parent_conn'] is conn:
+                            info = self.processes.pop(name)
 
-                                info['process'].join()
-                                conn.close()
+                            info['process'].join()
+                            conn.close()
 
-                                if callable(info['exit_cb']):
-                                    info['exit_cb'](**info)
+                            if callable(info['exit_cb']):
+                                info['exit_cb'](**info)
 
-                                break
+                            break
             except KeyboardInterrupt:
                 while self.processes:
                     _, info = self.processes.popitem()
