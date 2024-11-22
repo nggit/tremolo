@@ -33,6 +33,9 @@ class ProcessManager:
 
     @classmethod
     def _target(cls, conn, func, *args, **kwargs):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGTERM, sigterm_handler)
+
         t = Thread(target=cls._wait_main, args=(conn,))
         t.start()
 
@@ -89,8 +92,8 @@ class ProcessManager:
 
                     if info['process'].is_alive():
                         os.kill(info['process'].pid, signal.SIGTERM)
+                        info['process'].join()
 
-                    info['process'].join()
                     info['parent_conn'].close()
 
                     if callable(info['exit_cb']):

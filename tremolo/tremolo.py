@@ -497,9 +497,9 @@ class Tremolo:
             self.loop.run_until_complete(task)
         except KeyboardInterrupt:
             self.logger.info('Shutting down')
-            task.cancel()
         finally:
             if not task.done():
+                task.cancel()
                 self.loop.run_forever()
 
             if not task.cancelled():
@@ -609,12 +609,12 @@ class Tremolo:
                 # update some references
                 kwargs['_routes'] = self.routes
                 kwargs['_middlewares'] = self.middlewares
-        elif process.exitcode not in (-15, 0, 15):
+        elif process.exitcode != 0:
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
             )
 
-        if process.exitcode in (-15, 0, 15):
+        if process.exitcode == 0:
             print('pid %d terminated (%d)' % (process.pid, process.exitcode))
         else:
             # this is a workaround, especially on Windows
