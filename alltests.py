@@ -7,7 +7,7 @@ import unittest
 
 import tremolo
 
-from tests.http_server import app, HTTP_HOST, HTTP_PORT
+from tests.http_server import app, HTTP_HOST, HTTP_PORT, LIMIT_MEMORY
 from tests.asgi_server import app as asgi_app
 from tests.asgi_server import ASGI_HOST, ASGI_PORT
 
@@ -20,10 +20,10 @@ def main():
         target=app.run,
         kwargs=dict(host=HTTP_HOST,
                     port=HTTP_PORT,
+                    limit_memory=LIMIT_MEMORY,
                     debug=False,
                     reload=True,
                     loop='asyncio.SelectorEventLoop',
-                    limit_memory=102400,  # 100MiB
                     client_max_body_size=1048576,  # 1MiB
                     ws_max_payload_size=73728))
     )

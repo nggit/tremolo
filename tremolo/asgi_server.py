@@ -79,15 +79,15 @@ class ASGIServer(HTTPProtocol):
 
         try:
             await self.options['_app'](self._scope, self.receive, self.send)
-
-            if self._timer is not None:
-                self._timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
             if (self.request is not None and self.request.upgraded and
                     self._websocket is not None):
                 exc = WebSocketServerClosed(cause=exc)
 
             await self.handle_exception(exc)
+        finally:
+            if self._timer is not None:
+                self._timer.cancel()
 
     async def handle_error_500(self, exc):
         return await error_500(

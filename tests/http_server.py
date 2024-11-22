@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-__all__ = ('app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE')
+__all__ = ('app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE', 'LIMIT_MEMORY')
 
 import asyncio  # noqa: E402
 import concurrent.futures  # noqa: E402
@@ -13,6 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tremolo import Application  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.utils import memory_usage  # noqa: E402
+
+if sys.implementation.name == 'cpython' and sys.platform == 'linux':
+    LIMIT_MEMORY = 51200  # 50MiB
+else:
+    LIMIT_MEMORY = 0
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
@@ -151,7 +156,7 @@ async def get_query(**server):
     data = []
 
     for name, value in request.query.items():
-        data.append('{:s}={:s}'.format(name, value[0]))
+        data.append('%s=%s' % (name, value[0]))
 
     # b'a=111&b=222'
     return '&'.join(data)
@@ -203,18 +208,21 @@ async def get_lock(**server):
 
 @app.route('/triggermemoryleak')
 async def trigger_memory_leak(**server):
-    initial_memory_usage = memory_usage()
-
-    if initial_memory_usage == -1:
+    if LIMIT_MEMORY == 0:
         # non-Linux
         return b''
 
+    initial_memory_usage = memory_usage()
     data = bytearray()
 
-    while initial_memory_usage + len(data) < 100 * 1048576:
+    while initial_memory_usage + len(data) <= 52428800:
         data.extend(b' ' * 1048576)
 
-    await asyncio.sleep(10)
+    try:
+        await asyncio.sleep(10)
+    finally:
+        data.clear()
+
     # b'' will be returned instead of b'OK'
     # due to the memory limit being exceeded
     return b'OK'
@@ -229,7 +237,7 @@ async def post_form(**server):
     data = []
 
     for name, value in request.params['post'].items():
-        data.append('{:s}={:s}'.format(name, value[0]))
+        data.append('%s=%s' % (name, value[0]))
 
     # b'user=myuser&pass=mypass'
     return '&'.join(data)
@@ -371,7 +379,8 @@ app.listen(HTTP_PORT + 2, app_handler_timeout=1)
 app.listen('tremolo-test', debug=False, client_max_body_size=1048576)
 
 if __name__ == '__main__':
-    app.run(HTTP_HOST, port=HTTP_PORT, debug=True, reload=True,
+    app.run(HTTP_HOST, port=HTTP_PORT, limit_memory=LIMIT_MEMORY,
+            debug=True, reload=True,
             client_max_body_size=1048576, ws_max_payload_size=73728)
 
 # END
