@@ -497,19 +497,18 @@ class Tremolo:
             self.loop.run_until_complete(task)
         except KeyboardInterrupt:
             self.logger.info('Shutting down')
+            task.cancel()
+            self.loop.run_forever()
         finally:
-            if not task.done():
-                task.cancel()
-                self.loop.run_forever()
+            try:
+                if task.done():
+                    exc = task.exception()
 
-            if not task.cancelled():
-                exc = task.exception()
-
-                # to avoid None, SystemExit, etc. for being printed
-                if isinstance(exc, Exception):
-                    self.logger.error(exc)
-
-            self.loop.close()
+                    # to avoid None, SystemExit, etc. for being printed
+                    if isinstance(exc, Exception):
+                        self.logger.error(exc)
+            finally:
+                self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:

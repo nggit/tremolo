@@ -25,9 +25,8 @@ class ProcessManager:
                     conn.recv()
                     continue
             except EOFError:  # parent has exited
-                conn.close()
                 os.kill(os.getpid(), signal.SIGTERM)
-                return
+                break
             except OSError:  # handle is closed
                 break
 
@@ -42,7 +41,9 @@ class ProcessManager:
         try:
             conn.send(os.getpid())  # started, send pid to parent
 
-            return func(*args, **kwargs)
+            func(*args, **kwargs)
+        except KeyboardInterrupt:
+            pass
         finally:
             conn.close()  # trigger handle is closed
             t.join()
@@ -89,12 +90,13 @@ class ProcessManager:
             except KeyboardInterrupt:
                 while self.processes:
                     _, info = self.processes.popitem()
+                    process = info['process']
 
-                    if info['process'].is_alive():
-                        os.kill(info['process'].pid, signal.SIGTERM)
-                        info['process'].join()
+                    if process.is_alive():
+                        os.kill(process.pid, signal.SIGTERM)
+                        process.join()
 
                     info['parent_conn'].close()
 
-                    if callable(info['exit_cb']):
+                    if process.exitcode == 0 and callable(info['exit_cb']):
                         info['exit_cb'](**info)
