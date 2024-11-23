@@ -1,5 +1,5 @@
 [run]
-concurrency = multiprocessing
+concurrency = multiprocessing,thread
 parallel = True
 relative_files = True
 source = tremolo/

@@ -498,18 +498,17 @@ class Tremolo:
         except KeyboardInterrupt:
             self.logger.info('Shutting down')
             task.cancel()
+            self.loop.run_forever()
         finally:
-            if not task.done():
-                self.loop.run_forever()
+            try:
+                if task.done():
+                    exc = task.exception()
 
-            if not task.cancelled():
-                exc = task.exception()
-
-                # to avoid None, SystemExit, etc. for being printed
-                if isinstance(exc, Exception):
-                    self.logger.error(exc)
-
-            self.loop.close()
+                    # to avoid None, SystemExit, etc. for being printed
+                    if isinstance(exc, Exception):
+                        self.logger.error(exc)
+            finally:
+                self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
@@ -609,12 +608,12 @@ class Tremolo:
                 # update some references
                 kwargs['_routes'] = self.routes
                 kwargs['_middlewares'] = self.middlewares
-        elif process.exitcode not in (-15, 0, 15):
+        elif process.exitcode != 0:
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
             )
 
-        if process.exitcode in (-15, 0, 15):
+        if process.exitcode == 0:
             print('pid %d terminated (%d)' % (process.pid, process.exitcode))
         else:
             # this is a workaround, especially on Windows
@@ -641,6 +640,7 @@ class Tremolo:
                 sys.platform)
         )
         print('-' * terminal_width)
+        mp.set_start_method('spawn', force=True)
 
         import __main__
 
