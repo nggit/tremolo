@@ -94,7 +94,7 @@ class ProcessManager:
 
                     if process.is_alive():
                         os.kill(process.pid, signal.SIGTERM)
-                        process.join()
+                        process.join(5)
 
                     info['parent_conn'].close()
 
