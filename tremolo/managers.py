@@ -23,7 +23,6 @@ class ProcessManager:
             try:
                 if conn.poll(1):
                     conn.recv()
-                    continue
             except EOFError:  # parent has exited
                 os.kill(os.getpid(), signal.SIGTERM)
                 break
