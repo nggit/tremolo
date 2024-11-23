@@ -640,6 +640,7 @@ class Tremolo:
                 sys.platform)
         )
         print('-' * terminal_width)
+        mp.set_start_method('spawn', force=True)
 
         import __main__
 

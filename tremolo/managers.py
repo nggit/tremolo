@@ -6,6 +6,9 @@ import signal
 
 from threading import Thread
 
+PARENT = 0
+CHILD = 1
+
 
 def sigterm_handler(signum, frame):
     raise KeyboardInterrupt
@@ -13,9 +16,6 @@ def sigterm_handler(signum, frame):
 
 class ProcessManager:
     processes = {}
-
-    def __init__(self):
-        mp.set_start_method('spawn', force=True)
 
     @classmethod
     def _wait_main(cls, conn):
@@ -34,37 +34,38 @@ class ProcessManager:
     def _target(cls, conn, func, *args, **kwargs):
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         signal.signal(signal.SIGTERM, sigterm_handler)
+        conn[PARENT].close()
 
-        t = Thread(target=cls._wait_main, args=(conn,))
+        t = Thread(target=cls._wait_main, args=(conn[CHILD],))
         t.start()
 
         try:
-            conn.send(os.getpid())  # started, send pid to parent
+            conn[CHILD].send(os.getpid())  # started, send pid to parent
 
             func(*args, **kwargs)
         except KeyboardInterrupt:
             pass
         finally:
-            conn.close()  # trigger handle is closed
+            conn[CHILD].close()  # trigger handle is closed, also notify parent
             t.join()
 
     def spawn(self, target, args=(), kwargs={}, name=None, exit_cb=None):
-        parent_conn, child_conn = mp.Pipe()
+        conn = mp.Pipe()
         process = mp.Process(target=self._target, name=name,
-                             args=(child_conn, target, *args), kwargs=kwargs)
+                             args=(conn, target, *args), kwargs=kwargs)
         process.start()
-        child_conn.close()
+        conn[CHILD].close()
 
         self.processes[process.name] = {
             'target': target,
             'args': args,
             'kwargs': kwargs,
             'exit_cb': exit_cb,
-            'parent_conn': parent_conn,
+            'parent_conn': conn[PARENT],
             'process': process
         }
         # block until the child starts, receive its pid
-        return parent_conn.recv()
+        return conn[PARENT].recv()
 
     def wait(self):
         signal.signal(signal.SIGTERM, sigterm_handler)
