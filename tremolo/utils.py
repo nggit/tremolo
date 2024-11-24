@@ -82,7 +82,8 @@ def parse_args(**callbacks):
                                  '--keepalive-timeout',
                                  '--keepalive-connections',
                                  '--app-handler-timeout',
-                                 '--app-close-timeout'):
+                                 '--app-close-timeout',
+                                 '--shutdown-timeout'):
             try:
                 options[name] = int(sys.argv[i])
             except ValueError:

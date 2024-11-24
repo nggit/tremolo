@@ -321,7 +321,9 @@ class Tremolo:
                 options['app'], loop=self.loop, logger=self.logger
             )
             context.options['_lifespan'].startup()
-            exc = await context.options['_lifespan'].exception()
+            exc = await context.options['_lifespan'].exception(
+                timeout=context.options['shutdown_timeout'] / 2
+            )
 
             if exc:
                 raise exc
@@ -461,7 +463,9 @@ class Tremolo:
                     break
         else:
             context.options['_lifespan'].shutdown()
-            exc = await context.options['_lifespan'].exception()
+            exc = await context.options['_lifespan'].exception(
+                timeout=context.options['shutdown_timeout'] / 2
+            )
 
             if exc:
                 self.logger.error(exc)
@@ -630,6 +634,7 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        kwargs['shutdown_timeout'] = kwargs.get('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
@@ -745,7 +750,7 @@ class Tremolo:
 
         print('-' * terminal_width)
         print('%s main (pid %d) is running ' % (server_name, os.getpid()))
-        self.manager.wait()
+        self.manager.wait(timeout=kwargs['shutdown_timeout'])
 
         for sock in socks.values():
             self.close_sock(sock)
