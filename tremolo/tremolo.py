@@ -494,21 +494,23 @@ class Tremolo:
         task = self.loop.create_task(self._serve(host, port, **kwargs))
 
         try:
-            self.loop.run_until_complete(task)
-        except KeyboardInterrupt:
-            self.logger.info('Shutting down')
-            task.cancel()
-            self.loop.run_forever()
-        finally:
             try:
+                self.loop.run_until_complete(task)
+            except KeyboardInterrupt:
+                self.logger.info('Shutting down')
+                task.cancel()
+                self.loop.run_forever()
+            finally:
                 if task.done():
                     exc = task.exception()
 
                     # to avoid None, SystemExit, etc. for being printed
                     if isinstance(exc, Exception):
                         self.logger.error(exc)
-            finally:
-                self.loop.close()
+        except asyncio.CancelledError:
+            pass
+        finally:
+            self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
