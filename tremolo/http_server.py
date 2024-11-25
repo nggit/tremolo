@@ -261,6 +261,9 @@ class HTTPServer(HTTPProtocol):
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
+        if self.request is None or self.response is None:
+            return
+
         options = self.request.context.options
 
         for middleware in self._middlewares['request']:
