@@ -23,6 +23,7 @@ def main():
                     limit_memory=LIMIT_MEMORY,
                     debug=False,
                     reload=True,
+                    shutdown_timeout=5,
                     loop='asyncio.SelectorEventLoop',
                     client_max_body_size=1048576,  # 1MiB
                     ws_max_payload_size=73728))
@@ -41,7 +42,7 @@ def main():
     finally:
         for p in processes:
             if p.is_alive():
-                os.kill(p.pid, signal.SIGTERM)
+                os.kill(p.pid, signal.SIGINT)
                 p.join()
 
 
