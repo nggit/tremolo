@@ -103,11 +103,11 @@ class HTTPProtocol(asyncio.Protocol):
         self.add_close_callback(
             self.create_background_task(self._send_data()).cancel
         )
-        self.create_task(
+        self.add_close_callback(self.create_background_task(
             self.set_timeout(self._waiters['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
-        )
+        ).cancel)
 
     def abort(self, exc=None):
         if self.transport is not None and not self.transport.is_closing():
@@ -212,9 +212,10 @@ class HTTPProtocol(asyncio.Protocol):
             self.abort(exc)  # it's here for redundancy
             return
 
-        self.print_exception(
-            exc, quote_from_bytes(unquote_to_bytes(self.request.path))
-        )
+        if not isinstance(exc, asyncio.CancelledError):
+            self.print_exception(
+                exc, quote_from_bytes(unquote_to_bytes(self.request.path))
+            )
 
         # WebSocket
         if isinstance(exc, WebSocketException):
@@ -459,10 +460,11 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.transport.write(data)
             except asyncio.CancelledError:
-                if self.transport is None or self.transport.is_closing():
-                    break
+                self.close()
+                break
             except Exception as exc:
                 self.abort(exc)
+                break
 
     def _handle_keepalive(self):
         if 'request' in self._waiters:
@@ -492,11 +494,11 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._waiters['keepalive'] = self.loop.create_future()
 
-            self.create_task(
+            self.add_close_callback(self.create_background_task(
                 self.set_timeout(self._waiters['keepalive'],
                                  timeout=self.options['keepalive_timeout'],
                                  timeout_cb=self.keepalive_timeout)
-            )
+            ).cancel)
 
             while not self.request.has_body and self.queue[0].qsize():
                 # this data is supposed to be the next header

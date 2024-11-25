@@ -65,6 +65,8 @@ def usage(**context):
     print('  --app-close-timeout       Kill the app if it does not exit within this timeframe,')  # noqa: E501
     print('                            from when the client is disconnected')
     print('                            Defaults to 30 (seconds)')
+    print('  --shutdown-timeout        Maximum number of seconds to wait after SIGTERM is')  # noqa: E501
+    print('                            sent to a worker process. Defaults to 30 (seconds)')  # noqa: E501
     print('  --server-name             Set the "Server" field in the response header')  # noqa: E501
     print('  --root-path               Set the ASGI root_path. Defaults to ""')
     print('  --version                 Print the tremolo version and exit')

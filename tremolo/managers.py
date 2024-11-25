@@ -24,15 +24,13 @@ class ProcessManager:
                 if conn.poll(1):
                     conn.recv()
             except EOFError:  # parent has exited
-                os.kill(os.getpid(), signal.SIGTERM)
+                os._exit(0)
                 break
             except OSError:  # handle is closed
                 break
 
     @classmethod
     def _target(cls, conn, func, *args, **kwargs):
-        signal.signal(signal.SIGINT, signal.SIG_IGN)
-        signal.signal(signal.SIGTERM, sigterm_handler)
         conn[PARENT].close()
 
         t = Thread(target=cls._wait_main, args=(conn[CHILD],))
@@ -66,7 +64,7 @@ class ProcessManager:
         # block until the child starts, receive its pid
         return conn[PARENT].recv()
 
-    def wait(self):
+    def wait(self, timeout=30):
         signal.signal(signal.SIGTERM, sigterm_handler)
 
         while self.processes:
@@ -93,8 +91,8 @@ class ProcessManager:
                     process = info['process']
 
                     if process.is_alive():
-                        os.kill(process.pid, signal.SIGTERM)
-                        process.join(5)
+                        os.kill(process.pid, signal.SIGINT)
+                        process.join(timeout)
 
                     info['parent_conn'].close()
 

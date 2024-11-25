@@ -53,6 +53,9 @@ class ASGIServer(HTTPProtocol):
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
     async def headers_received(self):
+        if self.request is None or self.response is None:
+            return
+
         if not self.request.is_valid:
             await error_400(request=self.request, response=self.response)
             return

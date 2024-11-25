@@ -7,6 +7,7 @@ import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
 import re  # noqa: E402
+import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
@@ -62,6 +63,7 @@ class Tremolo:
         self.manager = ProcessManager()
         self.loop = None
         self.logger = None
+        self._task = None
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -321,7 +323,9 @@ class Tremolo:
                 options['app'], loop=self.loop, logger=self.logger
             )
             context.options['_lifespan'].startup()
-            exc = await context.options['_lifespan'].exception()
+            exc = await context.options['_lifespan'].exception(
+                timeout=context.options['shutdown_timeout'] / 2
+            )
 
             if exc:
                 raise exc
@@ -426,24 +430,36 @@ class Tremolo:
                                 modules[module] = sign
                                 continue
 
-                            while context.tasks:
-                                await context.tasks.pop()
-
                             self.logger.info('reload: %s', module.__file__)
                             sys.exit(3)
 
                 if limit_memory > 0 and memory_usage() > limit_memory:
+                    while context.tasks:
+                        context.tasks.pop().cancel()
+
                     self.logger.error('memory limit exceeded')
                     sys.exit(1)
-        except asyncio.CancelledError:  # shutdown (exit code 0)
-            while context.tasks:
-                await context.tasks.pop()
+        except asyncio.CancelledError:
+            self.logger.info('Shutting down')
+
+            if context.tasks:
+                _, pending = await asyncio.wait(
+                    context.tasks,
+                    timeout=context.options['shutdown_timeout'] / 2
+                )
+                for task in pending:
+                    task.cancel()
         finally:
             server.close()
-            await server.wait_closed()
-            await self._worker_stop(context)
 
-            self.loop.stop()
+            try:
+                while context.tasks:
+                    await context.tasks.pop()
+
+                await server.wait_closed()
+                await self._worker_stop(context)
+            finally:
+                self.loop.stop()
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
@@ -461,10 +477,15 @@ class Tremolo:
                     break
         else:
             context.options['_lifespan'].shutdown()
-            exc = await context.options['_lifespan'].exception()
+            exc = await context.options['_lifespan'].exception(
+                timeout=context.options['shutdown_timeout'] / 2
+            )
 
             if exc:
                 self.logger.error(exc)
+
+    def _handle_shutdown(self, signum, frame):
+        self._task.cancel()
 
     def _worker(self, host, port, **kwargs):
         self.logger = logging.getLogger(mp.current_process().name)
@@ -491,26 +512,23 @@ class Tremolo:
         self.loop = getattr(module, class_name or 'new_event_loop')()
 
         asyncio.set_event_loop(self.loop)
-        task = self.loop.create_task(self._serve(host, port, **kwargs))
+        self._task = self.loop.create_task(self._serve(host, port, **kwargs))
+
+        signal.signal(signal.SIGINT, self._handle_shutdown)
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
 
         try:
+            self.loop.run_forever()
+        finally:
             try:
-                self.loop.run_until_complete(task)
-            except KeyboardInterrupt:
-                self.logger.info('Shutting down')
-                task.cancel()
-                self.loop.run_forever()
-            finally:
-                if task.done():
-                    exc = task.exception()
+                if not self._task.cancelled():
+                    exc = self._task.exception()
 
                     # to avoid None, SystemExit, etc. for being printed
                     if isinstance(exc, Exception):
                         self.logger.error(exc)
-        except asyncio.CancelledError:
-            pass
-        finally:
-            self.loop.close()
+            finally:
+                self.loop.close()
 
     def create_sock(self, host, port, reuse_port=True):
         try:
@@ -630,6 +648,7 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        kwargs['shutdown_timeout'] = kwargs.get('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
@@ -642,7 +661,6 @@ class Tremolo:
                 sys.platform)
         )
         print('-' * terminal_width)
-        mp.set_start_method('spawn', force=True)
 
         import __main__
 
@@ -745,7 +763,7 @@ class Tremolo:
 
         print('-' * terminal_width)
         print('%s main (pid %d) is running ' % (server_name, os.getpid()))
-        self.manager.wait()
+        self.manager.wait(timeout=kwargs['shutdown_timeout'])
 
         for sock in socks.values():
             self.close_sock(sock)
