@@ -130,7 +130,7 @@ class TestTremoloObjects(unittest.TestCase):
 
                 self.assertEqual(repr(g), repr(g.__dict__))
 
-                g.info.update(server_name=b'Tremolo')
+                g.info['server_name'] = b'Tremolo'
                 g.path = b'/invalid">url'
 
                 data = bytearray()
