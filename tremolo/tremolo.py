@@ -634,7 +634,7 @@ class Tremolo:
             )
 
         if process.exitcode == 0:
-            print('pid %d terminated (%d)' % (process.pid, process.exitcode))
+            print('pid %d terminated (0)' % process.pid)
         else:
             # this is a workaround, especially on Windows
             # to trigger renew socket
