@@ -330,10 +330,9 @@ class Tremolo:
             if exc:
                 raise exc
 
-        server_info = {
-            'date': server_date(),
-            'name': server_name
-        }
+        context.info['server_date'] = server_date()
+        context.info['server_name'] = server_name
+
         server = await self.loop.create_server(
             lambda: Server(context,
                            loop=self.loop,
@@ -361,7 +360,6 @@ class Tremolo:
                            app_handler_timeout=options.get(
                                'app_handler_timeout', 120
                            ),
-                           server_info=server_info,
                            _connections=connections,
                            _app=options['app'],
                            _app_close_timeout=options.get(
@@ -399,7 +397,7 @@ class Tremolo:
                 await asyncio.sleep(1)
 
                 # update server date
-                server_info['date'] = server_date()
+                context.info['server_date'] = server_date()
 
                 # detect code changes
                 if 'reload' in options and options['reload']:

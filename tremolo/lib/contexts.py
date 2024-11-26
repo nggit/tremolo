@@ -27,10 +27,15 @@ class Context:
 class WorkerContext(Context):
     def __init__(self):
         self.__dict__ = {
+            'info': {},
             'options': {},
             'queues': {},
             'tasks': set()
         }
+
+    @property
+    def info(self):
+        return self.__dict__['info']
 
     @property
     def options(self):

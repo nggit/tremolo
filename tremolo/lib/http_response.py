@@ -73,11 +73,11 @@ class HTTPResponse(Response):
 
         self.set_header(
             b'Date',
-            self.request.protocol.options['server_info']['date']
+            self.request.protocol.globals.info['server_date']
         )
         self.set_header(
             b'Server',
-            self.request.protocol.options['server_info']['name']
+            self.request.protocol.globals.info['server_name']
         )
 
     def set_cookie(self, name, value='', expires=0, path='/', domain=None,
