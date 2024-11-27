@@ -46,7 +46,7 @@ def read_header(header, key):
 # a simple HTTP client for tests
 def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
                 data='', raw=b'', timeout=10, max_retries=10):
-    if max_retries < 0:
+    if max_retries <= 0:
         raise ValueError('max_retries is exceeded, or it cannot be negative')
 
     method = method.upper().encode('latin-1')
