@@ -176,7 +176,7 @@ def read_chunked(data):
         del data[:i + 2]
 
         if data[chunk_size:chunk_size + 2] != b'\r\n':
-            print('read_chunked: invalid chunked encoding')
+            print('read_chunked: bad chunked encoding')
             return False
 
         body.extend(data[:chunk_size])
