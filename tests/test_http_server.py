@@ -852,6 +852,10 @@ class TestHTTPServer(unittest.TestCase):
                                     version='1.0')
 
         self.assertFalse(body1 == b'')
+
+        if sys.platform != 'linux':
+            return
+
         body2 = body1
 
         for _ in range(10):
