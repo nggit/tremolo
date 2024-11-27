@@ -138,7 +138,7 @@ def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
                 elif response_header.startswith(b'HTTP/%s 101 ' % version):
                     sock.sendall(request_body)
 
-            return response_header, response_data
+            return response_header, bytes(response_data)
         except OSError:  # retry if either sendall() or recv() fails
             print(
                 'getcontents: retry (%d): %s' % (max_retries, request_header)
@@ -157,6 +157,7 @@ def read_chunked(data):
     if not data.endswith(b'\r\n0\r\n\r\n'):
         return False
 
+    data = bytearray(data)
     body = bytearray()
 
     while data != b'0\r\n\r\n':

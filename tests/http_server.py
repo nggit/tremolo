@@ -362,7 +362,7 @@ async def timeouts(request, **_):
 
 @app.route('/reload')
 async def reload(request, **_):
-    yield b'%d' % hash(app)
+    yield b'%d' % os.getpid()
 
     if request.query_string != b'':
         mtime = float(request.query_string)
