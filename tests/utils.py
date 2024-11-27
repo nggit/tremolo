@@ -139,7 +139,7 @@ def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
                     sock.sendall(request_body)
 
             return response_header, response_data
-        except OSError: # retry if either sendall() or recv() fails
+        except OSError:  # retry if either sendall() or recv() fails
             print(
                 'getcontents: retry (%d): %s' % (max_retries, request_header)
             )
