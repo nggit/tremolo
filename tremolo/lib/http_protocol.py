@@ -324,7 +324,7 @@ class HTTPProtocol(asyncio.Protocol):
                 # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
-            if len(data) > header_size + 2:
+            if self.request.has_body or len(data) > header_size + 2:
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(

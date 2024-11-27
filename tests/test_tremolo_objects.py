@@ -11,10 +11,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tremolo import Application  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
-from tremolo.lib.contexts import RequestContext  # noqa: E402
+from tremolo.lib.contexts import WorkerContext, RequestContext  # noqa: E402
 from tests import handlers, middlewares, hooks  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
-from tests.utils import function  # noqa: E402
+from tests.utils import syncify  # noqa: E402
 
 app = Application()
 
@@ -115,7 +115,7 @@ class TestTremoloObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             app.add_hook(hooks.on_worker_start, 'invalid')
 
-    @function
+    @syncify
     async def test_handler(self):
         for handler in app.routes[1]:
             self.assertEqual(await handler[1](), b'Service Unavailable')
@@ -126,17 +126,16 @@ class TestTremoloObjects(unittest.TestCase):
                     await handler[1]()
 
             elif handler[0] == 404:
-                context = RequestContext()
+                g = WorkerContext()
 
-                self.assertEqual(repr(context), repr(context.__dict__))
+                self.assertEqual(repr(g), repr(g.__dict__))
 
-                context.options.update({'server_info': {'name': b'Tremolo'}})
-                context.protocol = context
-                context.path = b'/invalid">url'
+                g.info['server_name'] = b'Tremolo'
+                g.path = b'/invalid">url'
 
                 data = bytearray()
 
-                async for buf in handler[1](request=context):
+                async for buf in handler[1](request=g, globals=g):
                     data.extend(buf)
 
                 self.assertTrue(data[:15] == b'<!DOCTYPE html>')
@@ -165,13 +164,13 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_serverconnections(self):
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=-10)
+            KeepAliveConnections(maxlen=-10)
 
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=0)
+            KeepAliveConnections(maxlen=0)
 
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=(0, 1))
+            KeepAliveConnections(maxlen=(0, 1))
 
         conn = KeepAliveConnections(maxlen=2)
         conn['a'] = 1

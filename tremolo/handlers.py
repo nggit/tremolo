@@ -14,7 +14,7 @@ async def error_400(**_):
     raise BadRequest
 
 
-async def error_404(request, **_):
+async def error_404(request, globals, **_):
     yield (
         b'<!DOCTYPE html><html lang="en"><head><meta name="viewport" '
         b'content="width=device-width, initial-scale=1.0" />'
@@ -27,7 +27,7 @@ async def error_404(request, **_):
            html_escape(request.path))
     yield (
         b'<address title="Powered by Tremolo">%s</address>'
-        b'</body></html>' % request.protocol.options['server_info']['name']
+        b'</body></html>' % globals.info['server_name']
     )
 
 
