@@ -282,7 +282,7 @@ async def upload_multipart(stream=False, **server):
                                     part['type'].encode(),
                                     (part['data'][:5] + part['data'][-3:]))
 
-    async for part in request.files(max_file_size=524288):
+    async for part in request.files(max_file_size=262144):
         if part['eof']:
             part['data'] = b'-----' + part['data'][-3:]
         else:

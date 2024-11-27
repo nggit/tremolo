@@ -316,7 +316,7 @@ class TestHTTPServer(unittest.TestCase):
                     create_chunked_body(create_multipart_body(
                         boundary,
                         file1=create_dummy_data(4096),
-                        file2=create_dummy_data(1048576))))
+                        file2=create_dummy_data(524288))))
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -325,8 +325,8 @@ class TestHTTPServer(unittest.TestCase):
             read_chunked(body) if chunked_detected(header) else body,
             b'name,length,type,data\r\n'
             b'file1,4096,application/octet-stream,BEGINEND\r\n'
-            b'file2,1048576,application/octet-stream,BEGIN---\r\n'
-            b'file2,1048576,application/octet-stream,-----END\r\n'
+            b'file2,524288,application/octet-stream,BEGIN---\r\n'
+            b'file2,524288,application/octet-stream,-----END\r\n'
         )
 
     def test_post_upload_payloadtoolarge_11(self):
