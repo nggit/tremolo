@@ -371,8 +371,9 @@ async def reload(request, **_):
         os.utime(TEST_FILE, (mtime, mtime))
 
 # test multiple ports
-app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2)
-app.listen(HTTP_PORT + 2, app_handler_timeout=1)
+app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2,
+           app_handler_timeout=1)
+app.listen(HTTP_PORT + 2)
 
 # test unix socket
 # 'tremolo-test.sock'

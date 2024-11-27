@@ -232,7 +232,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload_ok_10(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload?size=-1 HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 8192\r\n\r\n%sX' % (
                     HTTP_PORT, create_dummy_body(8192))
@@ -248,7 +248,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload2_ok_10(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload?size=10 HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 65536\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(65536))
@@ -264,7 +264,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload_ok_11(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%sX' % (
                     HTTP_PORT, create_dummy_body(8192, chunk_size=4096))
@@ -279,7 +279,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload2_ok_11(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(65536, chunk_size=4096))
@@ -294,7 +294,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload_maxqueue(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload?maxqueue HTTP/1.0\r\nHost: localhost:%d\r\n'
                 b'Content-Length: 8192\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(8192))
@@ -307,7 +307,7 @@ class TestHTTPServer(unittest.TestCase):
         boundary = b'----MultipartBoundary'
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload/multipart HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Content-Type: multipart/form-data; boundary=%s\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
@@ -332,7 +332,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_post_upload_payloadtoolarge_11(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Transfer-Encoding: chunked\r\n\r\n%s' % (
                     HTTP_PORT, create_dummy_body(1048576 + 8192,
@@ -351,7 +351,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_payloadtoolarge(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Content-Length: %d\r\n\r\n\x00' % (
                     HTTP_PORT, 1048576 + 8192)
@@ -367,7 +367,7 @@ class TestHTTPServer(unittest.TestCase):
     def test_continue(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT,
+            port=HTTP_PORT + 2,
             raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n%s' % (
                     HTTP_PORT, 65536, create_dummy_body(65536))
@@ -551,9 +551,9 @@ class TestHTTPServer(unittest.TestCase):
     def test_handlertimeout(self):
         header, body = getcontents(
             host=HTTP_HOST,
-            port=HTTP_PORT + 2,
+            port=HTTP_PORT + 1,
             raw=b'GET /timeouts?handler HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 2)
+                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 1)
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],

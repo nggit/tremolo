@@ -1,5 +1,5 @@
 __all__ = (
-    'function', 'read_header', 'getcontents',
+    'syncify', 'read_header', 'getcontents',
     'chunked_detected', 'read_chunked', 'valid_chunked',
     'create_dummy_data', 'create_chunked_body',
     'create_dummy_body', 'create_multipart_body', 'logger'
@@ -13,7 +13,7 @@ import time  # noqa: E402
 from functools import wraps  # noqa: E402
 
 
-def function(coro):
+def syncify(coro):
     @wraps(coro)
     def wrapper(*args, **kwargs):
         loop = asyncio.new_event_loop()
@@ -28,7 +28,7 @@ def function(coro):
 
 def read_header(header, key):
     name = b'\r\n%s: ' % key
-    headers = []
+    values = []
     start = 0
 
     while True:
@@ -38,33 +38,37 @@ def read_header(header, key):
             break
 
         start += len(name)
-        headers.append(header[start:header.find(b'\r\n', start)])
+        values.append(header[start:header.find(b'\r\n', start)])
 
-    return headers or [b'']
+    return values
 
 
 # a simple HTTP client for tests
 def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
-                data='', raw=b''):
+                data='', raw=b'', timeout=10, max_retries=10):
+    if max_retries < 0:
+        raise ValueError('max_retries is exceeded, or it cannot be negative')
+
+    method = method.upper().encode('latin-1')
+    url = url.encode('latin-1')
+    version = version.encode('latin-1')
+
     if raw == b'':
-        if not headers:
+        if headers is None:
             headers = []
 
         if data:
-            if headers == []:
+            if not headers:
                 headers.append(
                     'Content-Type: application/x-www-form-urlencoded'
                 )
 
             headers.append('Content-Length: %d' % len(data))
 
-        raw = (
-            '{:s} {:s} HTTP/{:s}\r\n'
-            'Host: {:s}:{:d}\r\n{:s}'
-            '\r\n\r\n{:s}'
-        ).format(
-            method, url, version, host, port,
-            '\r\n'.join(headers), data).encode('latin-1')
+        raw = b'%s %s HTTP/%s\r\nHost: %s:%d\r\n%s\r\n\r\n%s' % (
+            method, url, version, host.encode('latin-1'), port,
+            '\r\n'.join(headers).encode('latin-1'), data.encode('latin-1')
+        )
 
     family = socket.AF_INET
 
@@ -76,66 +80,73 @@ def getcontents(host, port, method='GET', url='/', version='1.1', headers=None,
 
     with socket.socket(family, socket.SOCK_STREAM) as sock:
         sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-        sock.settimeout(10)
+        sock.settimeout(timeout)
 
-        while sock.connect_ex((host, port)) != 0:
+        while sock.connect_ex((host, port)) != 0:  # server is not ready yet?
+            print('getcontents: reconnecting: %s:%d' % (host, port))
             time.sleep(1)
 
         request_header = raw[:raw.find(b'\r\n\r\n') + 4]
         request_body = raw[raw.find(b'\r\n\r\n') + 4:]
-        _request_header = request_header.lower()
 
-        sock.sendall(request_header)
+        try:
+            sock.sendall(request_header)
 
-        if not (b'\r\nexpect: 100-continue' in _request_header or
-                b'\r\nupgrade:' in _request_header):
-            sock.sendall(request_body)
+            if not (b'\r\nExpect: 100-continue' in request_header or
+                    b'\r\nUpgrade:' in request_header):
+                sock.sendall(request_body)
 
-        response_data = bytearray()
-        response_header = b''
-        cl = -1
-        buf = True
+            response_data = bytearray()
+            response_header = b''
+            content_length = -1
 
-        while buf:
-            if ((cl != -1 and len(response_data) >= cl) or
-                    response_data.endswith(b'\r\n0\r\n\r\n')):
-                break
+            while True:
+                if ((content_length != -1 and
+                        len(response_data) >= content_length) or
+                        response_data.endswith(b'\r\n0\r\n\r\n')):
+                    break
 
-            try:
                 buf = sock.recv(4096)
-            except ConnectionResetError:
-                print('getcontents: retry:', request_header)
-                return getcontents(host, port, raw=raw)
 
-            response_data.extend(buf)
+                if not buf:
+                    break
 
-            if response_header:
-                continue
+                response_data.extend(buf)
 
-            header_size = response_data.find(b'\r\n\r\n')
+                if response_header:
+                    continue
 
-            if header_size == -1:
-                continue
+                header_size = response_data.find(b'\r\n\r\n')
 
-            response_header = response_data[:header_size]
-            del response_data[:header_size + 4]
+                if header_size == -1:
+                    continue
 
-            if method.upper() == 'HEAD':
-                break
+                response_header = response_data[:header_size]
+                del response_data[:header_size + 4]
 
-            _response_header = response_header.lower()
-            _version = version.encode('latin-1')
-            cl = int(
-                read_header(_response_header, b'content-length')[0] or -1
+                if method == b'HEAD':
+                    break
+
+                values = read_header(response_header, b'Content-Length')
+
+                if values:
+                    content_length = int(values[0])
+
+                if response_header.startswith(b'HTTP/%s 100 ' % version):
+                    sock.sendall(request_body)
+                    response_header = b''
+                elif response_header.startswith(b'HTTP/%s 101 ' % version):
+                    sock.sendall(request_body)
+
+            return response_header, response_data
+        except OSError: # retry if either sendall() or recv() fails
+            print(
+                'getcontents: retry (%d): %s' % (max_retries, request_header)
             )
-
-            if _response_header.startswith(b'http/%s 100 continue' % _version):
-                sock.sendall(request_body)
-                response_header = b''
-            elif _response_header.startswith(b'http/%s 101 ' % _version):
-                sock.sendall(request_body)
-
-        return response_header, response_data
+            time.sleep(1)
+            return getcontents(
+                host, port, raw=raw, max_retries=max_retries - 1
+            )
 
 
 def chunked_detected(header):

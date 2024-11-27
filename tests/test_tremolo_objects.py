@@ -14,7 +14,7 @@ from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import WorkerContext, RequestContext  # noqa: E402
 from tests import handlers, middlewares, hooks  # noqa: E402
 from tests.http_server import HTTP_PORT  # noqa: E402
-from tests.utils import function  # noqa: E402
+from tests.utils import syncify  # noqa: E402
 
 app = Application()
 
@@ -115,7 +115,7 @@ class TestTremoloObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             app.add_hook(hooks.on_worker_start, 'invalid')
 
-    @function
+    @syncify
     async def test_handler(self):
         for handler in app.routes[1]:
             self.assertEqual(await handler[1](), b'Service Unavailable')
@@ -164,13 +164,13 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_serverconnections(self):
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=-10)
+            KeepAliveConnections(maxlen=-10)
 
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=0)
+            KeepAliveConnections(maxlen=0)
 
         with self.assertRaises(ValueError):
-            _ = KeepAliveConnections(maxlen=(0, 1))
+            KeepAliveConnections(maxlen=(0, 1))
 
         conn = KeepAliveConnections(maxlen=2)
         conn['a'] = 1
