@@ -179,7 +179,7 @@ def read_chunked(data):
         body.extend(data[:chunk_size])
         del data[:chunk_size + 2]
 
-    return body
+    return bytes(body)
 
 
 def valid_chunked(data):
@@ -189,15 +189,13 @@ def valid_chunked(data):
 def create_dummy_data(size, head=b'BEGIN', tail=b'END'):
     data = bytearray([255 - byte for byte in (head + tail)])
 
-    return bytearray(head) + (
+    return head + (
         data * (max((size - len(head + tail)) // len(data), 1))
-    ) + bytearray(tail)
+    ) + tail
 
 
 def create_chunked_body(data, chunk_size=16384):
-    if isinstance(data, bytes):
-        data = bytearray(data)
-
+    data = bytearray(data)
     body = bytearray()
 
     while data != b'':
@@ -206,7 +204,7 @@ def create_chunked_body(data, chunk_size=16384):
         body.extend(b'%X\r\n%s\r\n' % (len(chunk), chunk))
         del data[:chunk_size]
 
-    return body + b'0\r\n\r\n'
+    return bytes(body) + b'0\r\n\r\n'
 
 
 def create_dummy_body(size, chunk_size=0):
@@ -229,7 +227,7 @@ def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
             b'Content-Type: application/octet-stream\r\n\r\n%s\r\n' % data
         )
 
-    return body + bytearray(b'--%s--\r\n' % boundary)
+    return bytes(body) + b'--%s--\r\n' % boundary
 
 
 logger = logging.getLogger(__name__)
