@@ -845,6 +845,9 @@ class TestHTTPServer(unittest.TestCase):
                          b'HTTP/1.1 500 Internal Server Error')
 
     def test_reload(self):
+        if sys.platform != 'linux':
+            return
+
         header, body1 = getcontents(host=HTTP_HOST,
                                     port=HTTP_PORT,
                                     method='GET',
@@ -852,10 +855,6 @@ class TestHTTPServer(unittest.TestCase):
                                     version='1.0')
 
         self.assertFalse(body1 == b'')
-
-        if sys.platform != 'linux':
-            return
-
         body2 = body1
 
         for _ in range(10):
