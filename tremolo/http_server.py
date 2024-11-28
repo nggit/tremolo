@@ -43,7 +43,10 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self._middlewares['connect']:
-            self.context.ON_CONNECT = self.create_task(self._connection_made())
+            self.context.ON_CONNECT = self.create_background_task(
+                self._connection_made()
+            )
+            self.add_close_callback(self.context.ON_CONNECT.cancel)
 
     def connection_lost(self, exc):
         if self._middlewares['close']:

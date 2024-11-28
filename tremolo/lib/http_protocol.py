@@ -341,14 +341,13 @@ class HTTPProtocol(asyncio.Protocol):
                            'keepalive') and not fut.done():
                     fut.set_result(None)
 
-            self.handler = self.loop.create_task(self.headers_received())
             timer = self.loop.call_at(
                 self.loop.time() + self.options['app_handler_timeout'],
                 self.handler_timeout
             )
 
             try:
-                await self.handler
+                await self.headers_received()
             finally:
                 timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
@@ -377,7 +376,7 @@ class HTTPProtocol(asyncio.Protocol):
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
 
-                self.create_background_task(
+                self.handler = self.create_background_task(
                     self._handle_request(self._header_buf, header_size)
                 )
                 self._header_buf = None
