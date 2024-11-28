@@ -347,7 +347,8 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
             try:
-                await self.headers_received()
+                if self.request is not None and self.response is not None:
+                    await self.headers_received()
             finally:
                 timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
