@@ -276,13 +276,17 @@ class Tremolo:
 
             self.compile_routes(options['_routes'])
 
-            for _, func in self.hooks['worker_start']:
-                if (await func(globals=context,
-                               context=context,
-                               app=self,
-                               loop=self.loop,
-                               logger=self.logger)):
-                    break
+            try:
+                for _, func in self.hooks['worker_start']:
+                    if (await func(globals=context,
+                                   context=context,
+                                   app=self,
+                                   loop=self.loop,
+                                   logger=self.logger)):
+                        break
+            except Exception as exc:
+                self.loop.stop()
+                raise exc
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
@@ -328,6 +332,7 @@ class Tremolo:
             )
 
             if exc:
+                self.loop.stop()
                 raise exc
 
         context.info['server_date'] = server_date()
