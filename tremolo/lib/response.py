@@ -16,7 +16,7 @@ class Response:
         self.send_nowait(None)
 
     async def send(self, data, throttle=True, rate=1048576,
-                   buffer_size=16 * 1024, buffer_min_size=None):
+                   buffer_size=16384, buffer_min_size=None):
         if data is None:
             __class__.close(self)
             return
@@ -31,8 +31,7 @@ class Response:
             if throttle:
                 await self._protocol.put_to_queue(
                     self._send_buf + data,
-                    queue=self._protocol.queue[1],
-                    transport=None,
+                    i=1,
                     rate=rate,
                     buffer_size=buffer_size
                 )

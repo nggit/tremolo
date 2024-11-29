@@ -222,7 +222,7 @@ class HTTPResponse(Response):
 
         self.close(keepalive=keepalive)
 
-    async def write(self, data, chunked=None, buffer_size=16 * 1024, **kwargs):
+    async def write(self, data, chunked=None, buffer_size=16384, **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
@@ -291,7 +291,7 @@ class HTTPResponse(Response):
         else:
             await self.send(data, **kwargs)
 
-    async def sendfile(self, path, file_size=None, buffer_size=16 * 1024,
+    async def sendfile(self, path, file_size=None, buffer_size=16384,
                        content_type=b'application/octet-stream', executor=None,
                        **kwargs):
         if isinstance(content_type, str):

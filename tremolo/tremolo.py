@@ -350,7 +350,7 @@ class Tremolo:
                            ),
                            download_rate=options.get('download_rate', 1048576),
                            upload_rate=options.get('upload_rate', 1048576),
-                           buffer_size=options.get('buffer_size', 16 * 1024),
+                           buffer_size=options.get('buffer_size', 16384),
                            client_max_body_size=options.get(
                                'client_max_body_size', 2 * 1048576
                            ),
