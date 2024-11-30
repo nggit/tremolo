@@ -302,6 +302,10 @@ class HTTPProtocol(asyncio.Protocol):
                     )
 
                 if b'content-length' in self.request.headers:
+                    if isinstance(self.request.headers[b'content-length'],
+                                  list):
+                        raise BadRequest
+
                     self.request.content_length = int(
                         b'+' + self.request.headers[b'content-length']
                     )
