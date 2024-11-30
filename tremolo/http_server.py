@@ -268,8 +268,7 @@ class HTTPServer(HTTPProtocol):
 
         for middleware in self._middlewares['request']:
             options = await self._handle_middleware(
-                middleware[1],
-                {**middleware[2], **options}
+                middleware[1], {**middleware[2], **options}
             )
 
             if not isinstance(options, dict):
@@ -278,8 +277,7 @@ class HTTPServer(HTTPProtocol):
         if not self.request.is_valid:
             # bad request
             await self._handle_response(
-                self._routes[0][0][1],
-                {**self._routes[0][0][2], **options}
+                self._routes[0][0][1], {**self._routes[0][0][2], **options}
             )
             return
 
@@ -315,9 +313,7 @@ class HTTPServer(HTTPProtocol):
 
                 if m:
                     if key in self._routes:
-                        self._routes[key].append(
-                            (pattern, func, kwargs)
-                        )
+                        self._routes[key].append((pattern, func, kwargs))
                     else:
                         self._routes[key] = [(pattern, func, kwargs)]
 
@@ -334,8 +330,7 @@ class HTTPServer(HTTPProtocol):
 
         # not found
         await self._handle_response(
-            self._routes[0][1][1],
-            {**self._routes[0][1][2], **options}
+            self._routes[0][1][1], {**self._routes[0][1][2], **options}
         )
 
     async def handle_error_500(self, exc):

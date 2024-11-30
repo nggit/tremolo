@@ -164,7 +164,7 @@ class HTTPProtocol(asyncio.Protocol):
                                      mv[:buffer_size].nbytes))
             mv = mv[buffer_size:]
 
-        # maybe resume reading
+        # maybe resume reading, or close
         if i == 0 and self.transport is not None and self.request is not None:
             if self.request.upgraded:
                 self.transport.resume_reading()
