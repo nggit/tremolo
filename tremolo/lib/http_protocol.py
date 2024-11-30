@@ -147,13 +147,12 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(self, data, queue=None, transport=None,
-                           rate=1048576, buffer_size=16 * 1024):
+    async def put_to_queue(self, data, i=0, rate=1048576, buffer_size=16384):
         mv = memoryview(data)
 
-        while mv and queue is not None:
-            queue.put_nowait(mv[:buffer_size].tobytes())
-            queue_size = queue.qsize()
+        while mv and self.queue[i] is not None:
+            self.queue[i].put_nowait(mv[:buffer_size].tobytes())
+            queue_size = self.queue[i].qsize()
 
             if queue_size > self.options['max_queue_size']:
                 self.logger.error('%d exceeds the value of max_queue_size',
@@ -165,19 +164,20 @@ class HTTPProtocol(asyncio.Protocol):
                                      mv[:buffer_size].nbytes))
             mv = mv[buffer_size:]
 
-        if transport is not None and self.request is not None:
+        # maybe resume reading, or close
+        if i == 0 and self.transport is not None and self.request is not None:
             if self.request.upgraded:
-                transport.resume_reading()
+                self.transport.resume_reading()
                 return
 
             self.request.body_size += len(data)
 
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and
-                    queue is not None):
-                queue.put_nowait(None)
+                    self.queue[i] is not None):
+                self.queue[i].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
-                transport.resume_reading()
+                self.transport.resume_reading()
             else:
                 if self.queue[1] is not None:
                     self.request.http_keepalive = False
@@ -328,10 +328,7 @@ class HTTPProtocol(asyncio.Protocol):
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
-                    data[header_size + 2:],
-                    queue=self.queue[0],
-                    transport=self.transport,
-                    rate=self.options['upload_rate']
+                    data[header_size + 2:], rate=self.options['upload_rate']
                 )
 
             # successfully got header,
@@ -358,8 +355,6 @@ class HTTPProtocol(asyncio.Protocol):
         await waiter
         await self.put_to_queue(
             data,
-            queue=self.queue[0],
-            transport=self.transport,
             rate=self.options['upload_rate'],
             buffer_size=self.options['buffer_size']
         )
