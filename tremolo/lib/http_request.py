@@ -154,13 +154,13 @@ class HTTPRequest(Request):
 
     async def recv(self, size=-1, raw=True):
         if size == 0 or self.eof():
-            return bytearray()
+            return b''
 
         if self._read_instance is None:
             self._read_instance = self.stream(raw=raw)
 
         if size == -1:
-            return await self._read_instance.__anext__()
+            return bytes(await self._read_instance.__anext__())
 
         if len(self._read_buf) < size:
             async for data in self._read_instance:
@@ -171,7 +171,7 @@ class HTTPRequest(Request):
 
         buf = self._read_buf[:size]
         del self._read_buf[:size]
-        return buf
+        return bytes(buf)
 
     async def stream(self, raw=False):
         if self._eof:

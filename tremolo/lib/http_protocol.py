@@ -302,6 +302,10 @@ class HTTPProtocol(asyncio.Protocol):
                     )
 
                 if b'content-length' in self.request.headers:
+                    if isinstance(self.request.headers[b'content-length'],
+                                  list):
+                        raise BadRequest
+
                     self.request.content_length = int(
                         b'+' + self.request.headers[b'content-length']
                     )
@@ -464,7 +468,7 @@ class HTTPProtocol(asyncio.Protocol):
     def _handle_keepalive(self):
         if 'request' in self._waiters:
             # store this keepalive connection
-            self.options['_connections'][self] = None
+            self.options['_connections'].add(self)
 
         if self not in self.options['_connections']:
             self.close()
@@ -502,8 +506,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.transport.resume_reading()
 
     def connection_lost(self, _):
-        if self in self.options['_connections']:
-            del self.options['_connections'][self]
+        self.options['_connections'].discard(self)
 
         while self.tasks:
             task = self.tasks.pop()

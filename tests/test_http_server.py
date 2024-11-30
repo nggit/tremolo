@@ -523,8 +523,8 @@ class TestHTTPServer(unittest.TestCase):
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 500 Internal Server Error')
-        self.assertEqual(body, b'Internal Server Error')
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'Bad Request')
 
     def test_requesttimeout(self):
         data = getcontents(
