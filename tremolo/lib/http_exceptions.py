@@ -19,14 +19,8 @@ class HTTPException(TremoloException):
     message = 'Internal Server Error'
     content_type = 'text/html; charset=utf-8'
 
-    def __init__(
-            self,
-            *args,
-            code=None,
-            message=None,
-            content_type=None,
-            cause=None
-            ):
+    def __init__(self, *args, code=None, message=None, content_type=None,
+                 cause=None):
         self.args = args
 
         if isinstance(code, int):
