@@ -359,7 +359,8 @@ class HTTPRequest(Request):
         if self._read_instance is None:
             self._read_instance = self.stream()
 
-        while max_files > 0 and self._read_buf != b'--%s--\r\n' % boundary:
+        while max_files > 0 and not self._read_buf.startswith(b'--%s--' %
+                                                              boundary):
             data = b''
 
             if not paused:
@@ -386,11 +387,11 @@ class HTTPRequest(Request):
                 else:
                     body.extend(self._read_buf[header_size + 2:])
 
-                    if header_size <= 8192 and self._read_buf.startswith(
-                            b'--%s\r\n' % boundary):
+                    # use find() instead of startswith() to ignore the preamble
+                    if self._read_buf.find(b'--%s\r\n' % boundary,
+                                           0, header_size) != -1:
                         header = self.header.parse(
-                            self._read_buf,
-                            header_size=header_size
+                            self._read_buf, header_size=header_size
                         ).headers
 
                         if b'content-disposition' in header:
