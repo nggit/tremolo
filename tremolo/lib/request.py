@@ -31,7 +31,7 @@ class Request:
         self.body_consumed = 0
 
     async def recv(self):
-        while self.protocol.queue[0] is not None:
+        while self.protocol.queue is not None:
             task = self.protocol.loop.create_task(
                 self.protocol.queue[0].get()
             )
