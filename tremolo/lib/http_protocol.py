@@ -19,8 +19,6 @@ from .http_response import HTTPResponse
 from .queue import Queue
 from .websocket import WebSocket
 
-_DEFAULT_QUEUE = (None, None)
-
 
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('globals',
@@ -44,7 +42,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.loop = loop
         self.logger = logger
         self.fileno = -1
-        self.queue = _DEFAULT_QUEUE
+        self.queue = None
         self.request = None
         self.response = None
         self.handler = None
@@ -91,12 +89,9 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.context.update(transport=transport)
-        self.fileno = self.context.socket.fileno()
 
-        try:
-            self.queue = self.globals.queues.pop(self.fileno)
-        except KeyError:
-            self.queue = [Queue(), Queue()]
+        self.fileno = self.context.socket.fileno()
+        self.queue = self.globals.queues.pop(self.fileno, [Queue(), Queue()])
 
         self._waiters['request'] = self.loop.create_future()
 
@@ -150,7 +145,7 @@ class HTTPProtocol(asyncio.Protocol):
     async def put_to_queue(self, data, i=0, rate=1048576, buffer_size=16384):
         mv = memoryview(data)
 
-        while mv and self.queue[i] is not None:
+        while mv and self.queue is not None:
             self.queue[i].put_nowait(mv[:buffer_size].tobytes())
             queue_size = self.queue[i].qsize()
 
@@ -174,12 +169,12 @@ class HTTPProtocol(asyncio.Protocol):
 
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and
-                    self.queue[i] is not None):
+                    self.queue is not None):
                 self.queue[i].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
                 self.transport.resume_reading()
             else:
-                if self.queue[1] is not None:
+                if self.queue is not None:
                     self.request.http_keepalive = False
                     self.queue[1].put_nowait(None)
 
@@ -267,7 +262,7 @@ class HTTPProtocol(asyncio.Protocol):
         )
 
         if not header.is_request:
-            if self.queue[1] is not None:
+            if self.queue is not None:
                 self.queue[1].put_nowait(None)
 
             self.logger.info('bad request: not a request')
@@ -418,7 +413,7 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.set_write_buffer_limits(high=high, low=low)
 
     async def _send_data(self):
-        while self.queue[1] is not None:
+        while self.queue is not None:
             try:
                 data = await self.queue[1].get()
 
@@ -521,11 +516,11 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 self.print_exception(exc, 'connection_lost')
 
-        if self.queue is not _DEFAULT_QUEUE:
+        if self.queue is not None:
             if self.queue[0].clear() and self.queue[1].clear():
                 self.globals.queues[self.fileno] = self.queue
 
-            self.queue = _DEFAULT_QUEUE
+            self.queue = None
 
         self.context.update(transport=None, socket=None)
         self.request = None

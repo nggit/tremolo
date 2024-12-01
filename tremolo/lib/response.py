@@ -41,5 +41,5 @@ class Response:
             del self._send_buf[:]
 
     def send_nowait(self, data):
-        if self._protocol.queue[1] is not None:
+        if self._protocol.queue is not None:
             self._protocol.queue[1].put_nowait(data)
