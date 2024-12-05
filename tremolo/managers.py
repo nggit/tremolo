@@ -90,11 +90,13 @@ class ProcessManager:
                     _, info = self.processes.popitem()
                     process = info['process']
 
-                    if process.is_alive():
+                    try:
                         os.kill(process.pid, signal.SIGINT)
                         process.join(timeout)
-
-                    info['parent_conn'].close()
+                    except (OSError, KeyboardInterrupt):
+                        print('pid %d terminated (forced quit)' % process.pid)
+                    finally:
+                        info['parent_conn'].close()
 
                     if process.exitcode == 0 and callable(info['exit_cb']):
                         info['exit_cb'](**info)
