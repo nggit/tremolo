@@ -21,11 +21,7 @@ _WS_OR_WSS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('_scope',
-                 '_read',
-                 '_timer',
-                 '_websocket',
-                 '_http_chunked')
+    __slots__ = ('_scope', '_read', '_timer', '_websocket', '_http_chunked')
 
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
@@ -179,8 +175,6 @@ class ASGIServer(HTTPProtocol):
                     self.response.set_status(data['status'],
                                              HTTPStatus(data['status']).phrase)
 
-                self.response.set_base_header()
-
                 if 'headers' in data:
                     for header in data['headers']:
                         if b'\n' in header[0] or b'\n' in header[1]:
@@ -246,7 +240,6 @@ class ASGIServer(HTTPProtocol):
                         b'', chunked=self._http_chunked, throttle=False
                     )
                     self.response.close(keepalive=True)
-
                     self._read = None
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
@@ -257,7 +250,6 @@ class ASGIServer(HTTPProtocol):
                 await self._websocket.accept()
             elif data['type'] == 'websocket.close':
                 await self._websocket.close(data.get('code', 1000))
-
                 self._websocket = None
         except asyncio.CancelledError:
             pass
