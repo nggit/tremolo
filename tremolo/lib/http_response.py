@@ -24,21 +24,15 @@ KEEPALIVE_OR_UPGRADE = {
 
 
 class HTTPResponse(Response):
-    __slots__ = ('_headers',
-                 'http_chunked',
-                 'request',
-                 '_status',
-                 '_content_type')
+    __slots__ = ('request', 'http_chunked', '_headers')
 
     def __init__(self, request):
         super().__init__(request)
 
-        self._headers = {}
+        self.request = request
         self.http_chunked = False
 
-        self.request = request
-        self._status = []
-        self._content_type = []
+        self._headers = {}
 
     @property
     def headers(self):
@@ -68,7 +62,7 @@ class HTTPResponse(Response):
             self.headers[_name] = [name + b': ' + value]
 
     def set_base_header(self):
-        if self.headers_sent() or self.headers:
+        if self.headers_sent() or b'date' in self.headers:
             return
 
         self.set_header(
@@ -134,17 +128,17 @@ class HTTPResponse(Response):
             self.headers[b'_line'][1] = b'%d' % status
             self.headers[b'_line'][2] = message
         else:
-            self._status.append((status, message))
+            self.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
+                                      b'%d' % status,
+                                      message]
 
     def get_status(self):
-        if b'_line' in self.headers:
-            _, status, message = self.headers.pop(b'_line')
-            return int(status), message
-
         try:
-            return self._status.pop()
-        except IndexError:
-            return 200, b'OK'
+            _, status, message = self.headers.pop(b'_line')
+
+            return (int(status), message)
+        except KeyError:
+            return (200, b'OK')
 
     def set_content_type(self, content_type=b'text/html; charset=utf-8'):
         if isinstance(content_type, str):
@@ -153,18 +147,12 @@ class HTTPResponse(Response):
         if b'\n' in content_type:
             raise InternalServerError
 
-        if b'content-type' in self.headers:
-            self.headers[b'content-type'] = [b'Content-Type: ' + content_type]
-        else:
-            self._content_type.append(content_type)
+        self.headers[b'content-type'] = [b'Content-Type: ' + content_type]
 
     def get_content_type(self):
-        if b'content-type' in self.headers:
-            return self.headers.pop(b'content-type')[0][13:].lstrip()
-
         try:
-            return self._content_type.pop()
-        except IndexError:
+            return self.headers.pop(b'content-type')[0][13:].lstrip()
+        except KeyError:
             return b'text/html; charset=utf-8'
 
     def close(self, keepalive=False):
@@ -226,7 +214,7 @@ class HTTPResponse(Response):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
-            if b'_line' not in self.headers:
+            if b'connection' not in self.headers:
                 # this block is executed when write() is called outside the
                 # handler/middleware. e.g. ASGI server
                 self.set_base_header()
@@ -241,9 +229,7 @@ class HTTPResponse(Response):
                 else:
                     self.http_chunked = chunked
 
-                self.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
-                                          b'%d' % status[0],
-                                          status[1]]
+                self.set_status(*status)
 
                 if not no_content:
                     self.set_header(b'Content-Type', self.get_content_type())

@@ -140,9 +140,7 @@ class HTTPServer(HTTPProtocol):
         self.response.http_chunked = options.get(
             'chunked', self.request.version == b'1.1' and not no_content
         )
-        self.response.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
-                                           b'%d' % status[0],
-                                           status[1]]
+        self.response.set_status(*status)
 
         if not no_content:
             self.response.set_header(
