@@ -227,7 +227,7 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 500 Internal Server Error')
-        self.assertEqual(body, b'Internal Server Error')
+        self.assertEqual(body, b'form size limit reached')
 
     def test_post_upload_ok_10(self):
         header, body = getcontents(
@@ -524,7 +524,7 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'Bad Request')
+        self.assertEqual(body, b'bad Content-Length')
 
     def test_requesttimeout(self):
         data = getcontents(
@@ -546,7 +546,7 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 408 Request Timeout')
-        self.assertEqual(body, b'Request Timeout')
+        self.assertEqual(body, b'recv timeout')
 
     def test_handlertimeout(self):
         header, body = getcontents(

@@ -6,12 +6,19 @@ import time
 
 from base64 import urlsafe_b64encode as b64encode
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, unquote_to_bytes
 
 from .http_exceptions import (
-    BadRequest, ExpectationFailed, InternalServerError, RangeNotSatisfiable
+    HTTPException,
+    BadRequest,
+    InternalServerError,
+    RangeNotSatisfiable,
+    RequestTimeout,
+    WebSocketException,
+    WebSocketServerClosed
 )
 from .response import Response
+from .websocket import WebSocket
 
 KEEPALIVE_OR_CLOSE = {
     True: b'keep-alive',
@@ -94,7 +101,7 @@ class HTTPResponse(Response):
 
         for k, v in ((b'domain', domain), (b'samesite', samesite)):
             if v:
-                cookie.extend(b'; %s=%s' % (k, bytes(quote(v), 'latin-1')))
+                cookie.extend(b'; %s=%s' % (k, quote(v).encode('latin-1')))
 
         for k, v in ((secure, b'; secure'), (httponly, b'; httponly')):
             if k:
@@ -161,18 +168,6 @@ class HTTPResponse(Response):
             self.request.http_keepalive = False
 
         super().close()
-
-    async def send_continue(self):
-        if self.request.http_continue:
-            if (self.request.content_length >
-                    self.request.protocol.options['client_max_body_size']):
-                raise ExpectationFailed
-
-            await self.send(
-                b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version,
-                throttle=False
-            )
-            self.close(keepalive=True)
 
     async def end(self, data=b'', keepalive=True, **kwargs):
         if self.headers_sent():
@@ -454,3 +449,51 @@ class HTTPResponse(Response):
                 await self.write(data, chunked=False, **kwargs)
 
         self.close(keepalive=True)
+
+    async def handle_exception(self, exc, data=b''):
+        if not isinstance(exc, asyncio.CancelledError):
+            self.request.protocol.print_exception(
+                exc, quote(unquote_to_bytes(self.request.path))
+            )
+
+        # WebSocket
+        if isinstance(exc, WebSocketException):
+            if isinstance(exc, WebSocketServerClosed):
+                data = WebSocket.create_frame(
+                    exc.code.to_bytes(2, byteorder='big'), opcode=8
+                )
+                await self.send(data)
+
+            self.close(keepalive=True)
+            return
+
+        # HTTP
+        if self.headers_sent():
+            self.close()
+            return
+
+        if isinstance(exc, TimeoutError):
+            exc = RequestTimeout(cause=exc)
+        elif not isinstance(exc, HTTPException):
+            exc = InternalServerError(cause=exc)
+
+        self.headers.clear()
+        self.set_status(exc.code, exc.message)
+        self.set_content_type(exc.content_type)
+
+        if not data:
+            data = str(exc)
+
+        if isinstance(data, str):
+            encoding = 'utf-8'
+
+            for v in exc.content_type.split(';', 100):
+                v = v.lstrip()
+
+                if v.startswith('charset='):
+                    encoding = v[8:].strip() or encoding
+                    break
+
+            data = data.encode(encoding)
+
+        await self.end(data, keepalive=False)
