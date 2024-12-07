@@ -21,11 +21,14 @@ _WS_OR_WSS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('_scope', '_read', '_timer', '_websocket', '_http_chunked')
+    __slots__ = (
+        'response', '_scope', '_read', '_timer', '_websocket', '_http_chunked'
+    )
 
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
 
+        self.response = None  # set in headers_received
         self._scope = None
         self._read = None
         self._timer = None
@@ -48,11 +51,12 @@ class ASGIServer(HTTPProtocol):
         self._scope['method'] = self.request.method.decode('latin-1')
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
-    async def headers_received(self):
+    async def headers_received(self, response):
         if not self.request.is_valid:
-            await error_400(request=self.request, response=self.response)
+            await error_400(request=self.request, response=response)
             return
 
+        self.response = response
         self._scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},
             'http_version': self.request.version.decode('latin-1'),
@@ -80,22 +84,24 @@ class ASGIServer(HTTPProtocol):
                     self._websocket is not None):
                 exc = WebSocketServerClosed(cause=exc)
 
-            await self.handle_exception(exc)
+            await response.handle_exception(exc)
         finally:
             if self._timer is not None:
                 self._timer.cancel()
 
-    async def handle_error_500(self, exc):
-        return await error_500(
-            request=self.request, response=self.response, exc=exc
-        )
+    async def error_received(self, exc):
+        if self.request is not None and self.response is not None:
+            return await error_500(
+                request=self.request, response=self.response, exc=exc
+            )
 
     def connection_lost(self, exc):
         if self.handler is not None and not self.handler.done():
             self._set_app_close_timeout()
 
-        self._scope = None
         super().connection_lost(exc)
+        self.response = None
+        self._scope = None
 
     def _set_app_close_timeout(self):
         if self._timer is None:
@@ -142,7 +148,7 @@ class ASGIServer(HTTPProtocol):
                 }
 
         if self._scope['type'] != 'http':
-            await self.handle_exception(
+            await self.response.handle_exception(
                 InternalServerError('unsupported scope type %s' %
                                     self._scope['type'])
             )
@@ -178,7 +184,7 @@ class ASGIServer(HTTPProtocol):
                 if 'headers' in data:
                     for header in data['headers']:
                         if b'\n' in header[0] or b'\n' in header[1]:
-                            await self.handle_exception(
+                            await self.response.handle_exception(
                                 InternalServerError(
                                     'name or value cannot contain '
                                     'illegal characters')
@@ -214,7 +220,7 @@ class ASGIServer(HTTPProtocol):
                 # websocket has this
                 if 'subprotocol' in data and data['subprotocol']:
                     if '\n' in data['subprotocol']:
-                        await self.handle_exception(
+                        await self.response.handle_exception(
                             InternalServerError(
                                 'subprotocol value cannot contain '
                                 'illegal characters')

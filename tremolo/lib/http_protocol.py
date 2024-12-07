@@ -2,22 +2,12 @@
 
 import asyncio
 
-from urllib.parse import quote_from_bytes, unquote_to_bytes
-
 from .contexts import ConnectionContext
-from .http_exceptions import (
-    HTTPException,
-    BadRequest,
-    InternalServerError,
-    RequestTimeout,
-    WebSocketException,
-    WebSocketServerClosed
-)
+from .http_exceptions import BadRequest, ExpectationFailed
 from .http_parser import ParseHeader
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .queue import Queue
-from .websocket import WebSocket
 
 
 class HTTPProtocol(asyncio.Protocol):
@@ -28,9 +18,8 @@ class HTTPProtocol(asyncio.Protocol):
                  'logger',
                  'fileno',
                  'queue',
-                 'request',
-                 'response',
                  'handler',
+                 'request',
                  '_watermarks',
                  '_header_buf',
                  '_waiters')
@@ -43,9 +32,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger = logger
         self.fileno = -1
         self.queue = None
-        self.request = None
-        self.response = None
         self.handler = None
+        self.request = None
 
         self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
@@ -180,10 +168,10 @@ class HTTPProtocol(asyncio.Protocol):
 
                 self.logger.info('payload too large')
 
-    async def headers_received(self):
+    async def headers_received(self, response):
         raise NotImplementedError
 
-    async def handle_error_500(self, exc):
+    async def error_received(self, exc):
         raise NotImplementedError
 
     def handler_timeout(self):
@@ -202,59 +190,16 @@ class HTTPProtocol(asyncio.Protocol):
             exc_info=self.options['debug'] and exc
         )
 
-    async def handle_exception(self, exc):
-        if self.request is None or self.response is None:
-            self.abort(exc)  # it's here for redundancy
-            return
+    def send_continue(self):
+        if self.request is not None and self.request.http_continue:
+            if (self.request.content_length >
+                    self.options['client_max_body_size']):
+                raise ExpectationFailed
 
-        if not isinstance(exc, asyncio.CancelledError):
-            self.print_exception(
-                exc, quote_from_bytes(unquote_to_bytes(self.request.path))
+            self.transport.write(
+                b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version
             )
-
-        # WebSocket
-        if isinstance(exc, WebSocketException):
-            if isinstance(exc, WebSocketServerClosed):
-                data = WebSocket.create_frame(
-                    exc.code.to_bytes(2, byteorder='big'), opcode=8
-                )
-                await self.response.send(data)
-
-            if self.response is not None:
-                self.response.close(keepalive=True)
-            return
-
-        # HTTP
-        if self.response.headers_sent():
-            self.response.close()
-            return
-
-        if isinstance(exc, TimeoutError):
-            exc = RequestTimeout(cause=exc)
-        elif not isinstance(exc, HTTPException):
-            exc = InternalServerError(cause=exc)
-
-        self.response.headers.clear()
-        self.response.set_status(exc.code, exc.message)
-        self.response.set_content_type(exc.content_type)
-        data = b''
-
-        try:
-            data = await self.handle_error_500(exc) or data
-        finally:
-            if isinstance(data, str):
-                encoding = 'utf-8'
-
-                for v in exc.content_type.split(';', 100):
-                    v = v.lstrip()
-
-                    if v.startswith('charset='):
-                        encoding = v[8:].strip() or encoding
-                        break
-
-                data = data.encode(encoding)
-
-            await self.response.end(data, keepalive=False)
+            self.queue[1].put_nowait(None)
 
     async def _handle_request(self, data, header_size):
         header = ParseHeader(
@@ -269,7 +214,7 @@ class HTTPProtocol(asyncio.Protocol):
             return
 
         self.request = HTTPRequest(self, header)
-        self.response = HTTPResponse(self.request)
+        response = HTTPResponse(self.request)
 
         try:
             if b'connection' in self.request.headers:
@@ -282,35 +227,26 @@ class HTTPProtocol(asyncio.Protocol):
 
             if self.request.has_body:
                 # assuming a request with a body, such as POST
-                if b'content-type' in self.request.headers:
-                    # don't lower() content-type, as it may contain a boundary
-                    self.request.content_type = (
-                        self.request.headers[b'content-type']
-                    )
-
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
-                        raise BadRequest
+                        raise BadRequest('unexpected chunked encoding')
 
-                    self.request.transfer_encoding = (
-                        self.request.headers[b'transfer-encoding'].lower()
-                    )
+                    self.request.transfer_encoding = self.request.headers[
+                        b'transfer-encoding'
+                    ].lower()
 
                 if b'content-length' in self.request.headers:
-                    if isinstance(self.request.headers[b'content-length'],
-                                  list):
-                        raise BadRequest
-
-                    self.request.content_length = int(
-                        b'+' + self.request.headers[b'content-length']
-                    )
+                    try:
+                        self.request.content_length = int(
+                            b'+' + self.request.headers[b'content-length']
+                        )
+                    except (ValueError, TypeError) as exc:
+                        raise BadRequest('bad Content-Length') from exc
 
                     if (b'%d' % self.request.content_length !=
                             self.request.headers[b'content-length'] or
                             b'chunked' in self.request.transfer_encoding):
                         raise BadRequest
-                elif self.request.version == b'1.0':
-                    raise BadRequest
 
                 if (b'expect' in self.request.headers and
                         self.request.headers[b'expect']
@@ -333,8 +269,7 @@ class HTTPProtocol(asyncio.Protocol):
             # successfully got header,
             # clear either the request or keepalive timeout
             for key, fut in self._waiters.items():
-                if key in ('request',
-                           'keepalive') and not fut.done():
+                if key in ('request', 'keepalive') and not fut.done():
                     fut.set_result(None)
 
             timer = self.loop.call_at(
@@ -343,12 +278,18 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
             try:
-                if self.request is not None and self.response is not None:
-                    await self.headers_received()
+                if self.request is not None:
+                    await self.headers_received(response)
             finally:
                 timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
-            await self.handle_exception(exc)
+            data = None
+
+            try:
+                data = await self.error_received(exc)
+            finally:
+                if self.request is not None:
+                    await response.handle_exception(exc, data)
 
     async def _receive_data(self, data, waiter):
         await waiter
@@ -524,6 +465,5 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.context.update(transport=None, socket=None)
         self.request = None
-        self.response = None
         self.handler = None
         self._header_buf = None

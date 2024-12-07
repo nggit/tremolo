@@ -7,7 +7,7 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_routes', '_middlewares', '_server')
+    __slots__ = ('_routes', '_middlewares', '_server', 'response')
 
     def __init__(self, context, _routes=None, _middlewares=None, **kwargs):
         super().__init__(context, **kwargs)
@@ -21,6 +21,7 @@ class HTTPServer(HTTPProtocol):
             'logger': kwargs['logger'],
             'lock': kwargs['lock']
         }
+        self.response = None  # set in headers_received
 
     async def _connection_made(self):
         for _, func, _ in self._middlewares['connect']:
@@ -57,6 +58,8 @@ class HTTPServer(HTTPProtocol):
             )
         else:
             super().connection_lost(exc)
+
+        self.response = None
 
     async def _handle_middleware(self, func, options):
         self.response.set_base_header()
@@ -258,10 +261,11 @@ class HTTPServer(HTTPProtocol):
 
         self.response.close(keepalive=True)
 
-    async def headers_received(self):
+    async def headers_received(self, response):
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
+        self.response = response
         options = self.request.context.options
 
         for middleware in self._middlewares['request']:
@@ -331,8 +335,9 @@ class HTTPServer(HTTPProtocol):
             self._routes[0][1][1], {**self._routes[0][1][2], **options}
         )
 
-    async def handle_error_500(self, exc):
+    async def error_received(self, exc):
         # internal server error
-        return await self._routes[0][-1][1](request=self.request,
-                                            response=self.response,
-                                            exc=exc)
+        if self.request is not None and self.response is not None:
+            return await self._routes[0][-1][1](request=self.request,
+                                                response=self.response,
+                                                exc=exc)

@@ -39,5 +39,4 @@ class SSE:
 
     async def close(self):
         await self.response.write(b'', throttle=False)
-
         self.response.close(keepalive=True)

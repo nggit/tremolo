@@ -24,12 +24,11 @@ class HTTPRequest(Request):
                  'query_string',
                  'version',
                  'content_length',
-                 'content_type',
                  'transfer_encoding',
-                 '_body',
                  'http_continue',
                  'http_keepalive',
                  '_upgraded',
+                 '_body',
                  '_eof',
                  '_read_instance',
                  '_read_buf')
@@ -58,12 +57,11 @@ class HTTPRequest(Request):
             self.version = b'1.1'
 
         self.content_length = -1
-        self.content_type = b'application/octet-stream'
         self.transfer_encoding = b'none'
-        self._body = bytearray()
         self.http_continue = False
         self.http_keepalive = False
         self._upgraded = False
+        self._body = bytearray()
         self._eof = False
         self._read_instance = None
         self._read_buf = bytearray()
@@ -115,6 +113,20 @@ class HTTPRequest(Request):
                 self._scheme = scheme or b'http'
 
         return self._scheme
+
+    @property
+    def content_type(self):
+        # don't lower() content-type, as it may contain a boundary
+        return self.headers.get(b'content-type', b'application/octet-stream')
+
+    @property
+    def upgraded(self):
+        return self._upgraded
+
+    @upgraded.setter
+    def upgraded(self, value):
+        self.clear_body()
+        self._upgraded = value
 
     @property
     def has_body(self):
@@ -178,7 +190,7 @@ class HTTPRequest(Request):
             return
 
         if self.http_continue:
-            await self.protocol.response.send_continue()
+            self.protocol.send_continue()
 
         if not raw and b'chunked' in self.transfer_encoding:
             buf = bytearray()
@@ -257,15 +269,6 @@ class HTTPRequest(Request):
                     yield data
 
         self._eof = True
-
-    @property
-    def upgraded(self):
-        return self._upgraded
-
-    @upgraded.setter
-    def upgraded(self, value):
-        self.clear_body()
-        self._upgraded = value
 
     @property
     def params(self):
