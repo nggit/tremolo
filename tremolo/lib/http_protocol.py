@@ -18,8 +18,8 @@ class HTTPProtocol(asyncio.Protocol):
                  'logger',
                  'fileno',
                  'queue',
-                 'request',
                  'handler',
+                 'request',
                  '_watermarks',
                  '_header_buf',
                  '_waiters')
@@ -32,8 +32,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger = logger
         self.fileno = -1
         self.queue = None
-        self.request = None
         self.handler = None
+        self.request = None
 
         self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
@@ -269,8 +269,7 @@ class HTTPProtocol(asyncio.Protocol):
             # successfully got header,
             # clear either the request or keepalive timeout
             for key, fut in self._waiters.items():
-                if key in ('request',
-                           'keepalive') and not fut.done():
+                if key in ('request', 'keepalive') and not fut.done():
                     fut.set_result(None)
 
             timer = self.loop.call_at(

@@ -25,10 +25,10 @@ class HTTPRequest(Request):
                  'version',
                  'content_length',
                  'transfer_encoding',
-                 '_body',
                  'http_continue',
                  'http_keepalive',
                  '_upgraded',
+                 '_body',
                  '_eof',
                  '_read_instance',
                  '_read_buf')
@@ -58,10 +58,10 @@ class HTTPRequest(Request):
 
         self.content_length = -1
         self.transfer_encoding = b'none'
-        self._body = bytearray()
         self.http_continue = False
         self.http_keepalive = False
         self._upgraded = False
+        self._body = bytearray()
         self._eof = False
         self._read_instance = None
         self._read_buf = bytearray()
@@ -118,6 +118,15 @@ class HTTPRequest(Request):
     def content_type(self):
         # don't lower() content-type, as it may contain a boundary
         return self.headers.get(b'content-type', b'application/octet-stream')
+
+    @property
+    def upgraded(self):
+        return self._upgraded
+
+    @upgraded.setter
+    def upgraded(self, value):
+        self.clear_body()
+        self._upgraded = value
 
     @property
     def has_body(self):
@@ -260,15 +269,6 @@ class HTTPRequest(Request):
                     yield data
 
         self._eof = True
-
-    @property
-    def upgraded(self):
-        return self._upgraded
-
-    @upgraded.setter
-    def upgraded(self, value):
-        self.clear_body()
-        self._upgraded = value
 
     @property
     def params(self):
