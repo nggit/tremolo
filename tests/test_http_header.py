@@ -8,7 +8,7 @@ import sys
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tremolo.lib.http_parser import ParseHeader  # noqa: E402
+from tremolo.lib.http_header import HTTPHeader  # noqa: E402
 
 
 def decode_dict(data, encoding='latin-1'):
@@ -27,11 +27,11 @@ def decode_dict(data, encoding='latin-1'):
     return data
 
 
-class TestParseHeader(unittest.TestCase):
+class TestHTTPHeader(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
-        self.obj = ParseHeader()
+        self.obj = HTTPHeader()
 
     def tearDown(self):
         print(

@@ -6,7 +6,7 @@ from .contexts import ConnectionContext
 from .http_exceptions import (
     HTTPException, BadRequest, ExpectationFailed, RequestTimeout
 )
-from .http_parser import ParseHeader
+from .http_header import HTTPHeader
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .queue import Queue
@@ -210,7 +210,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[1].put_nowait(None)
 
     async def _handle_request(self, data, header_size):
-        header = ParseHeader(
+        header = HTTPHeader(
             data, header_size=header_size, excludes=[b'proxy']
         )
 

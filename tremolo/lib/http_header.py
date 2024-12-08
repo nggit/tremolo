@@ -19,7 +19,7 @@ class Headers(dict):
         return values.replace(b', ', b',').split(b',', 100)
 
 
-class ParseHeader:
+class HTTPHeader:
     __slots__ = ('is_request',
                  'is_response',
                  'is_valid',
