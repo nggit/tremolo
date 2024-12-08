@@ -173,7 +173,7 @@ async def get_cookies(**server):
     request = server['request']
 
     assert request.headers.get(b'cookie') == [b'a=123', b'a=xxx, yyy']
-    assert request.cookies['a'] == ['123', 'xxx, yyy']
+    assert request.cookies['a'] == ['xxx, yyy', '123']
 
     # b'a=123, a=xxx, yyy'
     return b', '.join(request.headers.getlist(b'cookie'))
