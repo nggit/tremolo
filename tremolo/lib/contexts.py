@@ -54,7 +54,6 @@ class ConnectionContext(Context):
     def __init__(self):
         self.__dict__ = {
             'transport': None,
-            'socket': None,
             'tasks': set()
         }
 
@@ -63,11 +62,15 @@ class ConnectionContext(Context):
         return self.__dict__['transport']
 
     @property
-    def socket(self):
-        if not self.__dict__['socket'] and self.transport is not None:
-            self.__dict__['socket'] = self.transport.get_extra_info('socket')
+    def client(self):
+        if 'client' not in self.__dict__ and self.transport is not None:
+            sock = self.transport.get_extra_info('socket')
+            self.__dict__['client'] = sock.getpeername() or None
 
-        return self.__dict__['socket']
+            if isinstance(self.__dict__['client'], tuple):
+                self.__dict__['client'] = self.__dict__['client'][:2]
+
+        return self.__dict__.get('client', None)
 
     @property
     def tasks(self):

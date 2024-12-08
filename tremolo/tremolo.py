@@ -335,6 +335,13 @@ class Tremolo:
                 self.loop.stop()
                 raise exc
 
+        sockname = sock.getsockname()
+
+        if isinstance(sockname, tuple):
+            context.info['server'] = sockname[:2]
+        else:
+            context.info['server'] = (sockname, None)
+
         context.info['server_date'] = server_date()
         context.info['server_name'] = server_name
 

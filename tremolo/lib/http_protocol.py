@@ -78,7 +78,7 @@ class HTTPProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.context.update(transport=transport)
 
-        self.fileno = self.context.socket.fileno()
+        self.fileno = transport.get_extra_info('socket').fileno()
         self.queue = self.globals.queues.pop(self.fileno, [Queue(), Queue()])
 
         self._waiters['request'] = self.loop.create_future()
@@ -463,7 +463,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             self.queue = None
 
-        self.context.update(transport=None, socket=None)
+        self.context.update(transport=None)
         self.request = None
         self.handler = None
         self._header_buf = None

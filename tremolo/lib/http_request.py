@@ -10,9 +10,7 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('_client',
-                 '_ip',
-                 '_is_secure',
+    __slots__ = ('_ip',
                  '_scheme',
                  'header',
                  'headers',
@@ -36,9 +34,7 @@ class HTTPRequest(Request):
     def __init__(self, protocol, header):
         super().__init__(protocol)
 
-        self._client = None
         self._ip = None
-        self._is_secure = None
         self._scheme = None
         self.header = header
         self.headers = header.headers.copy()
@@ -67,16 +63,6 @@ class HTTPRequest(Request):
         self._read_buf = bytearray()
 
     @property
-    def client(self):
-        if not self._client:
-            try:
-                self._client = self.socket.getpeername()[:2] or None
-            except TypeError:
-                pass
-
-        return self._client
-
-    @property
     def ip(self):
         if not self._ip:
             ip = self.headers.get(b'x-forwarded-for', b'')
@@ -92,15 +78,6 @@ class HTTPRequest(Request):
                 self._ip = ip[:(ip + b',').find(b',')]
 
         return self._ip
-
-    @property
-    def is_secure(self):
-        if self._is_secure is None:
-            self._is_secure = (
-                self.transport.get_extra_info('sslcontext') is not None
-            )
-
-        return self._is_secure
 
     @property
     def scheme(self):

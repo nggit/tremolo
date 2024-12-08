@@ -29,7 +29,11 @@ class ASGIServer(HTTPProtocol):
         super().__init__(context, **kwargs)
 
         self.response = None  # set in headers_received
-        self._scope = None
+        self._scope = {
+            'asgi': {'version': '3.0', 'spec_version': '2.3'},
+            'root_path': self.options['_root_path'],
+            'server': self.globals.info['server']
+        }
         self._read = None
         self._timer = None
         self._websocket = None
@@ -52,22 +56,20 @@ class ASGIServer(HTTPProtocol):
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
     async def headers_received(self, response):
+        self.response = response
+
         if not self.request.is_valid:
             await error_400(request=self.request, response=response)
             return
 
-        self.response = response
-        self._scope = {
-            'asgi': {'version': '3.0', 'spec_version': '2.3'},
-            'http_version': self.request.version.decode('latin-1'),
-            'path': unquote_to_bytes(self.request.path).decode('latin-1'),
-            'raw_path': self.request.path,
-            'query_string': self.request.query_string,
-            'root_path': self.options['_root_path'],
-            'headers': self.request.header.getheaders(),
-            'client': self.request.client,
-            'server': self.request.socket.getsockname()
-        }
+        self._scope.update(
+            http_version=self.request.version.decode('latin-1'),
+            path=unquote_to_bytes(self.request.path).decode('latin-1'),
+            raw_path=self.request.path,
+            query_string=self.request.query_string,
+            headers=self.request.header.getheaders(),
+            client=self.request.client
+        )
 
         if (self.options['ws'] and b'upgrade' in self.request.headers and
                 b'connection' in self.request.headers and
