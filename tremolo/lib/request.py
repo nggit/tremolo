@@ -24,7 +24,15 @@ class Request:
 
     @property
     def socket(self):
-        return self.protocol.context.socket
+        return self.transport.get_extra_info('socket')
+
+    @property
+    def client(self):
+        return self.protocol.context.client
+
+    @property
+    def is_secure(self):
+        return bool(self.transport.get_extra_info('sslcontext'))
 
     def clear_body(self):
         self.body_size = 0

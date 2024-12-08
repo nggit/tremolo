@@ -262,10 +262,11 @@ class HTTPServer(HTTPProtocol):
         self.response.close(keepalive=True)
 
     async def headers_received(self, response):
+        self.response = response
+
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
-        self.response = response
         options = self.request.context.options
 
         for middleware in self._middlewares['request']:

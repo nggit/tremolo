@@ -335,6 +335,13 @@ class Tremolo:
                 self.loop.stop()
                 raise exc
 
+        sockname = sock.getsockname()
+
+        if isinstance(sockname, tuple):
+            context.info['server'] = sockname[:2]
+        else:
+            context.info['server'] = (sockname, None)
+
         context.info['server_date'] = server_date()
         context.info['server_name'] = server_name
 
@@ -380,11 +387,10 @@ class Tremolo:
         sys.stdout.buffer.write(
             b'%s worker (pid %d) is started at ' % (server_name, os.getpid())
         )
+        print(context.info['server'][0], end='')
 
-        if sock.family.name == 'AF_UNIX':
-            print(sock.getsockname(), end='')
-        else:
-            print('%s port %d' % sock.getsockname()[:2], end='')
+        if context.info['server'][1] is not None:
+            print(' port %d' % context.info['server'][1], end='')
 
         if ssl_context is not None:
             sys.stdout.flush()

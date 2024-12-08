@@ -1,4 +1,4 @@
-__version__ = '0.0.835'
+__version__ = '0.0.837'
 
 from .tremolo import Tremolo, Tremolo as Application  # noqa: E402,F401
 from . import exceptions  # noqa: E402,F401
