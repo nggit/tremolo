@@ -485,15 +485,6 @@ class HTTPResponse(Response):
             data = str(exc)
 
         if isinstance(data, str):
-            encoding = 'utf-8'
-
-            for v in exc.content_type.split(';', 100):
-                v = v.lstrip()
-
-                if v.startswith('charset='):
-                    encoding = v[8:].strip() or encoding
-                    break
-
-            data = data.encode(encoding)
+            data = data.encode(exc.encoding)
 
         await self.end(data, keepalive=False)

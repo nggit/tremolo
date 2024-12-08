@@ -2,7 +2,7 @@
 
 __all__ = (
     'file_signature', 'html_escape', 'log_date', 'memory_usage',
-    'server_date', 'parse_args'
+    'server_date', 'parse_fields', 'parse_args'
 )
 
 import os  # noqa: E402
@@ -48,6 +48,25 @@ def memory_usage(pid=0):
 def server_date():
     return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
+
+
+def parse_fields(data, separator=';', max_fields=100):
+    if len(separator) != 1:
+        raise ValueError('separator must be a 1-character string')
+
+    end = len(data)
+
+    for _ in range(max_fields):
+        start = data.rfind(separator, 0, end) + 1
+        name, _, value = data[start:end].partition('=')
+
+        if name:
+            yield (name.strip().lower(), value.strip(' \t"'))
+
+        if start == 0:
+            break
+
+        end = start - 1
 
 
 def parse_args(**callbacks):

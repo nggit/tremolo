@@ -473,33 +473,39 @@ class TestHTTPServer(unittest.TestCase):
                          b'HTTP/1.1 400 Bad Request')
 
     def test_badrequest_notarequest(self):
-        data = getcontents(
+        header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b' HTTP/\r\nHost: localhost:%d\r\n\r\n' % HTTP_PORT
         )
 
-        self.assertEqual(data, (b'', b''))
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 400 Bad Request')
+        self.assertEqual(body, b'bad request: not a request')
 
     def test_badrequest(self):
-        data = getcontents(
+        header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'GET / HTTP/1.1\r\nHost: localhost:%d\r\n%s' % (
                     HTTP_PORT, b'\x00' * 8192)
         )
 
-        self.assertEqual(data, (b'', b''))
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 400 Bad Request')
+        self.assertEqual(body, b'bad request')
 
     def test_headertoolarge(self):
-        data = getcontents(
+        header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'GET / HTTP/1.1\r\nHost: localhost:%d\r\n%s\r\n\r\n' % (
                     HTTP_PORT, b'\x00' * 8192)
         )
 
-        self.assertEqual(data, (b'', b''))
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 400 Bad Request')
+        self.assertEqual(body, b'request header too large')
 
     def test_sec_content_length_and_transfer_encoding(self):
         header, body = getcontents(
@@ -527,14 +533,16 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(body, b'bad Content-Length')
 
     def test_requesttimeout(self):
-        data = getcontents(
+        header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT + 1,
             raw=b'GET / HTTP/1.1\r\n'
                 b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
         )
 
-        self.assertEqual(data, (b'', b''))
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 408 Request Timeout')
+        self.assertEqual(body, b'request timeout after 2s')
 
     def test_recvtimeout(self):
         header, body = getcontents(
