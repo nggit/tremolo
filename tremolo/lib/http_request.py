@@ -3,8 +3,9 @@
 import os
 import time
 
-from urllib.parse import parse_qs, parse_qsl
+from urllib.parse import parse_qs
 
+from tremolo.utils import parse_fields
 from .http_exceptions import BadRequest, PayloadTooLarge
 from .request import Request
 
@@ -273,19 +274,18 @@ class HTTPRequest(Request):
             self.params['cookies'] = {}
 
             if b'cookie' in self.headers:
+                cookie = self.headers[b'cookie']
+
                 if isinstance(self.headers[b'cookie'], list):
-                    self.params['cookies'] = parse_qs(
-                        b'&'.join(self.headers[b'cookie'])
-                        .replace(b'; ', b'&').replace(b';', b'&')
-                        .decode('latin-1'),
-                        max_num_fields=100 * len(self.headers[b'cookie'])
-                    )
-                else:
-                    self.params['cookies'] = parse_qs(
-                        self.headers[b'cookie'].replace(b'; ', b'&')
-                        .replace(b';', b'&').decode('latin-1'),
-                        max_num_fields=100
-                    )
+                    cookie = b';'.join(self.headers[b'cookie'])
+
+                for k, v in parse_fields(cookie):
+                    k = k.decode('latin-1')
+
+                    if k in self.params['cookies']:
+                        self.params['cookies'][k].append(v.decode('latin-1'))
+                    else:
+                        self.params['cookies'][k] = [v.decode('latin-1')]
 
             return self.params['cookies']
 
@@ -315,18 +315,13 @@ class HTTPRequest(Request):
         if self.eof():
             return
 
-        ct = parse_qs(
-            self.content_type.replace(b'; ', b'&').replace(b';', b'&')
-            .decode('latin-1'),
-            max_num_fields=100
-        )
+        for key, boundary in parse_fields(self.content_type):
+            if key == b'boundary' and boundary:
+                break
+        else:
+            raise BadRequest('missing boundary')
 
-        try:
-            boundary = ct['boundary'][0].encode('latin-1')
-            boundary_size = len(boundary)
-        except KeyError as exc:
-            raise BadRequest('missing boundary') from exc
-
+        boundary_size = len(boundary)
         header = None
         body = bytearray()
 
@@ -375,11 +370,9 @@ class HTTPRequest(Request):
                         ).headers
 
                         if b'content-disposition' in header:
-                            for k, v in parse_qsl(
-                                    header[b'content-disposition']
-                                    .replace(b'; ', b'&').replace(b';', b'&')
-                                    .decode('latin-1'), max_num_fields=100):
-                                part[k] = v.strip('"')
+                            for k, v in parse_fields(
+                                    header[b'content-disposition']):
+                                part[k.decode('latin-1')] = v.decode('latin-1')
 
                         if b'content-length' in header:
                             content_length = int(
@@ -388,9 +381,8 @@ class HTTPRequest(Request):
                             part['length'] = content_length
 
                         if b'content-type' in header:
-                            part['type'] = (
-                                header[b'content-type'].decode('latin-1')
-                            )
+                            part['type'] = header[
+                                           b'content-type'].decode('latin-1')
                     else:
                         header = {}
 

@@ -21,9 +21,7 @@ _WS_OR_WSS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = (
-        'response', '_scope', '_read', '_timer', '_websocket', '_http_chunked'
-    )
+    __slots__ = ('response', '_scope', '_read', '_websocket', '_timer')
 
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
@@ -35,9 +33,8 @@ class ASGIServer(HTTPProtocol):
             'server': self.globals.info['server']
         }
         self._read = None
-        self._timer = None
         self._websocket = None
-        self._http_chunked = None
+        self._timer = None
 
     def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
@@ -199,9 +196,7 @@ class ASGIServer(HTTPProtocol):
                             self.response.set_content_type(header[1])
                             continue
 
-                        if name in (b'date',
-                                    b'server',
-                                    b'transfer-encoding'):
+                        if name in (b'date', b'server', b'transfer-encoding'):
                             # disallow apps from changing them,
                             # as they are managed by Tremolo
                             continue
@@ -215,7 +210,7 @@ class ASGIServer(HTTPProtocol):
                         if name == b'content-length':
                             # will disable http chunked in the
                             # self.response.write()
-                            self._http_chunked = False
+                            self.response.http_chunked = False
 
                         self.response.append_header(*header)
 
@@ -238,15 +233,12 @@ class ASGIServer(HTTPProtocol):
                 if 'body' in data and data['body'] != b'':
                     await self.response.write(
                         data['body'],
-                        chunked=self._http_chunked,
                         throttle=self.response.headers_sent(),
                         buffer_size=self.options['buffer_size']
                     )
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self.response.write(
-                        b'', chunked=self._http_chunked, throttle=False
-                    )
+                    await self.response.write(b'', throttle=False)
                     self.response.close(keepalive=True)
                     self._read = None
             elif data['type'] == 'websocket.send':

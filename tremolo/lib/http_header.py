@@ -19,13 +19,9 @@ class Headers(dict):
         return values.replace(b', ', b',').split(b',', 100)
 
 
-class ParseHeader:
-    __slots__ = ('is_request',
-                 'is_response',
-                 'is_valid',
-                 'headers',
-                 '_headers',
-                 '_body')
+class HTTPHeader:
+    __slots__ = ('is_request', 'is_response', 'is_valid', 'headers',
+                 '_headers', '_body')
 
     def __init__(self, data=None, **kwargs):
         self.is_request = False

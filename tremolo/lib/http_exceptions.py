@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+from tremolo.utils import parse_fields
+
 
 class TremoloException(Exception):
     message = 'TremoloException'
@@ -34,6 +36,14 @@ class HTTPException(TremoloException):
 
         if isinstance(cause, Exception):
             self.__cause__ = cause
+
+    @property
+    def encoding(self):
+        for key, value in parse_fields(self.content_type.encode('latin-1')):
+            if key == b'charset' and value:
+                return value.decode('latin-1')
+
+        return 'utf-8'
 
 
 class BadRequest(HTTPException):

@@ -3,8 +3,10 @@
 import asyncio
 
 from .contexts import ConnectionContext
-from .http_exceptions import BadRequest, ExpectationFailed
-from .http_parser import ParseHeader
+from .http_exceptions import (
+    HTTPException, BadRequest, ExpectationFailed, RequestTimeout
+)
+from .http_header import HTTPHeader
 from .http_request import HTTPRequest
 from .http_response import HTTPResponse
 from .queue import Queue
@@ -92,27 +94,34 @@ class HTTPProtocol(asyncio.Protocol):
                              timeout_cb=self.request_timeout)
         ).cancel)
 
-    def abort(self, exc=None):
-        if self.transport is not None and not self.transport.is_closing():
-            self.transport.abort()
+    def close(self, exc=None):
+        if self.transport is None or self.transport.is_closing():
+            return
 
-            if exc:
-                self.print_exception(exc, 'abort')
+        if exc:
+            if isinstance(exc, HTTPException):
+                self.transport.write(
+                    b'HTTP/1.0 %d %s\r\nContent-Type: %s\r\n\r\n%s' %
+                    (exc.code,
+                     exc.message.encode(exc.encoding),
+                     exc.content_type.encode(exc.encoding),
+                     str(exc).encode(exc.encoding))
+                )
 
-    def close(self):
-        if self.transport is not None and not self.transport.is_closing():
-            if self.transport.can_write_eof():
-                self.transport.write_eof()
+            self.print_exception(exc, 'close')
 
-            self.transport.close()
+        if self.transport.can_write_eof():
+            self.transport.write_eof()
 
-    async def request_timeout(self, timeout):
-        self.logger.info('request timeout after %gs', timeout)
+        self.transport.close()
 
-    async def keepalive_timeout(self, timeout):
+    def request_timeout(self, timeout):
+        raise RequestTimeout('request timeout after %gs' % timeout)
+
+    def keepalive_timeout(self, timeout):
         self.logger.info('keepalive timeout after %gs', timeout)
 
-    async def send_timeout(self, timeout):
+    def send_timeout(self, timeout):
         self.logger.info('send timeout after %gs', timeout)
 
     async def set_timeout(self, waiter, timeout=30, timeout_cb=None):
@@ -124,9 +133,11 @@ class HTTPProtocol(asyncio.Protocol):
             if self.transport is not None:
                 try:
                     if callable(timeout_cb):
-                        await timeout_cb(timeout)
-                finally:
-                    self.abort()
+                        timeout_cb(timeout)
+
+                    self.close()
+                except Exception as exc:
+                    self.close(exc)
         finally:
             timer.cancel()
 
@@ -140,7 +151,7 @@ class HTTPProtocol(asyncio.Protocol):
             if queue_size > self.options['max_queue_size']:
                 self.logger.error('%d exceeds the value of max_queue_size',
                                   queue_size)
-                self.abort()
+                self.close()
                 return
 
             await asyncio.sleep(1 / (rate / max(queue_size, 1) /
@@ -162,11 +173,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif self.request.body_size < self.options['client_max_body_size']:
                 self.transport.resume_reading()
             else:
-                if self.queue is not None:
-                    self.request.http_keepalive = False
-                    self.queue[1].put_nowait(None)
-
-                self.logger.info('payload too large')
+                self.close(BadRequest('payload too large'))
 
     async def headers_received(self, response):
         raise NotImplementedError
@@ -191,26 +198,24 @@ class HTTPProtocol(asyncio.Protocol):
         )
 
     def send_continue(self):
-        if self.request is not None and self.request.http_continue:
-            if (self.request.content_length >
-                    self.options['client_max_body_size']):
-                raise ExpectationFailed
+        if self.request is None or not self.request.http_continue:
+            return
 
-            self.transport.write(
-                b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version
-            )
-            self.queue[1].put_nowait(None)
+        if self.request.content_length > self.options['client_max_body_size']:
+            raise ExpectationFailed
+
+        self.transport.write(
+            b'HTTP/%s 100 Continue\r\n\r\n' % self.request.version
+        )
+        self.queue[1].put_nowait(None)
 
     async def _handle_request(self, data, header_size):
-        header = ParseHeader(
+        header = HTTPHeader(
             data, header_size=header_size, excludes=[b'proxy']
         )
 
         if not header.is_request:
-            if self.queue is not None:
-                self.queue[1].put_nowait(None)
-
-            self.logger.info('bad request: not a request')
+            self.close(BadRequest('bad request: not a request'))
             return
 
         self.request = HTTPRequest(self, header)
@@ -218,9 +223,10 @@ class HTTPProtocol(asyncio.Protocol):
 
         try:
             if b'connection' in self.request.headers:
-                if b',close,' not in (b',' +
-                                      self.request.headers[b'connection']
-                                      .replace(b' ', b'').lower() + b','):
+                for v in self.request.headers[b'connection'].split(b',', 100):
+                    if v.strip().lower() == b'close':
+                        break
+                else:
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
                 self.request.http_keepalive = True
@@ -317,12 +323,11 @@ class HTTPProtocol(asyncio.Protocol):
                 )
                 self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
-                self.logger.info('request header too large')
-                self.abort()
-            elif not (header_size == 1 and len(self._header_buf) <=
-                      self.options['client_max_header_size']):
-                self.logger.info('bad request')
-                self.abort()
+                self.close(BadRequest('request header too large'))
+            elif not (
+                    header_size == 1 and len(self._header_buf) <=
+                    self.options['client_max_header_size']):
+                self.close(BadRequest('bad request'))
 
             return
 
@@ -398,7 +403,7 @@ class HTTPProtocol(asyncio.Protocol):
                 self.close()
                 break
             except Exception as exc:
-                self.abort(exc)
+                self.close(exc)
                 break
 
     def _handle_keepalive(self):
@@ -407,10 +412,10 @@ class HTTPProtocol(asyncio.Protocol):
             self.options['_connections'].add(self)
 
         if self not in self.options['_connections']:
-            self.close()
             self.logger.info(
                 'a keepalive connection is kicked out of the list'
             )
+            self.close()
             return
 
         if self.request.http_continue:
