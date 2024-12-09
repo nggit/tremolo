@@ -209,15 +209,7 @@ class HTTPProtocol(asyncio.Protocol):
         )
         self.queue[1].put_nowait(None)
 
-    async def _handle_request(self, data, header_size):
-        header = HTTPHeader(
-            data, header_size=header_size, excludes=[b'proxy']
-        )
-
-        if not header.is_request:
-            self.close(BadRequest('bad request: not a request'))
-            return
-
+    async def _handle_request(self, header):
         self.request = HTTPRequest(self, header)
         response = HTTPResponse(self.request)
 
@@ -265,11 +257,11 @@ class HTTPProtocol(asyncio.Protocol):
                 # using put_nowait directly won't
                 self.queue[0].put_nowait(b'')
 
-            if self.request.has_body or len(data) > header_size + 2:
+            if self.request.has_body or header.body:
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
-                    data[header_size + 2:], rate=self.options['upload_rate']
+                    header.body, rate=self.options['upload_rate']
                 )
 
             # successfully got header,
@@ -318,9 +310,17 @@ class HTTPProtocol(asyncio.Protocol):
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
 
-                self.handler = self.create_background_task(
-                    self._handle_request(self._header_buf, header_size)
-                )
+                header = HTTPHeader(self._header_buf,
+                                    header_size=header_size,
+                                    excludes=[b'proxy'])
+
+                if header.is_request:
+                    self.handler = self.create_background_task(
+                        self._handle_request(header)
+                    )
+                else:
+                    self.close(BadRequest('bad request: not a request'))
+
                 self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
                 self.close(BadRequest('request header too large'))
