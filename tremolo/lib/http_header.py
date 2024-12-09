@@ -21,7 +21,7 @@ class Headers(dict):
 
 class HTTPHeader:
     __slots__ = ('is_request', 'is_response', 'is_valid', 'headers',
-                 '_headers', '_body')
+                 '_headers', 'body')
 
     def __init__(self, data=None, **kwargs):
         self.is_request = False
@@ -30,7 +30,7 @@ class HTTPHeader:
 
         self.headers = Headers()
         self._headers = []
-        self._body = b''
+        self.body = b''
 
         self.parse(data, **kwargs)
 
@@ -51,7 +51,7 @@ class HTTPHeader:
 
         self.headers.clear()
         self._headers.clear()
-        self._body = data[header_size + 2:]
+        self.body = data[header_size + 2:]  # store data after the header
         start = 0
 
         while True:
@@ -183,4 +183,4 @@ class HTTPHeader:
         return b'\r\n'.join(
             [self.headers.get(b'_line', b'')] +
             [b': '.join(v) for v in self._headers]
-        ) + b'\r\n\r\n' + self._body
+        ) + b'\r\n\r\n' + self.body
