@@ -310,9 +310,9 @@ class HTTPProtocol(asyncio.Protocol):
                 # _handle_keepalive is called; indirectly via Response.close
                 self.transport.pause_reading()
 
-                header = HTTPHeader(
-                    data, header_size=header_size, excludes=[b'proxy']
-                )
+                header = HTTPHeader(self._header_buf,
+                                    header_size=header_size,
+                                    excludes=[b'proxy'])
 
                 if header.is_request:
                     self.handler = self.create_background_task(
