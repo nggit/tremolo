@@ -8,6 +8,7 @@ from base64 import urlsafe_b64encode as b64encode
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote, unquote_to_bytes
 
+from tremolo.utils import parse_fields
 from .http_exceptions import (
     HTTPException,
     BadRequest,
@@ -37,7 +38,7 @@ class HTTPResponse(Response):
         super().__init__(request)
 
         self.request = request
-        self.http_chunked = False
+        self.http_chunked = None
 
         self._headers = {}
 
@@ -219,8 +220,9 @@ class HTTPResponse(Response):
                               100 <= status[0] < 200)
 
                 if chunked is None:
-                    self.http_chunked = (self.request.version == b'1.1' and
-                                         not no_content)
+                    if self.http_chunked is None:
+                        self.http_chunked = (self.request.version == b'1.1' and
+                                             not no_content)
                 else:
                     self.http_chunked = chunked
 
@@ -332,53 +334,50 @@ class HTTPResponse(Response):
             _range = self.request.headers[b'range']
 
             if isinstance(_range, list):
-                for v in _range:
-                    if not v.startswith(b'bytes='):
-                        raise BadRequest('bad range')
-
-                _range = b','.join(_range)
-            else:
-                if not _range.startswith(b'bytes='):
-                    raise BadRequest('bad range')
+                _range = b';'.join(_range)
 
             ranges = []
 
-            try:
-                for v in _range.replace(b'bytes=', b'').split(b',', 100):
-                    v = v.strip()
+            for key, _bytes in parse_fields(_range):
+                if not (key == b'bytes' and _bytes):
+                    raise BadRequest('bad range')
 
-                    if v.startswith(b'-'):
-                        start = file_size + int(v)
+                try:
+                    for v in _bytes.split(b',', 100):
+                        v = v.strip()
 
-                        if start < 0:
-                            raise RangeNotSatisfiable
+                        if v.startswith(b'-'):
+                            start = file_size + int(v)
 
-                        ranges.append(
-                            (start, file_size - 1, file_size - start)
-                        )
-                    elif v.endswith(b'-'):
-                        start = int(v[:-1])
+                            if start < 0:
+                                raise RangeNotSatisfiable
 
-                        if start >= file_size:
-                            raise RangeNotSatisfiable
+                            ranges.append(
+                                (start, file_size - 1, file_size - start)
+                            )
+                        elif v.endswith(b'-'):
+                            start = int(v[:-1])
 
-                        ranges.append(
-                            (start, file_size - 1, file_size - start)
-                        )
-                    else:
-                        start, end = v.split(b'-', 1)
-                        start = int(start)
-                        end = int(end)
+                            if start >= file_size:
+                                raise RangeNotSatisfiable
 
-                        if end == 0:
-                            end = start
+                            ranges.append(
+                                (start, file_size - 1, file_size - start)
+                            )
+                        else:
+                            start, end = v.split(b'-', 1)
+                            start = int(start)
+                            end = int(end)
 
-                        if start > end or end >= file_size:
-                            raise RangeNotSatisfiable
+                            if end == 0:
+                                end = start
 
-                        ranges.append((start, end, end - start + 1))
-            except ValueError as exc:
-                raise BadRequest('bad range') from exc
+                            if start > end or end >= file_size:
+                                raise RangeNotSatisfiable
+
+                            ranges.append((start, end, end - start + 1))
+                except ValueError as exc:
+                    raise BadRequest('bad range') from exc
 
             self.set_status(206, b'Partial Content')
 

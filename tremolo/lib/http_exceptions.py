@@ -39,9 +39,9 @@ class HTTPException(TremoloException):
 
     @property
     def encoding(self):
-        for name, value in parse_fields(self.content_type):
-            if name == 'charset' and value:
-                return value
+        for key, value in parse_fields(self.content_type.encode('latin-1')):
+            if key == b'charset' and value:
+                return value.decode('latin-1')
 
         return 'utf-8'
 

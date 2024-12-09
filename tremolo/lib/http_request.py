@@ -3,7 +3,7 @@
 import os
 import time
 
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs
 
 from tremolo.utils import parse_fields
 from .http_exceptions import BadRequest, PayloadTooLarge
@@ -274,16 +274,18 @@ class HTTPRequest(Request):
             self.params['cookies'] = {}
 
             if b'cookie' in self.headers:
-                if isinstance(self.headers[b'cookie'], list):
-                    data = b';'.join(self.headers[b'cookie']).decode('latin-1')
-                else:
-                    data = self.headers[b'cookie'].decode('latin-1')
+                cookie = self.headers[b'cookie']
 
-                for name, value in parse_fields(data):
-                    if name in self.params['cookies']:
-                        self.params['cookies'][name].append(unquote(value))
+                if isinstance(self.headers[b'cookie'], list):
+                    cookie = b';'.join(self.headers[b'cookie'])
+
+                for k, v in parse_fields(cookie):
+                    k = k.decode('latin-1')
+
+                    if k in self.params['cookies']:
+                        self.params['cookies'][k].append(v.decode('latin-1'))
                     else:
-                        self.params['cookies'][name] = [unquote(value)]
+                        self.params['cookies'][k] = [v.decode('latin-1')]
 
             return self.params['cookies']
 
@@ -313,13 +315,12 @@ class HTTPRequest(Request):
         if self.eof():
             return
 
-        for name, value in parse_fields(self.content_type.decode('latin-1')):
-            if name == 'boundary' and value:
+        for key, boundary in parse_fields(self.content_type):
+            if key == b'boundary' and boundary:
                 break
         else:
             raise BadRequest('missing boundary')
 
-        boundary = value.encode('latin-1')
         boundary_size = len(boundary)
         header = None
         body = bytearray()
@@ -369,10 +370,9 @@ class HTTPRequest(Request):
                         ).headers
 
                         if b'content-disposition' in header:
-                            for name, value in parse_fields(
-                                    header[b'content-disposition']
-                                    .decode('latin-1')):
-                                part[name] = value
+                            for k, v in parse_fields(
+                                    header[b'content-disposition']):
+                                part[k.decode('latin-1')] = v.decode('latin-1')
 
                         if b'content-length' in header:
                             content_length = int(

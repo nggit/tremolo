@@ -20,12 +20,8 @@ class Headers(dict):
 
 
 class HTTPHeader:
-    __slots__ = ('is_request',
-                 'is_response',
-                 'is_valid',
-                 'headers',
-                 '_headers',
-                 '_body')
+    __slots__ = ('is_request', 'is_response', 'is_valid', 'headers',
+                 '_headers', '_body')
 
     def __init__(self, data=None, **kwargs):
         self.is_request = False

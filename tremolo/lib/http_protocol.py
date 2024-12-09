@@ -223,9 +223,10 @@ class HTTPProtocol(asyncio.Protocol):
 
         try:
             if b'connection' in self.request.headers:
-                if b',close,' not in (b',' +
-                                      self.request.headers[b'connection']
-                                      .replace(b' ', b'').lower() + b','):
+                for v in self.request.headers[b'connection'].split(b',', 100):
+                    if v.strip().lower() == b'close':
+                        break
+                else:
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
                 self.request.http_keepalive = True
