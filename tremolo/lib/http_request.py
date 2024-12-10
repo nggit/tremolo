@@ -295,8 +295,8 @@ class HTTPRequest(Request):
         except KeyError as exc:
             self.params['post'] = {}
 
-            if (b'application/x-www-form-urlencoded' in
-                    self.content_type.lower()):
+            if self.content_type.lower().startswith(
+                    b'application/x-www-form-urlencoded'):
                 async for data in self.stream():
                     self._body.extend(data)
 
