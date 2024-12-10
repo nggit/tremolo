@@ -36,7 +36,7 @@ class HTTPHeader:
 
     def parse(self, data, header_size=-1, header_max_size=65536, excludes=(),
               max_lines=100, max_line_size=8190):
-        if data is None:
+        if not data:
             return self
 
         if header_size == -1:
@@ -107,19 +107,15 @@ class HTTPHeader:
                 self.headers[b'_line'] = line
             elif colon_pos > 0 and line[colon_pos - 1] != 32:
                 name = line[:colon_pos].lower()
-                value = line[colon_pos + 1:]
+                value = line[colon_pos + 1:].strip(b' \t')
 
-                if value.startswith(b' '):
-                    value = value[1:]
-
-                if (name in self.headers and
-                        isinstance(self.headers[name], list)):
-                    self.headers[name].append(value)
-                else:
-                    if name in self.headers:
-                        self.headers[name] = [self.headers[name], value]
+                if name in self.headers:
+                    if isinstance(self.headers[name], list):
+                        self.headers[name].append(value)
                     else:
-                        self.headers[name] = value
+                        self.headers[name] = [self.headers[name], value]
+                else:
+                    self.headers[name] = value
 
                 if name not in excludes:
                     self._headers.append((name, value))
