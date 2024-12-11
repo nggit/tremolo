@@ -14,7 +14,7 @@ from .handlers import error_400, error_500
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
-_WS_OR_WSS = {
+_WSS_OR_WS = {
     False: 'ws',
     True: 'wss'
 }
@@ -40,7 +40,7 @@ class ASGIServer(HTTPProtocol):
         self._websocket = WebSocket(self.request, self.response)
 
         self._scope['type'] = 'websocket'
-        self._scope['scheme'] = _WS_OR_WSS[self.request.scheme == b'https']
+        self._scope['scheme'] = _WSS_OR_WS[self.request.scheme == b'https']
         self._scope['subprotocols'] = [
             value.decode('latin-1') for value in
             self.request.headers.getlist(b'sec-websocket-protocol')]

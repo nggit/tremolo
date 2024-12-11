@@ -22,10 +22,10 @@ from .response import Response
 from .websocket import WebSocket
 
 KEEPALIVE_OR_CLOSE = {
-    True: b'keep-alive',
-    False: b'close'
+    False: b'close',
+    True: b'keep-alive'
 }
-KEEPALIVE_OR_UPGRADE = {
+UPGRADE_OR_KEEPALIVE = {
     False: b'keep-alive',
     True: b'upgrade'
 }
@@ -241,7 +241,7 @@ class HTTPResponse(Response):
 
                     self.set_header(
                         b'Connection',
-                        KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
+                        UPGRADE_OR_KEEPALIVE[status[0] in (101, 426)]
                     )
                 else:
                     self.set_header(b'Connection', b'close')

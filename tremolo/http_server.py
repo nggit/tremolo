@@ -1,7 +1,7 @@
 # Copyright (c) 2023 nggit
 
 from .lib.http_protocol import HTTPProtocol
-from .lib.http_response import KEEPALIVE_OR_CLOSE, KEEPALIVE_OR_UPGRADE
+from .lib.http_response import KEEPALIVE_OR_CLOSE, UPGRADE_OR_KEEPALIVE
 from .lib.sse import SSE
 from .lib.websocket import WebSocket
 
@@ -161,7 +161,7 @@ class HTTPServer(HTTPProtocol):
 
                 self.response.set_header(
                     b'Connection',
-                    KEEPALIVE_OR_UPGRADE[status[0] in (101, 426)]
+                    UPGRADE_OR_KEEPALIVE[status[0] in (101, 426)]
                 )
             else:
                 self.response.set_header(b'Connection', b'close')
