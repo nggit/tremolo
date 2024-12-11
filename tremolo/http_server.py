@@ -62,9 +62,7 @@ class HTTPServer(HTTPProtocol):
         self.response = None
 
     async def _handle_middleware(self, func, options):
-        self.response.set_base_header()
         self.request.context.options.update(options)
-
         data = await func(request=self.request, response=self.response,
                           **self._server)
 
@@ -117,9 +115,7 @@ class HTTPServer(HTTPProtocol):
         if 'content_type' in options:
             self.response.set_content_type(options['content_type'])
 
-        self.response.set_base_header()
         self.request.context.options.update(options)
-
         agen = func(request=self.request, response=self.response,
                     **self._server)
         next_data = getattr(agen, '__anext__', False)
