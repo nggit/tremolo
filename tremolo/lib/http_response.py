@@ -62,17 +62,26 @@ class HTTPResponse(Response):
         if isinstance(value, str):
             value = value.encode('latin-1')
 
-        _name = name.lower()
+        key = name.lower()
 
-        if _name in self.headers:
-            self.headers[_name].append(name + b': ' + value)
+        if key in self.headers:
+            self.headers[key].append(name + b': ' + value)
         else:
-            self.headers[_name] = [name + b': ' + value]
+            self.headers[key] = [name + b': ' + value]
 
-    def set_base_header(self):
-        if self.headers_sent() or b'date' in self.headers:
-            return
+    def set_header(self, name, value=''):
+        if isinstance(name, str):
+            name = name.encode('latin-1')
 
+        if isinstance(value, str):
+            value = value.encode('latin-1')
+
+        if b'\n' in name or b'\n' in value:
+            raise InternalServerError
+
+        self.headers[name.lower()] = [name + b': ' + value]
+
+    def set_base_headers(self):
         self.set_header(
             b'Date',
             self.request.protocol.globals.info['server_date']
@@ -113,18 +122,6 @@ class HTTPResponse(Response):
 
         self.append_header(b'Set-Cookie', cookie)
 
-    def set_header(self, name, value=''):
-        if isinstance(name, str):
-            name = name.encode('latin-1')
-
-        if isinstance(value, str):
-            value = value.encode('latin-1')
-
-        if b'\n' in name or b'\n' in value:
-            raise InternalServerError
-
-        self.headers[name.lower()] = [name + b': ' + value]
-
     def set_status(self, status=200, message=b'OK'):
         if isinstance(message, str):
             message = message.encode('latin-1')
@@ -159,7 +156,7 @@ class HTTPResponse(Response):
 
     def get_content_type(self):
         try:
-            return self.headers.pop(b'content-type')[0][13:].lstrip()
+            return self.headers.pop(b'content-type')[0][13:].strip(b' \t')
         except KeyError:
             return b'text/html; charset=utf-8'
 
@@ -174,7 +171,7 @@ class HTTPResponse(Response):
         if self.headers_sent():
             await self.write(data, throttle=False)
         else:
-            self.set_base_header()
+            self.set_base_headers()
 
             status = self.get_status()
             content_length = len(data)
@@ -201,7 +198,6 @@ class HTTPResponse(Response):
                         k not in excludes),
                     data), throttle=False, **kwargs
             )
-
             self.headers_sent(True)
 
         self.close(keepalive=keepalive)
@@ -210,11 +206,11 @@ class HTTPResponse(Response):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
+            self.set_base_headers()
+
             if b'connection' not in self.headers:
                 # this block is executed when write() is called outside the
                 # handler/middleware. e.g. ASGI server
-                self.set_base_header()
-
                 status = self.get_status()
                 no_content = (status[0] in (204, 205, 304) or
                               100 <= status[0] < 200)
