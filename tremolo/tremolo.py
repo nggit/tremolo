@@ -26,8 +26,8 @@ from .lib.contexts import WorkerContext  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 
 _REUSEPORT_OR_REUSEADDR = {
-    True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR),
-    False: socket.SO_REUSEADDR
+    False: socket.SO_REUSEADDR,
+    True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR)
 }
 
 
