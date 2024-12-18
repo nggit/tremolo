@@ -108,7 +108,7 @@ class Tremolo:
 
         return decorator
 
-    def hook(self, name, priority=999):
+    def hook(self, name, *args, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
@@ -117,21 +117,18 @@ class Tremolo:
             self.add_hook(wrapper, name, priority)
             return wrapper
 
+        if len(args) == 1 and callable(args[0]):
+            return decorator(args[0])
+
         return decorator
 
     def on_worker_start(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.hook('worker_start')(args[0])
-
-        return self.hook('worker_start', **kwargs)
+        return self.hook('worker_start', *args, **kwargs)
 
     def on_worker_stop(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.hook('worker_stop')(args[0])
+        return self.hook('worker_stop', *args, **kwargs)
 
-        return self.hook('worker_stop', **kwargs)
-
-    def middleware(self, name, priority=999):
+    def middleware(self, name, *args, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
@@ -142,31 +139,22 @@ class Tremolo:
             )
             return wrapper
 
+        if len(args) == 1 and callable(args[0]):
+            return decorator(args[0])
+
         return decorator
 
     def on_connect(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('connect')(args[0])
-
-        return self.middleware('connect', **kwargs)
+        return self.middleware('connect', *args, **kwargs)
 
     def on_close(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('close')(args[0])
-
-        return self.middleware('close', **kwargs)
+        return self.middleware('close', *args, **kwargs)
 
     def on_request(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('request')(args[0])
-
-        return self.middleware('request', **kwargs)
+        return self.middleware('request', *args, **kwargs)
 
     def on_response(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('response')(args[0])
-
-        return self.middleware('response', **kwargs)
+        return self.middleware('response', *args, **kwargs)
 
     def getoptions(self, func):
         options = {}
