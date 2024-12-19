@@ -570,10 +570,6 @@ class Tremolo:
         if process.exitcode == 0:
             print('pid %d terminated' % process.pid)
         else:
-            # this is a workaround, especially on Windows
-            # to trigger renew socket
-            kwargs['_sock'] = None
-
             self.manager.spawn(
                 self._worker, args=args, kwargs=kwargs,
                 exit_cb=self._handle_reload
