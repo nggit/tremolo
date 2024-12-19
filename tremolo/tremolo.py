@@ -452,7 +452,7 @@ class Tremolo:
         signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
-            self.loop.run_forever()
+            self.loop.run_forever()  # until loop.stop() is called
         finally:
             try:
                 if not task.cancelled():
@@ -697,7 +697,9 @@ class Tremolo:
 
         print('-' * terminal_width)
         print('%s main (pid %d) is running ' % (server_name, os.getpid()))
-        self.manager.wait(timeout=kwargs['shutdown_timeout'])
 
-        for sock in socks.values():
-            self.close_sock(sock)
+        try:
+            self.manager.wait(timeout=kwargs['shutdown_timeout'])
+        finally:
+            for sock in socks.values():
+                self.close_sock(sock)
