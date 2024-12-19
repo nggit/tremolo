@@ -26,12 +26,12 @@ class ASGIServer(HTTPProtocol):
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
 
-        self.response = None  # set in headers_received
         self._scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},
             'root_path': self.options['_root_path'],
             'server': self.globals.info['server']
         }
+        self.response = None  # set in headers_received
         self._read = None
         self._websocket = None
         self._timer = None
