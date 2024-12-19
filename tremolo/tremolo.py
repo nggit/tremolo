@@ -49,18 +49,6 @@ class Tremolo:
         self.loop = None
         self.logger = None
 
-    def listen(self, port, host=None, **options):
-        if not isinstance(port, int):
-            # assume it's a UNIX socket path
-            host = port
-            port = None
-
-        if (host, port) in self.ports:
-            return False
-
-        self.ports[(host, port)] = options
-        return (host, port) in self.ports
-
     def route(self, path):
         if isinstance(path, int):
             return self.error(path)
@@ -157,6 +145,18 @@ class Tremolo:
         )
         self.middlewares[name].sort(key=lambda item: item[0],
                                     reverse=name in ('close', 'response'))
+
+    def listen(self, port, host=None, **options):
+        if not isinstance(port, int):
+            # assume it's a UNIX socket path
+            host = port
+            port = None
+
+        if (host, port) in self.ports:
+            return False
+
+        self.ports[(host, port)] = options
+        return (host, port) in self.ports
 
     async def _serve(self, host, port, **options):
         backlog = options.get('backlog', 100)
