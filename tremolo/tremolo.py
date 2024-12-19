@@ -63,7 +63,6 @@ class Tremolo:
         self.manager = ProcessManager()
         self.loop = None
         self.logger = None
-        self._task = None
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -484,9 +483,6 @@ class Tremolo:
             if exc:
                 self.logger.error(exc)
 
-    def _handle_shutdown(self, signum, frame):
-        self._task.cancel()
-
     def _worker(self, host, port, **kwargs):
         self.logger = logging.getLogger(mp.current_process().name)
         self.logger.setLevel(
@@ -512,17 +508,17 @@ class Tremolo:
         self.loop = getattr(module, class_name or 'new_event_loop')()
 
         asyncio.set_event_loop(self.loop)
-        self._task = self.loop.create_task(self._serve(host, port, **kwargs))
+        task = self.loop.create_task(self._serve(host, port, **kwargs))
 
-        signal.signal(signal.SIGINT, self._handle_shutdown)
-        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
+        signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
             self.loop.run_forever()
         finally:
             try:
-                if not self._task.cancelled():
-                    exc = self._task.exception()
+                if not task.cancelled():
+                    exc = task.exception()
 
                     # to avoid None, SystemExit, etc. for being printed
                     if isinstance(exc, Exception):
