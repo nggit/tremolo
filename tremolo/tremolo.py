@@ -6,7 +6,6 @@ import asyncio  # noqa: E402
 import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
-import re  # noqa: E402
 import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
@@ -16,10 +15,11 @@ from functools import wraps  # noqa: E402
 from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
-from . import __version__, handlers  # noqa: E402
+from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
+from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, log_date, memory_usage, server_date
+    file_signature, log_date, memory_usage, server_date, getoptions
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
@@ -33,22 +33,8 @@ _REUSEPORT_OR_REUSEADDR = {
 
 class Tremolo:
     def __init__(self):
-        self.routes = {
-            0: [
-                (400, handlers.error_400, {}),
-                (404, handlers.error_404, dict(status=(404, b'Not Found'),
-                                               stream=False)),
-                # must be at the very end
-                (500, handlers.error_500, {})
-            ],
-            1: [
-                (
-                    b'^/+(?:\\?.*)?$',
-                    handlers.index, dict(status=(503, b'Service Unavailable'))
-                )
-            ],
-            -1: []
-        }
+        self.manager = ProcessManager()
+        self.routes = Routes()
         self.middlewares = {
             'connect': [],
             'close': [],
@@ -60,7 +46,6 @@ class Tremolo:
             'worker_stop': []
         }
         self.ports = {}
-        self.manager = ProcessManager()
         self.loop = None
         self.logger = None
 
@@ -85,7 +70,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_route(wrapper, path, self.getoptions(func))
+            self.routes.add(wrapper, path, getoptions(func))
             return wrapper
 
         return decorator
@@ -99,7 +84,7 @@ class Tremolo:
             for i, h in enumerate(self.routes[0]):
                 if code == h[0]:
                     self.routes[0][i] = (
-                        h[0], wrapper, dict(h[2], **self.getoptions(func))
+                        h[0], wrapper, dict(h[2], **getoptions(func))
                     )
                     break
 
@@ -133,9 +118,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_middleware(
-                wrapper, name, priority, self.getoptions(func)
-            )
+            self.add_middleware(wrapper, name, priority, getoptions(func))
             return wrapper
 
         if len(args) == 1 and callable(args[0]):
@@ -155,19 +138,6 @@ class Tremolo:
     def on_response(self, *args, **kwargs):
         return self.middleware('response', *args, **kwargs)
 
-    def getoptions(self, func):
-        options = {}
-        arg_count = func.__code__.co_argcount
-
-        if func.__defaults__ is not None:
-            arg_count -= len(func.__defaults__)
-
-        for i, name in enumerate(func.__code__.co_varnames[
-                                     arg_count:func.__code__.co_argcount]):
-            options[name] = func.__defaults__[i]
-
-        return options
-
     def add_hook(self, func, name='worker_start', priority=999):
         if name not in self.hooks:
             raise ValueError('%s is not one of the: %s' %
@@ -183,42 +153,10 @@ class Tremolo:
                              (name, ', '.join(self.middlewares)))
 
         self.middlewares[name].append(
-            (priority, func, kwargs or self.getoptions(func))
+            (priority, func, kwargs or getoptions(func))
         )
         self.middlewares[name].sort(key=lambda item: item[0],
                                     reverse=name in ('close', 'response'))
-
-    def add_route(self, func, path='/', kwargs=None):
-        if not kwargs:
-            kwargs = self.getoptions(func)
-
-        if path.startswith('^') or path.endswith('$'):
-            pattern = path.encode('latin-1')
-            self.routes[-1].append((pattern, func, kwargs))
-        else:
-            path = path.split('?', 1)[0].strip('/').encode('latin-1')
-
-            if path == b'':
-                key = 1
-                pattern = self.routes[1][0][0]
-                self.routes[key] = [(pattern, func, kwargs)]
-            else:
-                parts = path.split(b'/', 254)
-                key = bytes([len(parts)]) + parts[0]
-                pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
-
-                if key in self.routes:
-                    self.routes[key].append((pattern, func, kwargs))
-                else:
-                    self.routes[key] = [(pattern, func, kwargs)]
-
-    def compile_routes(self, routes={}):
-        for key in routes:
-            for i, h in enumerate(routes[key]):
-                pattern, *handler = h
-
-                if isinstance(pattern, bytes):
-                    routes[key][i] = (re.compile(pattern), *handler)
 
     async def _serve(self, host, port, **options):
         backlog = options.get('backlog', 100)
@@ -261,7 +199,7 @@ class Tremolo:
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
-            self.compile_routes(options['_routes'])
+            options['_routes'].compile()
 
             try:
                 for _, func in self.hooks['worker_start']:
