@@ -2,7 +2,7 @@
 
 
 class KeepAliveConnections(dict):
-    def __init__(self, *args, maxlen=512, **kwargs):
+    def __init__(self, maxlen=512):
         if not isinstance(maxlen, int) or maxlen < 1:
             raise ValueError(
                 'maxlen must be an integer greater than or equal to 1, '
@@ -10,7 +10,6 @@ class KeepAliveConnections(dict):
             )
 
         self._maxlen = maxlen
-        super().__init__(*args, **kwargs)
 
     def __repr__(self):
         return self.keys().__repr__()

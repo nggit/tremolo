@@ -72,7 +72,7 @@ class TestTremoloObjects(unittest.TestCase):
         self.assertEqual(func(), b'My Page!')
         self.assertEqual(options, {})
 
-        app.compile_routes(app.routes)
+        app.routes.compile()
         pattern, func, options = app.routes[-1][-1]
 
         self.assertEqual(pattern.pattern, b'^/page/(?P<page_id>\\d+)')
