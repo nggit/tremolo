@@ -288,14 +288,14 @@ class Tremolo:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
-            options['app_dir'], base_name = os.path.split(
+            context.options['app_dir'], base_name = os.path.split(
                 os.path.abspath(path))
             module_name = os.path.splitext(base_name)[0]
 
-            if options['app_dir'] == '':
-                options['app_dir'] = os.getcwd()
+            if context.options['app_dir'] == '':
+                context.options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, options['app_dir'])
+            sys.path.insert(0, context.options['app_dir'])
             options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
@@ -385,57 +385,9 @@ class Tremolo:
             sys.stdout.buffer.write(b' (https)')
 
         print()
-        paths = [path for path in sys.path
-                 if not options['app_dir'].startswith(path)]
-        modules = {}
-        limit_memory = options.get('limit_memory', 0)
 
         try:
-            # serve forever
-            while True:
-                await asyncio.sleep(1)
-
-                # update server date
-                context.info['server_date'] = server_date()
-
-                # detect code changes
-                if 'reload' in options and options['reload']:
-                    for module in (dict(modules) or sys.modules.values()):
-                        if not hasattr(module, '__file__'):
-                            continue
-
-                        for path in paths:
-                            if (module.__file__ is None or
-                                    module.__file__.startswith(path)):
-                                break
-                        else:
-                            if not os.path.exists(module.__file__):
-                                if module in modules:
-                                    del modules[module]
-
-                                continue
-
-                            sign = file_signature(module.__file__)
-
-                            if module in modules:
-                                if modules[module] == sign:
-                                    # file not modified
-                                    continue
-
-                                modules[module] = sign
-                            else:
-                                modules[module] = sign
-                                continue
-
-                            self.logger.info('reload: %s', module.__file__)
-                            sys.exit(3)
-
-                if limit_memory > 0 and memory_usage() > limit_memory:
-                    while context.tasks:
-                        context.tasks.pop().cancel()
-
-                    self.logger.error('memory limit exceeded')
-                    sys.exit(1)
+            await self._serve_forever(context)
         except asyncio.CancelledError:
             self.logger.info('Shutting down')
 
@@ -457,6 +409,57 @@ class Tremolo:
                 await self._worker_stop(context)
             finally:
                 self.loop.stop()
+
+    async def _serve_forever(self, context):
+        limit_memory = context.options.get('limit_memory', 0)
+        paths = [path for path in sys.path
+                 if not context.options['app_dir'].startswith(path)]
+        modules = {}
+
+        while True:
+            await asyncio.sleep(1)
+
+            # update server date
+            context.info['server_date'] = server_date()
+
+            # detect code changes
+            if 'reload' in context.options and context.options['reload']:
+                for module in (dict(modules) or sys.modules.values()):
+                    if not hasattr(module, '__file__'):
+                        continue
+
+                    for path in paths:
+                        if (module.__file__ is None or
+                                module.__file__.startswith(path)):
+                            break
+                    else:
+                        if not os.path.exists(module.__file__):
+                            if module in modules:
+                                del modules[module]
+
+                            continue
+
+                        sign = file_signature(module.__file__)
+
+                        if module in modules:
+                            if modules[module] == sign:
+                                # file not modified
+                                continue
+
+                            modules[module] = sign
+                        else:
+                            modules[module] = sign
+                            continue
+
+                        self.logger.info('reload: %s', module.__file__)
+                        sys.exit(3)
+
+            if limit_memory > 0 and memory_usage() > limit_memory:
+                while context.tasks:
+                    context.tasks.pop().cancel()
+
+                self.logger.error('memory limit exceeded')
+                sys.exit(1)
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
