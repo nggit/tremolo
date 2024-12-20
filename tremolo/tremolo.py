@@ -6,7 +6,6 @@ import asyncio  # noqa: E402
 import logging  # noqa: E402
 import multiprocessing as mp  # noqa: E402
 import os  # noqa: E402
-import re  # noqa: E402
 import signal  # noqa: E402
 import socket  # noqa: E402
 import ssl  # noqa: E402
@@ -16,10 +15,11 @@ from functools import wraps  # noqa: E402
 from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
-from . import __version__, handlers  # noqa: E402
+from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
+from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, log_date, memory_usage, server_date
+    file_signature, log_date, memory_usage, server_date, getoptions
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
@@ -33,22 +33,8 @@ _REUSEPORT_OR_REUSEADDR = {
 
 class Tremolo:
     def __init__(self):
-        self.routes = {
-            0: [
-                (400, handlers.error_400, {}),
-                (404, handlers.error_404, dict(status=(404, b'Not Found'),
-                                               stream=False)),
-                # must be at the very end
-                (500, handlers.error_500, {})
-            ],
-            1: [
-                (
-                    b'^/+(?:\\?.*)?$',
-                    handlers.index, dict(status=(503, b'Service Unavailable'))
-                )
-            ],
-            -1: []
-        }
+        self.manager = ProcessManager()
+        self.routes = Routes()
         self.middlewares = {
             'connect': [],
             'close': [],
@@ -60,22 +46,8 @@ class Tremolo:
             'worker_stop': []
         }
         self.ports = {}
-        self.manager = ProcessManager()
         self.loop = None
         self.logger = None
-        self._task = None
-
-    def listen(self, port, host=None, **options):
-        if not isinstance(port, int):
-            # assume it's a UNIX socket path
-            host = port
-            port = None
-
-        if (host, port) in self.ports:
-            return False
-
-        self.ports[(host, port)] = options
-        return (host, port) in self.ports
 
     def route(self, path):
         if isinstance(path, int):
@@ -86,7 +58,7 @@ class Tremolo:
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_route(wrapper, path, self.getoptions(func))
+            self.routes.add(wrapper, path, getoptions(func))
             return wrapper
 
         return decorator
@@ -100,7 +72,7 @@ class Tremolo:
             for i, h in enumerate(self.routes[0]):
                 if code == h[0]:
                     self.routes[0][i] = (
-                        h[0], wrapper, dict(h[2], **self.getoptions(func))
+                        h[0], wrapper, dict(h[2], **getoptions(func))
                     )
                     break
 
@@ -108,7 +80,7 @@ class Tremolo:
 
         return decorator
 
-    def hook(self, name, priority=999):
+    def hook(self, name, *args, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
@@ -117,69 +89,42 @@ class Tremolo:
             self.add_hook(wrapper, name, priority)
             return wrapper
 
+        if len(args) == 1 and callable(args[0]):
+            return decorator(args[0])
+
         return decorator
 
     def on_worker_start(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.hook('worker_start')(args[0])
-
-        return self.hook('worker_start', **kwargs)
+        return self.hook('worker_start', *args, **kwargs)
 
     def on_worker_stop(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.hook('worker_stop')(args[0])
+        return self.hook('worker_stop', *args, **kwargs)
 
-        return self.hook('worker_stop', **kwargs)
-
-    def middleware(self, name, priority=999):
+    def middleware(self, name, *args, priority=999):
         def decorator(func):
             @wraps(func)
             def wrapper(**kwargs):
                 return func(**kwargs)
 
-            self.add_middleware(
-                wrapper, name, priority, self.getoptions(func)
-            )
+            self.add_middleware(wrapper, name, priority, getoptions(func))
             return wrapper
+
+        if len(args) == 1 and callable(args[0]):
+            return decorator(args[0])
 
         return decorator
 
     def on_connect(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('connect')(args[0])
-
-        return self.middleware('connect', **kwargs)
+        return self.middleware('connect', *args, **kwargs)
 
     def on_close(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('close')(args[0])
-
-        return self.middleware('close', **kwargs)
+        return self.middleware('close', *args, **kwargs)
 
     def on_request(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('request')(args[0])
-
-        return self.middleware('request', **kwargs)
+        return self.middleware('request', *args, **kwargs)
 
     def on_response(self, *args, **kwargs):
-        if len(args) == 1 and callable(args[0]):
-            return self.middleware('response')(args[0])
-
-        return self.middleware('response', **kwargs)
-
-    def getoptions(self, func):
-        options = {}
-        arg_count = func.__code__.co_argcount
-
-        if func.__defaults__ is not None:
-            arg_count -= len(func.__defaults__)
-
-        for i, name in enumerate(func.__code__.co_varnames[
-                                     arg_count:func.__code__.co_argcount]):
-            options[name] = func.__defaults__[i]
-
-        return options
+        return self.middleware('response', *args, **kwargs)
 
     def add_hook(self, func, name='worker_start', priority=999):
         if name not in self.hooks:
@@ -196,42 +141,22 @@ class Tremolo:
                              (name, ', '.join(self.middlewares)))
 
         self.middlewares[name].append(
-            (priority, func, kwargs or self.getoptions(func))
+            (priority, func, kwargs or getoptions(func))
         )
         self.middlewares[name].sort(key=lambda item: item[0],
                                     reverse=name in ('close', 'response'))
 
-    def add_route(self, func, path='/', kwargs=None):
-        if not kwargs:
-            kwargs = self.getoptions(func)
+    def listen(self, port, host=None, **options):
+        if not isinstance(port, int):
+            # assume it's a UNIX socket path
+            host = port
+            port = None
 
-        if path.startswith('^') or path.endswith('$'):
-            pattern = path.encode('latin-1')
-            self.routes[-1].append((pattern, func, kwargs))
-        else:
-            path = path.split('?', 1)[0].strip('/').encode('latin-1')
+        if (host, port) in self.ports:
+            return False
 
-            if path == b'':
-                key = 1
-                pattern = self.routes[1][0][0]
-                self.routes[key] = [(pattern, func, kwargs)]
-            else:
-                parts = path.split(b'/', 254)
-                key = bytes([len(parts)]) + parts[0]
-                pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
-
-                if key in self.routes:
-                    self.routes[key].append((pattern, func, kwargs))
-                else:
-                    self.routes[key] = [(pattern, func, kwargs)]
-
-    def compile_routes(self, routes={}):
-        for key in routes:
-            for i, h in enumerate(routes[key]):
-                pattern, *handler = h
-
-                if isinstance(pattern, bytes):
-                    routes[key][i] = (re.compile(pattern), *handler)
+        self.ports[(host, port)] = options
+        return (host, port) in self.ports
 
     async def _serve(self, host, port, **options):
         backlog = options.get('backlog', 100)
@@ -274,7 +199,7 @@ class Tremolo:
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
-            self.compile_routes(options['_routes'])
+            options['_routes'].compile()
 
             try:
                 for _, func in self.hooks['worker_start']:
@@ -300,14 +225,14 @@ class Tremolo:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
-            options['app_dir'], base_name = os.path.split(
+            context.options['app_dir'], base_name = os.path.split(
                 os.path.abspath(path))
             module_name = os.path.splitext(base_name)[0]
 
-            if options['app_dir'] == '':
-                options['app_dir'] = os.getcwd()
+            if context.options['app_dir'] == '':
+                context.options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, options['app_dir'])
+            sys.path.insert(0, context.options['app_dir'])
             options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
@@ -397,57 +322,9 @@ class Tremolo:
             sys.stdout.buffer.write(b' (https)')
 
         print()
-        paths = [path for path in sys.path
-                 if not options['app_dir'].startswith(path)]
-        modules = {}
-        limit_memory = options.get('limit_memory', 0)
 
         try:
-            # serve forever
-            while True:
-                await asyncio.sleep(1)
-
-                # update server date
-                context.info['server_date'] = server_date()
-
-                # detect code changes
-                if 'reload' in options and options['reload']:
-                    for module in (dict(modules) or sys.modules.values()):
-                        if not hasattr(module, '__file__'):
-                            continue
-
-                        for path in paths:
-                            if (module.__file__ is None or
-                                    module.__file__.startswith(path)):
-                                break
-                        else:
-                            if not os.path.exists(module.__file__):
-                                if module in modules:
-                                    del modules[module]
-
-                                continue
-
-                            sign = file_signature(module.__file__)
-
-                            if module in modules:
-                                if modules[module] == sign:
-                                    # file not modified
-                                    continue
-
-                                modules[module] = sign
-                            else:
-                                modules[module] = sign
-                                continue
-
-                            self.logger.info('reload: %s', module.__file__)
-                            sys.exit(3)
-
-                if limit_memory > 0 and memory_usage() > limit_memory:
-                    while context.tasks:
-                        context.tasks.pop().cancel()
-
-                    self.logger.error('memory limit exceeded')
-                    sys.exit(1)
+            await self._serve_forever(context)
         except asyncio.CancelledError:
             self.logger.info('Shutting down')
 
@@ -469,6 +346,57 @@ class Tremolo:
                 await self._worker_stop(context)
             finally:
                 self.loop.stop()
+
+    async def _serve_forever(self, context):
+        limit_memory = context.options.get('limit_memory', 0)
+        paths = [path for path in sys.path
+                 if not context.options['app_dir'].startswith(path)]
+        modules = {}
+
+        while True:
+            await asyncio.sleep(1)
+
+            # update server date
+            context.info['server_date'] = server_date()
+
+            # detect code changes
+            if 'reload' in context.options and context.options['reload']:
+                for module in (dict(modules) or sys.modules.values()):
+                    if not hasattr(module, '__file__'):
+                        continue
+
+                    for path in paths:
+                        if (module.__file__ is None or
+                                module.__file__.startswith(path)):
+                            break
+                    else:
+                        if not os.path.exists(module.__file__):
+                            if module in modules:
+                                del modules[module]
+
+                            continue
+
+                        sign = file_signature(module.__file__)
+
+                        if module in modules:
+                            if modules[module] == sign:
+                                # file not modified
+                                continue
+
+                            modules[module] = sign
+                        else:
+                            modules[module] = sign
+                            continue
+
+                        self.logger.info('reload: %s', module.__file__)
+                        sys.exit(3)
+
+            if limit_memory > 0 and memory_usage() > limit_memory:
+                while context.tasks:
+                    context.tasks.pop().cancel()
+
+                self.logger.error('memory limit exceeded')
+                sys.exit(1)
 
     async def _worker_stop(self, context):
         if context.options['app'] is None:
@@ -492,9 +420,6 @@ class Tremolo:
 
             if exc:
                 self.logger.error(exc)
-
-    def _handle_shutdown(self, signum, frame):
-        self._task.cancel()
 
     def _worker(self, host, port, **kwargs):
         self.logger = logging.getLogger(mp.current_process().name)
@@ -521,17 +446,17 @@ class Tremolo:
         self.loop = getattr(module, class_name or 'new_event_loop')()
 
         asyncio.set_event_loop(self.loop)
-        self._task = self.loop.create_task(self._serve(host, port, **kwargs))
+        task = self.loop.create_task(self._serve(host, port, **kwargs))
 
-        signal.signal(signal.SIGINT, self._handle_shutdown)
-        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
+        signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
-            self.loop.run_forever()
+            self.loop.run_forever()  # until loop.stop() is called
         finally:
             try:
-                if not self._task.cancelled():
-                    exc = self._task.exception()
+                if not task.cancelled():
+                    exc = task.exception()
 
                     # to avoid None, SystemExit, etc. for being printed
                     if isinstance(exc, Exception):
@@ -645,10 +570,6 @@ class Tremolo:
         if process.exitcode == 0:
             print('pid %d terminated' % process.pid)
         else:
-            # this is a workaround, especially on Windows
-            # to trigger renew socket
-            kwargs['_sock'] = None
-
             self.manager.spawn(
                 self._worker, args=args, kwargs=kwargs,
                 exit_cb=self._handle_reload
@@ -772,7 +693,9 @@ class Tremolo:
 
         print('-' * terminal_width)
         print('%s main (pid %d) is running ' % (server_name, os.getpid()))
-        self.manager.wait(timeout=kwargs['shutdown_timeout'])
 
-        for sock in socks.values():
-            self.close_sock(sock)
+        try:
+            self.manager.wait(timeout=kwargs['shutdown_timeout'])
+        finally:
+            for sock in socks.values():
+                self.close_sock(sock)

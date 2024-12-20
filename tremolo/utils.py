@@ -2,7 +2,7 @@
 
 __all__ = (
     'file_signature', 'html_escape', 'log_date', 'memory_usage',
-    'server_date', 'parse_fields', 'parse_args'
+    'server_date', 'getoptions', 'parse_fields', 'parse_args'
 )
 
 import os  # noqa: E402
@@ -49,6 +49,20 @@ def memory_usage(pid=0):
 def server_date():
     return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
+
+
+def getoptions(func):
+    options = {}
+    arg_count = func.__code__.co_argcount
+
+    if func.__defaults__ is not None:
+        arg_count -= len(func.__defaults__)
+
+    for i, name in enumerate(func.__code__.co_varnames[
+                                 arg_count:func.__code__.co_argcount]):
+        options[name] = func.__defaults__[i]
+
+    return options
 
 
 def parse_fields(data, separator=b';', max_fields=100):
