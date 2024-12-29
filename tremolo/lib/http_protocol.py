@@ -20,7 +20,7 @@ class HTTPProtocol(asyncio.Protocol):
                  'logger',
                  'fileno',
                  'queue',
-                 'handler',
+                 'handlers',
                  'request',
                  '_watermarks',
                  '_header_buf',
@@ -34,7 +34,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.logger = logger
         self.fileno = -1
         self.queue = None
-        self.handler = None
+        self.handlers = set()
         self.request = None
 
         self._watermarks = {'high': 65536, 'low': 8192}
@@ -101,12 +101,12 @@ class HTTPProtocol(asyncio.Protocol):
         if exc:
             if isinstance(exc, HTTPException):
                 self.transport.write(
-                    b'HTTP/1.0 %d %s\r\nContent-Type: %s\r\n\r\n%s' %
+                    b'HTTP/1.0 %d %s\r\nContent-Type: %s\r\n\r\n' %
                     (exc.code,
                      exc.message.encode(exc.encoding),
-                     exc.content_type.encode(exc.encoding),
-                     str(exc).encode(exc.encoding))
+                     exc.content_type.encode(exc.encoding))
                 )
+                self.transport.write(str(exc).encode(exc.encoding))
 
             self.print_exception(exc, 'close')
 
@@ -186,21 +186,23 @@ class HTTPProtocol(asyncio.Protocol):
     async def error_received(self, exc):
         raise NotImplementedError
 
-    def handler_timeout(self):
+    def handlers_timeout(self):
         if self.request is not None and self.request.upgraded:
             return
 
-        self.handler.cancel()
-        self.logger.error(
-            'handler timeout (app_handler_timeout=%g, app_close_timeout=%g)',
-            self.options['app_handler_timeout'],
-            self.options['app_close_timeout']
-        )
+        while self.handlers:
+            self.handlers.pop().cancel()
+            self.logger.error(
+                'handler timeout '
+                '(app_handler_timeout=%g, app_close_timeout=%g)',
+                self.options['app_handler_timeout'],
+                self.options['app_close_timeout']
+            )
 
     def set_handler_timeout(self, timeout):
-        if self.handler is not None and not self.handler.done():
+        if self.handlers:
             return self.loop.call_at(
-                self.loop.time() + timeout, self.handler_timeout
+                self.loop.time() + timeout, self.handlers_timeout
             )
 
     def print_exception(self, exc, *args):
@@ -265,9 +267,7 @@ class HTTPProtocol(asyncio.Protocol):
                     # by checking this state
                     self.request.http_continue = True
             else:
-                # because put_to_queue may also resume reading
-                # using put_nowait directly won't
-                self.queue[0].put_nowait(b'')
+                await self.put_to_queue(b'')
 
             if self.request.has_body or header.body:
                 # the initial body that accompanies the header
@@ -278,9 +278,8 @@ class HTTPProtocol(asyncio.Protocol):
 
             # successfully got header,
             # clear either the request or keepalive timeout
-            for key, fut in self._waiters.items():
-                if key in ('request', 'keepalive') and not fut.done():
-                    fut.set_result(None)
+            if not self._waiters['request'].done():
+                self._waiters['request'].set_result(None)
 
             if self.request is not None:
                 timer = self.set_handler_timeout(
@@ -318,7 +317,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             if 1 < header_size <= self.options['client_max_header_size']:
                 # this will keep blocking on bodyless requests forever, unless
-                # _handle_keepalive is called; indirectly via Response.close
+                # Response.close is called (resumed in _handle_keepalive)
                 self.transport.pause_reading()
 
                 header = HTTPHeader(self._header_buf,
@@ -326,30 +325,30 @@ class HTTPProtocol(asyncio.Protocol):
                                     excludes=[b'proxy'])
 
                 if header.is_request:
-                    self.handler = self.create_background_task(
+                    task = self.create_background_task(
                         self._handle_request(header)
                     )
+                    self.handlers.add(task)
+                    task.add_done_callback(self.handlers.discard)
                 else:
                     self.close(BadRequest('bad request: not a request'))
 
                 self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
                 self.close(BadRequest('request header too large'))
-            elif not (
-                    header_size == 1 and len(self._header_buf) <=
-                    self.options['client_max_header_size']):
+            elif not (header_size == 1 and len(self._header_buf) <=
+                      self.options['client_max_header_size']):
                 self.close(BadRequest('bad request'))
 
             return
 
+        # resumed in put_to_queue or _handle_keepalive
         self.transport.pause_reading()
 
         if 'receive' in self._waiters:
             waiter = self._waiters['receive']
-        elif 'request' in self._waiters:
-            waiter = self._waiters['request']
         else:
-            waiter = self._waiters['keepalive']
+            waiter = self._waiters['request']
 
         self._waiters['receive'] = self.create_task(
             self._receive_data(data, waiter)
@@ -379,7 +378,7 @@ class HTTPProtocol(asyncio.Protocol):
                     if self.request is not None:
                         if (self.request.http_keepalive and
                                 self._header_buf is None):
-                            self._handle_keepalive()
+                            await self._handle_keepalive()
                             continue
 
                         self.request.clear_body()
@@ -417,8 +416,8 @@ class HTTPProtocol(asyncio.Protocol):
                 self.close(exc)
                 break
 
-    def _handle_keepalive(self):
-        if 'request' in self._waiters:
+    async def _handle_keepalive(self):
+        if len(self.handlers) == 1:
             # store this keepalive connection
             self.globals.connections.add(self)
 
@@ -432,21 +431,24 @@ class HTTPProtocol(asyncio.Protocol):
         if self.request.http_continue:
             self.request.http_continue = False
         elif self.request.upgraded:
-            if 'request' in self._waiters:
-                self._waiters['receive'] = self._waiters.pop('request')
-            else:
+            if 'request' not in self._waiters:
                 self.close()
+                return
+
+            self._waiters.setdefault('receive', self._waiters.pop('request'))
         else:
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
+            if 'receive' in self._waiters:
+                await self._waiters.pop('receive')
+
             self._header_buf = bytearray()
             self.request.clear_body()
-            self._waiters.clear()
 
-            self._waiters['keepalive'] = self.loop.create_future()
+            self._waiters['request'] = self.loop.create_future()
 
             self.add_close_callback(self.create_background_task(
-                self.set_timeout(self._waiters['keepalive'],
+                self.set_timeout(self._waiters['request'],
                                  timeout=self.options['keepalive_timeout'],
                                  timeout_cb=self.keepalive_timeout)
             ).cancel)
