@@ -194,6 +194,7 @@ class Tremolo:
             maxlen=options.get('keepalive_connections', 512)
         )
         context = WorkerContext()
+        context.update(connections=connections)
         context.options.update(options)
 
         if options['app'] is None:
@@ -297,7 +298,6 @@ class Tremolo:
                            app_handler_timeout=options.get(
                                'app_handler_timeout', 120
                            ),
-                           _connections=connections,
                            _app=options['app'],
                            _app_close_timeout=options.get(
                                'app_close_timeout', 30

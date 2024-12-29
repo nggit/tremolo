@@ -49,6 +49,10 @@ class WorkerContext(Context):
     def tasks(self):
         return self.__dict__['tasks']
 
+    @property
+    def connections(self):
+        return self.__dict__.get('connections', None)
+
 
 class ConnectionContext(Context):
     def __init__(self):
