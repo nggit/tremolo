@@ -187,14 +187,21 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     def handler_timeout(self):
-        if (self.request is None or self.request.upgraded or
-                self.handler is None):
+        if self.request is not None and self.request.upgraded:
             return
 
         self.handler.cancel()
-        self.logger.error('handler timeout after %gs. consider increasing '
-                          'the value of app_handler_timeout',
-                          self.options['app_handler_timeout'])
+        self.logger.error(
+            'handler timeout (app_handler_timeout=%g, app_close_timeout=%g)',
+            self.options['app_handler_timeout'],
+            self.options['app_close_timeout']
+        )
+
+    def set_handler_timeout(self, timeout):
+        if self.handler is not None and not self.handler.done():
+            return self.loop.call_at(
+                self.loop.time() + timeout, self.handler_timeout
+            )
 
     def print_exception(self, exc, *args):
         self.logger.error(
@@ -275,16 +282,15 @@ class HTTPProtocol(asyncio.Protocol):
                 if key in ('request', 'keepalive') and not fut.done():
                     fut.set_result(None)
 
-            timer = self.loop.call_at(
-                self.loop.time() + self.options['app_handler_timeout'],
-                self.handler_timeout
-            )
+            if self.request is not None:
+                timer = self.set_handler_timeout(
+                    self.options['app_handler_timeout']
+                )
 
-            try:
-                if self.request is not None:
+                try:
                     await self.headers_received(response)
-            finally:
-                timer.cancel()
+                finally:
+                    timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
             data = None
 
@@ -452,6 +458,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.transport.resume_reading()
 
     def connection_lost(self, _):
+        self.set_handler_timeout(self.options['app_close_timeout'])
         self.globals.connections.discard(self)
 
         while self.tasks:
@@ -475,5 +482,4 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.context.update(transport=None)
         self.request = None
-        self.handler = None
         self._header_buf = None

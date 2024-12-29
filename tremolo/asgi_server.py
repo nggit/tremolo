@@ -21,7 +21,7 @@ _WSS_OR_WS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('response', '_scope', '_read', '_websocket', '_timer')
+    __slots__ = ('response', '_scope', '_read', '_websocket')
 
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
@@ -34,7 +34,6 @@ class ASGIServer(HTTPProtocol):
         self.response = None  # set in headers_received
         self._read = None
         self._websocket = None
-        self._timer = None
 
     def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
@@ -84,9 +83,6 @@ class ASGIServer(HTTPProtocol):
                 exc = WebSocketServerClosed(cause=exc)
 
             await response.handle_exception(exc)
-        finally:
-            if self._timer is not None:
-                self._timer.cancel()
 
     async def error_received(self, exc):
         if self.request is not None and self.response is not None:
@@ -95,19 +91,10 @@ class ASGIServer(HTTPProtocol):
             )
 
     def connection_lost(self, exc):
-        if self.handler is not None and not self.handler.done():
-            self._set_app_close_timeout()
-
         super().connection_lost(exc)
+
         self.response = None
         self._scope = None
-
-    def _set_app_close_timeout(self):
-        if self._timer is None:
-            self._timer = self.loop.call_at(
-                self.loop.time() + self.options['_app_close_timeout'],
-                self.handler.cancel
-            )
 
     async def receive(self):
         if self._scope['type'] == 'websocket':
@@ -140,7 +127,7 @@ class ASGIServer(HTTPProtocol):
                 if not (self._websocket is None or self.request is None):
                     self.print_exception(exc)
 
-                self._set_app_close_timeout()
+                self.set_handler_timeout(self.options['app_close_timeout'])
                 return {
                     'type': 'websocket.disconnect',
                     'code': code
@@ -169,7 +156,7 @@ class ASGIServer(HTTPProtocol):
                     isinstance(exc, StopAsyncIteration)):
                 self.print_exception(exc)
 
-            self._set_app_close_timeout()
+            self.set_handler_timeout(self.options['app_close_timeout'])
             return {'type': 'http.disconnect'}
 
     async def send(self, data):

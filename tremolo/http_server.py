@@ -53,7 +53,7 @@ class HTTPServer(HTTPProtocol):
         if self._middlewares['close']:
             task = self.create_background_task(self._connection_lost(exc))
             self.loop.call_at(
-                self.loop.time() + self.options['_app_close_timeout'],
+                self.loop.time() + self.options['app_close_timeout'],
                 task.cancel
             )
         else:
