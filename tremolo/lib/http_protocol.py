@@ -141,26 +141,30 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(self, data, i=0, rate=1048576, buffer_size=16384):
-        mv = memoryview(data)
+    async def put_to_queue(self, data, i=0, rate=-1, buffer_size=16384):
+        if data:
+            mv = memoryview(data)
 
-        while mv and self.queue is not None:
-            self.queue[i].put_nowait(mv[:buffer_size].tobytes())
-            queue_size = self.queue[i].qsize()
+            while mv and self.queue is not None:
+                self.queue[i].put_nowait(mv[:buffer_size].tobytes())
+                queue_size = self.queue[i].qsize()
 
-            if queue_size > self.options['max_queue_size']:
-                self.logger.error('%d exceeds the value of max_queue_size',
-                                  queue_size)
-                self.close()
-                return
+                if queue_size > self.options['max_queue_size']:
+                    self.logger.error('%d exceeds the value of max_queue_size',
+                                      queue_size)
+                    self.close()
+                    return
 
-            await asyncio.sleep(1 / (rate / max(queue_size, 1) /
-                                     mv[:buffer_size].nbytes))
-            mv = mv[buffer_size:]
+                if rate > 0:
+                    await asyncio.sleep(1 / (rate / max(queue_size, 1) /
+                                             mv[:buffer_size].nbytes))
+                mv = mv[buffer_size:]
+        else:
+            self.queue[i].put_nowait(data)
 
         # maybe resume reading, or close
         if i == 0 and self.transport is not None and self.request is not None:
-            if self.request.upgraded:
+            if not data or self.request.upgraded:
                 self.transport.resume_reading()
                 return
 
@@ -171,7 +175,8 @@ class HTTPProtocol(asyncio.Protocol):
                     self.queue is not None):
                 self.queue[i].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
-                self.transport.resume_reading()
+                if self.request.has_body:
+                    self.transport.resume_reading()
             else:
                 self.close(BadRequest('payload too large'))
 
@@ -409,9 +414,9 @@ class HTTPProtocol(asyncio.Protocol):
     def _handle_keepalive(self):
         if 'request' in self._waiters:
             # store this keepalive connection
-            self.options['_connections'].add(self)
+            self.globals.connections.add(self)
 
-        if self not in self.options['_connections']:
+        if self not in self.globals.connections:
             self.logger.info(
                 'a keepalive connection is kicked out of the list'
             )
@@ -447,7 +452,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.transport.resume_reading()
 
     def connection_lost(self, _):
-        self.options['_connections'].discard(self)
+        self.globals.connections.discard(self)
 
         while self.tasks:
             task = self.tasks.pop()

@@ -38,5 +38,5 @@ class SSE:
         await self.response.write(b'data: %s\n\n' % data)
 
     async def close(self):
-        await self.response.write(b'', throttle=False)
+        await self.response.write(b'')
         self.response.close(keepalive=True)

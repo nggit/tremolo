@@ -173,15 +173,14 @@ class WebSocket:
 
     async def send(self, payload_data, fin=1, opcode=None):
         await self.response.send(
-            __class__.create_frame(payload_data, fin=fin, opcode=opcode),
-            throttle=False
+            __class__.create_frame(payload_data, fin=fin, opcode=opcode)
         )
 
     def _ping(self):
         # ping only if this connection is still listed,
         # otherwise let the recv timeout drop it
-        if self.protocol in self.protocol.options['_connections']:
-            self.protocol.loop.create_task(self.ping())
+        if self.protocol in self.protocol.globals.connections:
+            self.protocol.create_task(self.ping())
 
     async def ping(self, data=b''):
         await self.send(data, opcode=9)
