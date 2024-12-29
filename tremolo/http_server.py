@@ -211,7 +211,7 @@ class HTTPServer(HTTPProtocol):
                     )
                 except StopAsyncIteration:
                     await self.response.write(
-                        b'', throttle=False, buffer_min_size=buffer_min_size
+                        b'', buffer_min_size=buffer_min_size
                     )
                     break
         else:
@@ -253,7 +253,7 @@ class HTTPServer(HTTPProtocol):
                                           rate=options['rate'],
                                           buffer_size=options['buffer_size'])
 
-            await self.response.write(b'', throttle=False)
+            await self.response.write(b'')
 
         self.response.close(keepalive=True)
 

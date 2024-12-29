@@ -169,7 +169,7 @@ class HTTPResponse(Response):
 
     async def end(self, data=b'', keepalive=True, **kwargs):
         if self.headers_sent():
-            await self.write(data, throttle=False)
+            await self.write(data)
         else:
             self.set_base_headers()
 
@@ -196,7 +196,7 @@ class HTTPResponse(Response):
                     b'\r\n'.join(
                         b'\r\n'.join(v) for k, v in self.headers.items() if
                         k not in excludes),
-                    data), throttle=False, **kwargs
+                    data), **kwargs
             )
             self.headers_sent(True)
 
@@ -260,7 +260,7 @@ class HTTPResponse(Response):
             await self.send(
                 b' '.join(self.headers.pop(b'_line')) + b'\r\n' +
                 b'\r\n'.join(b'\r\n'.join(v) for v in self.headers.values()) +
-                b'\r\n\r\n', throttle=False
+                b'\r\n\r\n'
             )
             self.headers_sent(True)
 

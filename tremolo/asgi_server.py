@@ -233,12 +233,12 @@ class ASGIServer(HTTPProtocol):
                 if 'body' in data and data['body'] != b'':
                     await self.response.write(
                         data['body'],
-                        throttle=self.response.headers_sent(),
+                        rate=self.options['download_rate'],
                         buffer_size=self.options['buffer_size']
                     )
 
                 if 'more_body' not in data or data['more_body'] is False:
-                    await self.response.write(b'', throttle=False)
+                    await self.response.write(b'')
                     self.response.close(keepalive=True)
                     self._read = None
             elif data['type'] == 'websocket.send':
