@@ -187,17 +187,15 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     def handlers_timeout(self):
-        if self.request is not None and self.request.upgraded:
-            return
-
-        while self.handlers:
-            self.handlers.pop().cancel()
-            self.logger.error(
-                'handler timeout '
-                '(app_handler_timeout=%g, app_close_timeout=%g)',
-                self.options['app_handler_timeout'],
-                self.options['app_close_timeout']
-            )
+        if self.request is None or not self.request.upgraded:
+            while self.handlers:
+                self.handlers.pop().cancel()
+                self.logger.error(
+                    'handler timeout '
+                    '(app_handler_timeout=%g, app_close_timeout=%g)',
+                    self.options['app_handler_timeout'],
+                    self.options['app_close_timeout']
+                )
 
     def set_handler_timeout(self, timeout):
         if self.handlers:
