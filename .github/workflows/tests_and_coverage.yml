@@ -22,20 +22,23 @@ jobs:
           - '3.7'
           - '3.6'
           - 'pypy3.10'
-        os: ['ubuntu-20.04', 'windows-latest']
+        os: ['ubuntu-20.04', 'windows-latest', 'macos-latest']
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        if: ${{ !startsWith(matrix.os, 'macos-') || matrix.python_version == '3.13' }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python_version }}
+        if: ${{ !startsWith(matrix.os, 'macos-') || matrix.python_version == '3.13' }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --upgrade coverage
+        if: ${{ !startsWith(matrix.os, 'macos-') || matrix.python_version == '3.13' }}
 
       - name: Lint
         run: |
@@ -47,14 +50,16 @@ jobs:
 
       - name: Run tests
         run: python alltests.py
-        if: ${{ matrix.python_version != '3.13' }}
+        if: |
+          matrix.python_version != '3.13' && !startsWith(matrix.os, 'macos-') ||
+          matrix.python_version == '3.13' && startsWith(matrix.os, 'macos-')
 
       - name: Run tests with coverage
         run: |
           python -m coverage run alltests.py
           python -m coverage combine
           mkdir artifact && mv .coverage artifact/.coverage.${{ matrix.os }}
-        if: ${{ matrix.python_version == '3.13' && !startsWith(matrix.os, 'windows-') }}
+        if: ${{ matrix.python_version == '3.13' && startsWith(matrix.os, 'ubuntu-') }}
 
       - name: Run tests with coverage on Windows
         run: |
@@ -68,7 +73,7 @@ jobs:
         with:
           path: artifact
           include-hidden-files: true
-        if: ${{ matrix.python_version == '3.13' }}
+        if: ${{ matrix.python_version == '3.13' && !startsWith(matrix.os, 'macos-') }}
 
   report:
     name: Upload coverage to SonarCloud Scan
