@@ -351,12 +351,15 @@ async def sse_handler(sse=None, **_):
 
 
 @app.route('/timeouts')
-async def timeouts(request, **_):
+async def timeouts(request, response, **_):
     if request.query_string == b'recv':
         # attempt to read body on a GET request
         # should raise a TimeoutError and ended up with a RequestTimeout
         await request.recv(100)
     elif request.query_string == b'handler':
+        await asyncio.sleep(10)
+    elif request.query_string == b'close':
+        response.close()
         await asyncio.sleep(10)
 
 
@@ -371,8 +374,8 @@ async def reload(request, **_):
         os.utime(TEST_FILE, (mtime, mtime))
 
 # test multiple ports
-app.listen(HTTP_PORT + 1, request_timeout=2, keepalive_timeout=2,
-           app_handler_timeout=1)
+app.listen(HTTP_PORT + 1, request_timeout=1, keepalive_timeout=2,
+           app_handler_timeout=2, app_close_timeout=0)
 app.listen(HTTP_PORT + 2)
 
 # test unix socket
