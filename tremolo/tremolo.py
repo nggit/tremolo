@@ -202,17 +202,13 @@ class Tremolo:
 
             options['_routes'].compile()
 
-            try:
-                for _, func in self.hooks['worker_start']:
-                    if (await func(globals=context,
-                                   context=context,
-                                   app=self,
-                                   loop=self.loop,
-                                   logger=self.logger)):
-                        break
-            except Exception as exc:
-                self.loop.stop()
-                raise exc
+            for _, func in self.hooks['worker_start']:
+                if (await func(globals=context,
+                               context=context,
+                               app=self,
+                               loop=self.loop,
+                               logger=self.logger)):
+                    break
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
@@ -258,7 +254,6 @@ class Tremolo:
             )
 
             if exc:
-                self.loop.stop()
                 raise exc
 
         sockname = sock.getsockname()
@@ -338,14 +333,11 @@ class Tremolo:
         finally:
             server.close()
 
-            try:
-                while context.tasks:
-                    await context.tasks.pop()
+            while context.tasks:
+                await context.tasks.pop()
 
-                await server.wait_closed()
-                await self._worker_stop(context)
-            finally:
-                self.loop.stop()
+            await server.wait_closed()
+            await self._worker_stop(context)
 
     async def _serve_forever(self, context):
         limit_memory = context.options.get('limit_memory', 0)
@@ -448,21 +440,20 @@ class Tremolo:
         asyncio.set_event_loop(self.loop)
         task = self.loop.create_task(self._serve(host, port, **kwargs))
 
+        task.add_done_callback(lambda fut: self.loop.stop())
         signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
         signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
             self.loop.run_forever()  # until loop.stop() is called
         finally:
-            try:
-                if not task.cancelled():
-                    exc = task.exception()
+            self.loop.close()
 
-                    # to avoid None, SystemExit, etc. for being printed
-                    if isinstance(exc, Exception):
-                        self.logger.error(exc)
-            finally:
-                self.loop.close()
+            if not task.cancelled():
+                exc = task.exception()
+
+                if exc:
+                    raise exc
 
     def create_sock(self, host, port, reuse_port=True):
         try:
