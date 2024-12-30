@@ -281,15 +281,15 @@ class HTTPProtocol(asyncio.Protocol):
             if not self._waiters['request'].done():
                 self._waiters['request'].set_result(None)
 
-            if self.request is not None:
-                timer = self.set_handler_timeout(
-                    self.options['app_handler_timeout']
-                )
+            timer = self.set_handler_timeout(
+                self.options['app_handler_timeout']
+            )
 
-                try:
+            try:
+                if self.request is not None:
                     await self.headers_received(response)
-                finally:
-                    timer.cancel()
+            finally:
+                timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
             data = None
 
@@ -460,9 +460,6 @@ class HTTPProtocol(asyncio.Protocol):
         self.transport.resume_reading()
 
     def connection_lost(self, _):
-        self.set_handler_timeout(self.options['app_close_timeout'])
-        self.globals.connections.discard(self)
-
         while self.tasks:
             task = self.tasks.pop()
 
@@ -485,3 +482,6 @@ class HTTPProtocol(asyncio.Protocol):
         self.context.update(transport=None)
         self.request = None
         self._header_buf = None
+
+        self.set_handler_timeout(self.options['app_close_timeout'])
+        self.globals.connections.discard(self)
