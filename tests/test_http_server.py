@@ -542,9 +542,9 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.0 408 Request Timeout')
-        self.assertEqual(body, b'request timeout after 2s')
+        self.assertEqual(body, b'request timeout after 1s')
 
-    def test_recvtimeout(self):
+    def test_recv_timeout(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT + 1,
@@ -556,7 +556,7 @@ class TestHTTPServer(unittest.TestCase):
                          b'HTTP/1.1 408 Request Timeout')
         self.assertEqual(body, b'recv timeout')
 
-    def test_handlertimeout(self):
+    def test_handler_timeout(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT + 1,
@@ -567,6 +567,16 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 500 Internal Server Error')
         self.assertEqual(body, b'Internal Server Error')
+
+    def test_close_timeout(self):
+        data = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 1,
+            raw=b'GET /timeouts?close HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 1)
+        )
+
+        self.assertEqual(data, (b'', b''))
 
     def test_download_10(self):
         header, body = getcontents(host=HTTP_HOST,

@@ -298,10 +298,10 @@ class Tremolo:
                            app_handler_timeout=options.get(
                                'app_handler_timeout', 120
                            ),
-                           _app=options['app'],
-                           _app_close_timeout=options.get(
+                           app_close_timeout=options.get(
                                'app_close_timeout', 30
                            ),
+                           _app=options['app'],
                            _root_path=options.get('root_path', ''),
                            _routes=options['_routes'],
                            _middlewares=options['_middlewares']),
