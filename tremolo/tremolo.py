@@ -354,21 +354,22 @@ class Tremolo:
             # detect code changes
             if 'reload' in context.options and context.options['reload']:
                 for module in (dict(modules) or sys.modules.values()):
-                    if not hasattr(module, '__file__'):
+                    module_file = getattr(module, '__file__', None)
+
+                    if module_file is None:
                         continue
 
                     for path in paths:
-                        if (module.__file__ is None or
-                                module.__file__.startswith(path)):
+                        if module_file.startswith(path):
                             break
                     else:
-                        if not os.path.exists(module.__file__):
+                        if not os.path.exists(module_file):
                             if module in modules:
                                 del modules[module]
 
                             continue
 
-                        sign = file_signature(module.__file__)
+                        sign = file_signature(module_file)
 
                         if module in modules:
                             if modules[module] == sign:
@@ -380,7 +381,7 @@ class Tremolo:
                             modules[module] = sign
                             continue
 
-                        self.logger.info('reload: %s', module.__file__)
+                        self.logger.info('reload: %s', module_file)
                         sys.exit(3)
 
             if limit_memory > 0 and memory_usage() > limit_memory:
@@ -524,29 +525,22 @@ class Tremolo:
 
             if kwargs['app'] is None:
                 for module in list(sys.modules.values()):
-                    if (hasattr(module, '__file__') and
+                    module_file = getattr(module, '__file__', None)
+
+                    if (module_file and
                             module.__name__ not in ('__main__',
                                                     '__mp_main__',
                                                     'tremolo') and
                             not module.__name__.startswith('tremolo.') and
-                            module.__file__ is not None and
-                            module.__file__.startswith(kwargs['app_dir']) and
-                            os.path.exists(module.__file__)):
+                            module_file.startswith(kwargs['app_dir']) and
+                            os.path.exists(module_file)):
                         reload_module(module)
 
-                if kwargs['module_name'] in sys.modules:
-                    _module = sys.modules[kwargs['module_name']]
-                else:
-                    _module = import_module(kwargs['module_name'])
+                module = import_module(kwargs['module_name'])
 
                 # we need to update/rebind objects like
                 # routes, middleware, etc.
-                for attr_name in dir(_module):
-                    if attr_name.startswith('__'):
-                        continue
-
-                    attr = getattr(_module, attr_name)
-
+                for attr in module.__dict__.values():
                     if isinstance(attr, self.__class__):
                         self.__dict__.update(attr.__dict__)
 
