@@ -216,8 +216,7 @@ class Tremolo:
             # '/path/to/module.py'       -> 'module:app'   (dir: '/path/to')
             # '/path/to/module.py:myapp' -> 'module:myapp' (dir: '/path/to')
 
-            if (':\\' in options['app'] and options['app'].count(':') < 2 or
-                    ':' not in options['app']):
+            if options['app'].find(':', options['app'].find(':\\') + 1) == -1:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
