@@ -170,8 +170,7 @@ class Tremolo:
 
         sock.listen(backlog)
 
-        if ('ssl' in options and options['ssl'] and
-                isinstance(options['ssl'], dict)):
+        if 'ssl' in options and isinstance(options['ssl'] or None, dict):
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_context.load_cert_chain(
                 certfile=options['ssl'].get('cert', ''),
