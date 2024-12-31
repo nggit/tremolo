@@ -122,8 +122,8 @@ def parse_args(**callbacks):
                 options[name] = int(sys.argv[i])
             except ValueError:
                 print(
-                    'Invalid %s value "%s". It must be a number' % (
-                        sys.argv[i - 1], sys.argv[i])
+                    'Invalid %s value "%s". It must be a number' %
+                    (sys.argv[i - 1], sys.argv[i])
                 )
                 sys.exit(1)
         elif sys.argv[i - 1] == '--ssl-cert':

@@ -170,8 +170,7 @@ class Tremolo:
 
         sock.listen(backlog)
 
-        if ('ssl' in options and options['ssl'] and
-                isinstance(options['ssl'], dict)):
+        if 'ssl' in options and isinstance(options['ssl'] or None, dict):
             ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_context.load_cert_chain(
                 certfile=options['ssl'].get('cert', ''),
@@ -202,17 +201,13 @@ class Tremolo:
 
             options['_routes'].compile()
 
-            try:
-                for _, func in self.hooks['worker_start']:
-                    if (await func(globals=context,
-                                   context=context,
-                                   app=self,
-                                   loop=self.loop,
-                                   logger=self.logger)):
-                        break
-            except Exception as exc:
-                self.loop.stop()
-                raise exc
+            for _, func in self.hooks['worker_start']:
+                if (await func(globals=context,
+                               context=context,
+                               app=self,
+                               loop=self.loop,
+                               logger=self.logger)):
+                    break
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
@@ -221,13 +216,13 @@ class Tremolo:
             # '/path/to/module.py'       -> 'module:app'   (dir: '/path/to')
             # '/path/to/module.py:myapp' -> 'module:myapp' (dir: '/path/to')
 
-            if (':\\' in options['app'] and options['app'].count(':') < 2 or
-                    ':' not in options['app']):
+            if options['app'].find(':', options['app'].find(':\\') + 1) == -1:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
             context.options['app_dir'], base_name = os.path.split(
-                os.path.abspath(path))
+                os.path.abspath(path)
+            )
             module_name = os.path.splitext(base_name)[0]
 
             if context.options['app_dir'] == '':
@@ -258,7 +253,6 @@ class Tremolo:
             )
 
             if exc:
-                self.loop.stop()
                 raise exc
 
         sockname = sock.getsockname()
@@ -338,14 +332,11 @@ class Tremolo:
         finally:
             server.close()
 
-            try:
-                while context.tasks:
-                    await context.tasks.pop()
+            while context.tasks:
+                await context.tasks.pop()
 
-                await server.wait_closed()
-                await self._worker_stop(context)
-            finally:
-                self.loop.stop()
+            await server.wait_closed()
+            await self._worker_stop(context)
 
     async def _serve_forever(self, context):
         limit_memory = context.options.get('limit_memory', 0)
@@ -362,21 +353,22 @@ class Tremolo:
             # detect code changes
             if 'reload' in context.options and context.options['reload']:
                 for module in (dict(modules) or sys.modules.values()):
-                    if not hasattr(module, '__file__'):
+                    module_file = getattr(module, '__file__', None)
+
+                    if module_file is None:
                         continue
 
                     for path in paths:
-                        if (module.__file__ is None or
-                                module.__file__.startswith(path)):
+                        if module_file.startswith(path):
                             break
                     else:
-                        if not os.path.exists(module.__file__):
+                        if not os.path.exists(module_file):
                             if module in modules:
                                 del modules[module]
 
                             continue
 
-                        sign = file_signature(module.__file__)
+                        sign = file_signature(module_file)
 
                         if module in modules:
                             if modules[module] == sign:
@@ -388,7 +380,7 @@ class Tremolo:
                             modules[module] = sign
                             continue
 
-                        self.logger.info('reload: %s', module.__file__)
+                        self.logger.info('reload: %s', module_file)
                         sys.exit(3)
 
             if limit_memory > 0 and memory_usage() > limit_memory:
@@ -448,21 +440,20 @@ class Tremolo:
         asyncio.set_event_loop(self.loop)
         task = self.loop.create_task(self._serve(host, port, **kwargs))
 
+        task.add_done_callback(lambda fut: self.loop.stop())
         signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
         signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
             self.loop.run_forever()  # until loop.stop() is called
         finally:
-            try:
-                if not task.cancelled():
-                    exc = task.exception()
+            self.loop.close()
 
-                    # to avoid None, SystemExit, etc. for being printed
-                    if isinstance(exc, Exception):
-                        self.logger.error(exc)
-            finally:
-                self.loop.close()
+            if not task.cancelled():
+                exc = task.exception()
+
+                if exc:
+                    raise exc
 
     def create_sock(self, host, port, reuse_port=True):
         try:
@@ -533,29 +524,22 @@ class Tremolo:
 
             if kwargs['app'] is None:
                 for module in list(sys.modules.values()):
-                    if (hasattr(module, '__file__') and
+                    module_file = getattr(module, '__file__', None)
+
+                    if (module_file and
                             module.__name__ not in ('__main__',
                                                     '__mp_main__',
                                                     'tremolo') and
                             not module.__name__.startswith('tremolo.') and
-                            module.__file__ is not None and
-                            module.__file__.startswith(kwargs['app_dir']) and
-                            os.path.exists(module.__file__)):
+                            module_file.startswith(kwargs['app_dir']) and
+                            os.path.exists(module_file)):
                         reload_module(module)
 
-                if kwargs['module_name'] in sys.modules:
-                    _module = sys.modules[kwargs['module_name']]
-                else:
-                    _module = import_module(kwargs['module_name'])
+                module = import_module(kwargs['module_name'])
 
                 # we need to update/rebind objects like
                 # routes, middleware, etc.
-                for attr_name in dir(_module):
-                    if attr_name.startswith('__'):
-                        continue
-
-                    attr = getattr(_module, attr_name)
-
+                for attr in module.__dict__.values():
                     if isinstance(attr, self.__class__):
                         self.__dict__.update(attr.__dict__)
 
@@ -578,17 +562,17 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
-        kwargs['shutdown_timeout'] = kwargs.get('shutdown_timeout', 30)
+        kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' % (
-                server_name,
-                __version__,
-                sys.implementation.name,
-                *sys.version_info[:3],
-                sys.platform)
+            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' %
+            (server_name,
+             __version__,
+             sys.implementation.name,
+             *sys.version_info[:3],
+             sys.platform)
         )
         print('-' * terminal_width)
 
@@ -599,11 +583,8 @@ class Tremolo:
                 if not hasattr(__main__, '__file__'):
                     raise RuntimeError('could not find ASGI app')
 
-                for attr_name in dir(__main__):
-                    if attr_name.startswith('__'):
-                        continue
-
-                    if getattr(__main__, attr_name) == kwargs['app']:
+                for attr_name, attr in __main__.__dict__.items():
+                    if attr == kwargs['app']:
                         break
                 else:
                     attr_name = 'app'
@@ -629,14 +610,13 @@ class Tremolo:
 
                 for routes in self.routes.values():
                     for route in routes:
-                        pattern, func, kwds = route
+                        pattern, func, kw = route
 
                         print(
-                            '  %s -> %s(%s)' % (
-                                pattern,
-                                func.__name__,
-                                ', '.join(
-                                    '%s=%s' % item for item in kwds.items()))
+                            '  %s -> %s(%s)' %
+                            (pattern,
+                             func.__name__,
+                             ', '.join('%s=%s' % item for item in kw.items()))
                         )
 
                 print()
@@ -671,11 +651,11 @@ class Tremolo:
 
             options = {**kwargs, **options}
             print(
-                '  run(host=%s, port=%d, worker_num=%d, %s)' % (
-                    _host,
-                    _port,
-                    worker_num,
-                    ', '.join('%s=%s' % item for item in options.items()))
+                '  run(host=%s, port=%d, worker_num=%d, %s)' %
+                (_host,
+                 _port,
+                 worker_num,
+                 ', '.join('%s=%s' % item for item in options.items()))
             )
 
             args = (_host, _port)

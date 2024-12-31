@@ -105,8 +105,8 @@ class HTTPResponse(Response):
         path = quote(path).encode('latin-1')
 
         cookie = bytearray(
-            b'%s=%s; expires=%s; max-age=%d; path=%s' % (
-                name, value, date_expired, expires, path)
+            b'%s=%s; expires=%s; max-age=%d; path=%s' %
+            (name, value, date_expired, expires, path)
         )
 
         for k, v in ((b'domain', domain), (b'samesite', samesite)):
@@ -186,17 +186,15 @@ class HTTPResponse(Response):
 
             await self.send(
                 b'HTTP/%s %d %s\r\nContent-Type: %s\r\nContent-Length: %d\r\n'
-                b'Connection: %s\r\n%s\r\n\r\n%s' % (
-                    self.request.version,
-                    *status,
-                    self.get_content_type(),
-                    content_length,
-                    KEEPALIVE_OR_CLOSE[
-                        keepalive and self.request.http_keepalive],
-                    b'\r\n'.join(
-                        b'\r\n'.join(v) for k, v in self.headers.items() if
-                        k not in excludes),
-                    data), **kwargs
+                b'Connection: %s\r\n%s\r\n\r\n%s' %
+                (self.request.version,
+                 *status,
+                 self.get_content_type(),
+                 content_length,
+                 KEEPALIVE_OR_CLOSE[keepalive and self.request.http_keepalive],
+                 b'\r\n'.join(b'\r\n'.join(v) for k, v in self.headers.items()
+                              if k not in excludes),
+                 data), **kwargs
             )
             self.headers_sent(True)
 
@@ -276,6 +274,9 @@ class HTTPResponse(Response):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
+        kwargs.setdefault(
+            'rate', self.request.protocol.options['download_rate']
+        )
         kwargs['buffer_size'] = buffer_size
         loop = self.request.protocol.loop
 
@@ -383,8 +384,8 @@ class HTTPResponse(Response):
                 self.set_content_type(content_type)
                 self.set_header(b'Content-Length', b'%d' % size)
                 self.set_header(
-                    b'Content-Range', b'bytes %d-%d/%d' % (
-                        start, end, file_size)
+                    b'Content-Range', b'bytes %d-%d/%d' %
+                    (start, end, file_size)
                 )
                 await run_sync(handle.seek, start)
 
@@ -404,8 +405,8 @@ class HTTPResponse(Response):
                 for start, end, size in ranges:
                     await self.write(
                         b'--%s\r\nContent-Type: %s\r\n'
-                        b'Content-Range: bytes %d-%d/%d\r\n\r\n' % (
-                            boundary, content_type, start, end, file_size),
+                        b'Content-Range: bytes %d-%d/%d\r\n\r\n' %
+                        (boundary, content_type, start, end, file_size),
                         **kwargs
                     )
                     await run_sync(handle.seek, start)

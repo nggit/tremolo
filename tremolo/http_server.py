@@ -98,9 +98,8 @@ class HTTPServer(HTTPProtocol):
             self._server['websocket'] = WebSocket(self.request, self.response)
 
     async def _handle_response(self, func, options):
-        options['rate'] = options.get('rate', self.options['download_rate'])
-        options['buffer_size'] = options.get('buffer_size',
-                                             self.options['buffer_size'])
+        options.setdefault('rate', self.options['download_rate'])
+        options.setdefault('buffer_size', self.options['buffer_size'])
 
         if not self.request.has_body:
             if 'websocket' in options:

@@ -91,10 +91,11 @@ def bind(value='', **context):
 
 def version(**context):
     print(
-        'tremolo %s (%s %d.%d.%d, %s)' % (__version__,
-                                          sys.implementation.name,
-                                          *sys.version_info[:3],
-                                          sys.platform)
+        'tremolo %s (%s %d.%d.%d, %s)' %
+        (__version__,
+         sys.implementation.name,
+         *sys.version_info[:3],
+         sys.platform)
     )
     return 0
 
