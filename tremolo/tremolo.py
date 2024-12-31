@@ -563,7 +563,7 @@ class Tremolo:
     def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
         kwargs['reuse_port'] = reuse_port
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
-        kwargs['shutdown_timeout'] = kwargs.get('shutdown_timeout', 30)
+        kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
@@ -584,11 +584,8 @@ class Tremolo:
                 if not hasattr(__main__, '__file__'):
                     raise RuntimeError('could not find ASGI app')
 
-                for attr_name in dir(__main__):
-                    if attr_name.startswith('__'):
-                        continue
-
-                    if getattr(__main__, attr_name) == kwargs['app']:
+                for attr_name, attr in __main__.__dict__.items():
+                    if attr == kwargs['app']:
                         break
                 else:
                     attr_name = 'app'

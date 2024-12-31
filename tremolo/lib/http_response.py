@@ -276,6 +276,9 @@ class HTTPResponse(Response):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
+        kwargs.setdefault(
+            'rate', self.request.protocol.options['download_rate']
+        )
         kwargs['buffer_size'] = buffer_size
         loop = self.request.protocol.loop
 
