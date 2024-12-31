@@ -62,9 +62,9 @@ class WebSocket:
 
             if payload_length > self.protocol.options['ws_max_payload_size']:
                 raise WebSocketServerClosed(
-                    '%d exceeds maximum payload size (%d)' % (
-                        payload_length,
-                        self.protocol.options['ws_max_payload_size']),
+                    '%d exceeds maximum payload size (%d)' %
+                    (payload_length,
+                     self.protocol.options['ws_max_payload_size']),
                     code=1009
                 )
 
@@ -105,8 +105,8 @@ class WebSocket:
             )
 
         raise WebSocketServerClosed(
-            'unsupported opcode %x with payload length %d' % (
-                opcode, payload_length),
+            'unsupported opcode %x with payload length %d' %
+            (opcode, payload_length),
             code=1008
         )
 

@@ -222,7 +222,8 @@ class Tremolo:
 
             path, attr_name = options['app'].rsplit(':', 1)
             context.options['app_dir'], base_name = os.path.split(
-                os.path.abspath(path))
+                os.path.abspath(path)
+            )
             module_name = os.path.splitext(base_name)[0]
 
             if context.options['app_dir'] == '':
@@ -567,12 +568,12 @@ class Tremolo:
         terminal_width = min(get_terminal_size()[0], 72)
 
         print(
-            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' % (
-                server_name,
-                __version__,
-                sys.implementation.name,
-                *sys.version_info[:3],
-                sys.platform)
+            'Starting %s (tremolo %s, %s %d.%d.%d, %s)' %
+            (server_name,
+             __version__,
+             sys.implementation.name,
+             *sys.version_info[:3],
+             sys.platform)
         )
         print('-' * terminal_width)
 
@@ -610,14 +611,13 @@ class Tremolo:
 
                 for routes in self.routes.values():
                     for route in routes:
-                        pattern, func, kwds = route
+                        pattern, func, kw = route
 
                         print(
-                            '  %s -> %s(%s)' % (
-                                pattern,
-                                func.__name__,
-                                ', '.join(
-                                    '%s=%s' % item for item in kwds.items()))
+                            '  %s -> %s(%s)' %
+                            (pattern,
+                             func.__name__,
+                             ', '.join('%s=%s' % item for item in kw.items()))
                         )
 
                 print()
@@ -652,11 +652,11 @@ class Tremolo:
 
             options = {**kwargs, **options}
             print(
-                '  run(host=%s, port=%d, worker_num=%d, %s)' % (
-                    _host,
-                    _port,
-                    worker_num,
-                    ', '.join('%s=%s' % item for item in options.items()))
+                '  run(host=%s, port=%d, worker_num=%d, %s)' %
+                (_host,
+                 _port,
+                 worker_num,
+                 ', '.join('%s=%s' % item for item in options.items()))
             )
 
             args = (_host, _port)
