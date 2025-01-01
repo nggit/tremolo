@@ -68,6 +68,7 @@ class HTTPServer(HTTPProtocol):
     async def _handle_middleware(self, func, kwargs):
         options = self.request.context.options
         options.update(kwargs)
+
         data = await func(**self._server)
 
         if data is None:
