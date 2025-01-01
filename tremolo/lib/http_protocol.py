@@ -162,7 +162,7 @@ class HTTPProtocol(asyncio.Protocol):
                     await asyncio.sleep(1 / (rate / max(queue_size, 1) /
                                              mv[:buffer_size].nbytes))
                 mv = mv[buffer_size:]
-        else:
+        elif self.queue is not None:
             self.queue[i].put_nowait(data)
 
         # maybe resume reading, or close
