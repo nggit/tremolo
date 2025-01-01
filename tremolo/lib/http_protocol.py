@@ -94,8 +94,11 @@ class HTTPProtocol(asyncio.Protocol):
                              timeout_cb=self.request_timeout)
         ).cancel)
 
+    def is_closing(self):
+        return self.transport is None or self.transport.is_closing()
+
     def close(self, exc=None):
-        if self.transport is None or self.transport.is_closing():
+        if self.is_closing():
             return
 
         if exc:
@@ -130,7 +133,7 @@ class HTTPProtocol(asyncio.Protocol):
         try:
             return await waiter
         except asyncio.CancelledError:
-            if self.transport is not None:
+            if not self.is_closing():
                 try:
                     if callable(timeout_cb):
                         timeout_cb(timeout)
@@ -159,7 +162,7 @@ class HTTPProtocol(asyncio.Protocol):
                     await asyncio.sleep(1 / (rate / max(queue_size, 1) /
                                              mv[:buffer_size].nbytes))
                 mv = mv[buffer_size:]
-        else:
+        elif self.queue is not None:
             self.queue[i].put_nowait(data)
 
         # maybe resume reading, or close
@@ -294,8 +297,7 @@ class HTTPProtocol(asyncio.Protocol):
             try:
                 data = await self.error_received(exc)
             finally:
-                if self.request is not None:
-                    await response.handle_exception(exc, data)
+                await response.handle_exception(exc, data)
 
     async def _receive_data(self, data, waiter):
         await waiter

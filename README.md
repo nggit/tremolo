@@ -19,8 +19,7 @@ You can take advantage of this to serve/generate big files efficiently:
 
 ```python
 @app.route('/my/url/speedtest.bin')
-async def my_big_data(**server):
-    response = server['response']
+async def my_big_data(request, response):
     buffer_size = 16384
 
     response.set_content_type('application/octet-stream')

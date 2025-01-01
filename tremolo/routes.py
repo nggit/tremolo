@@ -10,7 +10,9 @@ class Routes(dict):
     def __init__(self):
         self[0] = [
             (400, handlers.error_400, {}),
-            (404, handlers.error_404, dict(status=(404, b'Not Found'),
+            (404, handlers.error_404, dict(request=None,
+                                           globals=None,
+                                           status=(404, b'Not Found'),
                                            stream=False)),
             # must be at the very end
             (500, handlers.error_500, {})

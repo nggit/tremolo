@@ -447,6 +447,9 @@ class HTTPResponse(Response):
         self.close(keepalive=True)
 
     async def handle_exception(self, exc, data=b''):
+        if self.request.protocol.is_closing():
+            return
+
         if not isinstance(exc, asyncio.CancelledError):
             self.request.protocol.print_exception(
                 exc, quote(unquote_to_bytes(self.request.path))
