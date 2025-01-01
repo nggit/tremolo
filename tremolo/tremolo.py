@@ -202,11 +202,11 @@ class Tremolo:
             options['_routes'].compile()
 
             for _, func in self.hooks['worker_start']:
-                if (await func(globals=context,
-                               context=context,
-                               app=self,
-                               loop=self.loop,
-                               logger=self.logger)):
+                if await func(globals=context,
+                              context=context,
+                              app=self,
+                              loop=self.loop,
+                              logger=self.logger):
                     break
         else:
             from .asgi_lifespan import ASGILifespan
@@ -397,12 +397,12 @@ class Tremolo:
             while i > 0:
                 i -= 1
 
-                if (await self.hooks['worker_stop'][i][1](
+                if await self.hooks['worker_stop'][i][1](
                         globals=context,
                         context=context,
                         app=self,
                         loop=self.loop,
-                        logger=self.logger)):
+                        logger=self.logger):
                     break
         else:
             context.options['_lifespan'].shutdown()
