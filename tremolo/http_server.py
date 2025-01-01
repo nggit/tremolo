@@ -7,7 +7,7 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_routes', '_middlewares', '_server', 'response')
+    __slots__ = ('_routes', '_middlewares', '_server')
 
     def __init__(self, context, _routes=None, _middlewares=None, **kwargs):
         super().__init__(context, **kwargs)
@@ -15,13 +15,17 @@ class HTTPServer(HTTPProtocol):
         self._routes = _routes
         self._middlewares = _middlewares
         self._server = {
+            'response': None,  # set in headers_received
             'globals': context,
             'context': self.context,
             'loop': kwargs['loop'],
             'logger': kwargs['logger'],
             'lock': kwargs['lock']
         }
-        self.response = None  # set in headers_received
+
+    @property
+    def response(self):
+        return self._server['response']
 
     async def _connection_made(self):
         for _, func, _ in self._middlewares['connect']:
@@ -59,13 +63,12 @@ class HTTPServer(HTTPProtocol):
         else:
             super().connection_lost(exc)
 
-        self.response = None
+        self._server['response'] = None
 
     async def _handle_middleware(self, func, kwargs):
         options = self.request.context.options
         options.update(kwargs)
-        data = await func(request=self.request, response=self.response,
-                          **self._server)
+        data = await func(**self._server)
 
         if data is None:
             return False
@@ -118,8 +121,9 @@ class HTTPServer(HTTPProtocol):
         if 'content_type' in options:
             self.response.set_content_type(options['content_type'])
 
-        agen = func(request=self.request, response=self.response,
-                    **self._server)
+        kwargs = {name: self._server.get(name, kwargs[name])
+                  for name in kwargs} or self._server
+        agen = func(**kwargs)
         next_data = getattr(agen, '__anext__', False)
 
         if next_data:
@@ -256,7 +260,8 @@ class HTTPServer(HTTPProtocol):
         self.response.close(keepalive=True)
 
     async def headers_received(self, response):
-        self.response = response
+        self._server['response'] = response
+        self._server['request'] = self.request
 
         if self._middlewares['connect']:
             await self.context.ON_CONNECT

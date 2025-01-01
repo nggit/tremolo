@@ -53,13 +53,16 @@ def server_date():
 
 def getoptions(func):
     options = {}
-    arg_count = func.__code__.co_argcount
+    argcount = func.__code__.co_argcount
 
     if func.__defaults__ is not None:
-        arg_count -= len(func.__defaults__)
+        argcount -= len(func.__defaults__)
+
+    for name in func.__code__.co_varnames[:argcount]:
+        options[name] = None
 
     for i, name in enumerate(func.__code__.co_varnames[
-                                 arg_count:func.__code__.co_argcount]):
+                                 argcount:func.__code__.co_argcount]):
         options[name] = func.__defaults__[i]
 
     return options
