@@ -61,34 +61,36 @@ class HTTPServer(HTTPProtocol):
 
         self.response = None
 
-    async def _handle_middleware(self, func, options):
-        self.request.context.options.update(options)
+    async def _handle_middleware(self, func, kwargs):
+        options = self.request.context.options
+        options.update(kwargs)
         data = await func(request=self.request, response=self.response,
                           **self._server)
 
         if data is None:
-            return options
+            return False
 
-        if not isinstance(data, (bytes, bytearray, str, tuple)):
+        if isinstance(data, (bytes, bytearray, str, tuple)):
+            if 'status' in options:
+                self.response.set_status(*options['status'])
+
+            if 'content_type' in options:
+                self.response.set_content_type(options['content_type'])
+
+            encoding = ('utf-8',)
+
+            if isinstance(data, tuple):
+                data, *encoding = data + encoding
+
+            if isinstance(data, str):
+                data = data.encode(encoding[0])
+
+            await self.response.end(data)
+        else:
             self.logger.info('middleware %s has exited with the connection '
                              'possibly left open', func.__name__)
-            return
 
-        if 'status' in options:
-            self.response.set_status(*options['status'])
-
-        if 'content_type' in options:
-            self.response.set_content_type(options['content_type'])
-
-        encoding = ('utf-8',)
-
-        if isinstance(data, tuple):
-            data, *encoding = data + encoding
-
-        if isinstance(data, str):
-            data = data.encode(encoding[0])
-
-        await self.response.end(data)
+        return True
 
     def _handle_websocket(self):
         if (self.options['ws'] and b'upgrade' in self.request.headers and
@@ -97,7 +99,9 @@ class HTTPServer(HTTPProtocol):
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
             self._server['websocket'] = WebSocket(self.request, self.response)
 
-    async def _handle_response(self, func, options):
+    async def _handle_response(self, func, kwargs):
+        options = self.request.context.options
+        options.update(kwargs)
         options.setdefault('rate', self.options['download_rate'])
         options.setdefault('buffer_size', self.options['buffer_size'])
 
@@ -114,7 +118,6 @@ class HTTPServer(HTTPProtocol):
         if 'content_type' in options:
             self.response.set_content_type(options['content_type'])
 
-        self.request.context.options.update(options)
         agen = func(request=self.request, response=self.response,
                     **self._server)
         next_data = getattr(agen, '__anext__', False)
@@ -169,12 +172,10 @@ class HTTPServer(HTTPProtocol):
 
             while i > 0:
                 i -= 1
-                options = await self._handle_middleware(
-                    self._middlewares['response'][i][1],
-                    {**self._middlewares['response'][i][2], **options}
-                )
 
-                if not isinstance(options, dict):
+                if await self._handle_middleware(
+                        self._middlewares['response'][i][1],
+                        self._middlewares['response'][i][2]):
                     return
 
             if self.request.method == b'HEAD' or no_content:
@@ -233,12 +234,10 @@ class HTTPServer(HTTPProtocol):
 
             while i > 0:
                 i -= 1
-                options = await self._handle_middleware(
-                    self._middlewares['response'][i][1],
-                    {**self._middlewares['response'][i][2], **options}
-                )
 
-                if not isinstance(options, dict):
+                if await self._handle_middleware(
+                        self._middlewares['response'][i][1],
+                        self._middlewares['response'][i][2]):
                     return
 
             if self.request.method == b'HEAD' or no_content:
@@ -262,20 +261,14 @@ class HTTPServer(HTTPProtocol):
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
-        options = self.request.context.options
-
         for middleware in self._middlewares['request']:
-            options = await self._handle_middleware(
-                middleware[1], {**middleware[2], **options}
-            )
-
-            if not isinstance(options, dict):
+            if await self._handle_middleware(middleware[1], middleware[2]):
                 return
 
         if not self.request.is_valid:
             # bad request
             await self._handle_response(
-                self._routes[0][0][1], {**self._routes[0][0][2], **options}
+                self._routes[0][0][1], self._routes[0][0][2]
             )
             return
 
@@ -299,7 +292,7 @@ class HTTPServer(HTTPProtocol):
 
                     self.request.params['path'] = matches
 
-                    await self._handle_response(func, {**kwargs, **options})
+                    await self._handle_response(func, kwargs)
                     return
         else:
             i = len(self._routes[-1])
@@ -322,13 +315,13 @@ class HTTPServer(HTTPProtocol):
 
                     self.request.params['path'] = matches
 
-                    await self._handle_response(func, {**kwargs, **options})
+                    await self._handle_response(func, kwargs)
                     del self._routes[-1][i]
                     return
 
         # not found
         await self._handle_response(
-            self._routes[0][1][1], {**self._routes[0][1][2], **options}
+            self._routes[0][1][1], self._routes[0][1][2]
         )
 
     async def error_received(self, exc):
