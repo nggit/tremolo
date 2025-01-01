@@ -244,9 +244,7 @@ async def post_form(**server):
 
 
 @app.route('/upload')
-async def upload(content_type=b'application/octet-stream', **server):
-    request = server['request']
-
+async def upload(request, content_type=b'application/octet-stream'):
     if request.query_string == b'maxqueue':
         request.protocol.options['max_queue_size'] = 0
 
@@ -263,9 +261,10 @@ async def upload(content_type=b'application/octet-stream', **server):
 
 
 @app.route('/upload/multipart')
-async def upload_multipart(stream=False, **server):
-    request = server['request']
-    server['response'].set_content_type(b'text/csv')
+async def upload_multipart(request, response, stream=False, **server):
+    assert server == {}
+
+    response.set_content_type(b'text/csv')
 
     # should be ignored
     yield b''
@@ -299,7 +298,7 @@ async def upload_multipart(stream=False, **server):
 
 
 @app.route('/download')
-async def download(request, response, **_):
+async def download(request, response):
     if request.query_string == b'executor':
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             await response.sendfile(
@@ -310,7 +309,7 @@ async def download(request, response, **_):
 
 
 @app.route('/ws')
-async def ws_handler(websocket=None, **_):
+async def ws_handler(websocket=None):
     if websocket.request.query_string == b'close':
         await websocket.accept()
 
@@ -336,7 +335,9 @@ async def ws_handler(websocket=None, **_):
 
 
 @app.route('/sse')
-async def sse_handler(sse=None, **_):
+async def sse_handler(sse=None, **server):
+    assert server == {}
+
     if sse.request.query_string == b'error':
         # InternalServerError due to '\n' in the event value
         await sse.send('Hello', event='hel\nlo')
@@ -351,7 +352,7 @@ async def sse_handler(sse=None, **_):
 
 
 @app.route('/timeouts')
-async def timeouts(request, response, **_):
+async def timeouts(request, response):
     if request.query_string == b'recv':
         # attempt to read body on a GET request
         # should raise a TimeoutError and ended up with a RequestTimeout
@@ -364,7 +365,9 @@ async def timeouts(request, response, **_):
 
 
 @app.route('/reload')
-async def reload(request, **_):
+async def reload(request, **server):
+    assert server == {}
+
     yield b'%d' % os.getpid()
 
     if request.query_string != b'':
