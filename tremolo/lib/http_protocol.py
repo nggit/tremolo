@@ -79,9 +79,12 @@ class HTTPProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.context.update(transport=transport)
-
         self.fileno = transport.get_extra_info('socket').fileno()
-        self.queue = self.globals.queues.pop(self.fileno, [Queue(), Queue()])
+
+        try:
+            self.queue = self.globals.queues.pop(self.fileno)
+        except KeyError:
+            self.queue = [Queue(), Queue()]
 
         self._waiters['request'] = self.loop.create_future()
 
