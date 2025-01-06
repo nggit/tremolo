@@ -262,7 +262,9 @@ async def upload(request, content_type=b'application/octet-stream'):
 
 @app.route('/upload/multipart')
 async def upload_multipart(request, response, stream=False, **server):
-    assert server == {}
+    assert server != {}
+    assert 'request' not in server
+    assert 'response' not in server
 
     response.set_content_type(b'text/csv')
 
@@ -336,7 +338,7 @@ async def ws_handler(websocket=None):
 
 @app.route('/sse')
 async def sse_handler(sse=None, **server):
-    assert server == {}
+    assert server != {}
 
     if sse.request.query_string == b'error':
         # InternalServerError due to '\n' in the event value
@@ -366,7 +368,9 @@ async def timeouts(request, response):
 
 @app.route('/reload')
 async def reload(request, **server):
-    assert server == {}
+    assert server != {}
+    assert 'request' not in server
+    assert 'response' in server
 
     yield b'%d' % os.getpid()
 
