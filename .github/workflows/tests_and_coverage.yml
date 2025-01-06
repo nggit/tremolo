@@ -26,16 +26,34 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: List the modified files
+        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^)" >> $GITHUB_ENV
+        if: ${{ !startsWith(matrix.os, 'windows-') }}
+
+      - name: List the modified files (Windows)
+        shell: cmd
+        run: |
+          set "FILES_MODIFIED="
+          for /f "delims=" %%f in ('git diff --name-only HEAD HEAD^') do (
+            set "FILES_MODIFIED=%FILES_MODIFIED%;%%f"
+          )
+          echo FILES_MODIFIED=%FILES_MODIFIED% >> %GITHUB_ENV% 
+        if: ${{ startsWith(matrix.os, 'windows-') }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python_version }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install --upgrade coverage
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
 
       - name: Lint
         run: |
@@ -43,32 +61,38 @@ jobs:
           python -m bandit --recursive tremolo/
           python -m pip install --upgrade flake8
           python -m flake8 .
-        if: ${{ matrix.os == 'ubuntu-20.04' && matrix.python_version == '3.13' }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          matrix.os == 'ubuntu-20.04' && matrix.python_version == '3.13'
 
       - name: Run tests
         run: python alltests.py
-        if: ${{ matrix.python_version != '3.13' }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version != '3.13' }}
 
       - name: Run tests with coverage
         run: |
           python -m coverage run alltests.py
           python -m coverage combine
           mkdir artifact && mv .coverage artifact/.coverage.${{ matrix.os }}
-        if: ${{ matrix.python_version == '3.13' && !startsWith(matrix.os, 'windows-') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          matrix.python_version == '3.13' && !startsWith(matrix.os, 'windows-')
 
-      - name: Run tests with coverage on Windows
+      - name: Run tests with coverage (Windows)
+        shell: cmd
         run: |
           python -m coverage run alltests.py
           python -m coverage combine
           mkdir artifact && move .coverage artifact\.coverage.windows
-        shell: cmd
-        if: ${{ matrix.python_version == '3.13' && startsWith(matrix.os, 'windows-') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          matrix.python_version == '3.13' && startsWith(matrix.os, 'windows-')
 
       - uses: actions/upload-artifact@v3
         with:
           path: artifact
           include-hidden-files: true
-        if: ${{ matrix.python_version == '3.13' }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version == '3.13' }}
 
   report:
     name: Upload coverage to SonarCloud Scan
