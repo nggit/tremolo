@@ -101,14 +101,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: List the modified files
+        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^)" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           python -m venv --system-site-packages .local
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           python -m pip install --upgrade pip
           python -m pip install --upgrade coverage
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
 
       - uses: actions/download-artifact@v3
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
 
       - run: |
           tree -L 2
@@ -118,8 +123,10 @@ jobs:
           python -m coverage combine artifact
           python -m coverage report --show-missing --skip-covered
           python -m coverage xml
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
 
       - uses: sonarsource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
