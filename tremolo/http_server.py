@@ -122,9 +122,11 @@ class HTTPServer(HTTPProtocol):
         if 'content_type' in options:
             self.response.set_content_type(options['content_type'])
 
-        kwargs = {name: self._server.get(name, kwargs[name])
-                  for name in kwargs} or self._server
-        agen = func(**kwargs)
+        try:
+            agen = func(**self._server)
+        except TypeError:  # doesn't accept extra **kwargs
+            agen = func(**{k: self._server.get(k, kwargs[k]) for k in kwargs})
+
         next_data = getattr(agen, '__anext__', False)
 
         if next_data:
