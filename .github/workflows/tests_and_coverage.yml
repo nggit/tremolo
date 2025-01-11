@@ -96,9 +96,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: List the modified files
-        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^)" >> $GITHUB_ENV
+        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^ | xargs)" >> $GITHUB_ENV
 
       - name: Install dependencies
         run: |
