@@ -30,17 +30,13 @@ jobs:
           fetch-depth: 2
 
       - name: List the modified files
-        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^)" >> $GITHUB_ENV
+        run: echo "FILES_MODIFIED=$(git diff --name-only HEAD HEAD^ | xargs)" >> $GITHUB_ENV
         if: ${{ !startsWith(matrix.os, 'windows-') }}
 
       - name: List the modified files (Windows)
-        shell: cmd
         run: |
-          set "FILES_MODIFIED="
-          for /f "delims=" %%f in ('git diff --name-only HEAD HEAD^') do (
-            set "FILES_MODIFIED=%FILES_MODIFIED%;%%f"
-          )
-          echo FILES_MODIFIED=%FILES_MODIFIED% >> %GITHUB_ENV% 
+          $FILES_MODIFIED = $(git diff --name-only HEAD HEAD^) -join ' '
+          echo "FILES_MODIFIED=$FILES_MODIFIED" | Out-File -FilePath $env:GITHUB_ENV
         if: ${{ startsWith(matrix.os, 'windows-') }}
 
       - name: Setup Python
