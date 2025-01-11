@@ -65,6 +65,19 @@ class HTTPServer(HTTPProtocol):
 
         self._server['response'] = None
 
+    async def run_middlewares(self, name, reverse=False, start=0, step=1):
+        if reverse:
+            start = len(self._middlewares[name]) - 1
+            step = -1
+
+        while 0 <= start < len(self._middlewares[name]):
+            if await self._handle_middleware(
+                    self._middlewares[name][start][1],
+                    self._middlewares[name][start][2]):
+                return True
+
+            start += step
+
     async def _handle_middleware(self, func, kwargs):
         options = self.request.context.options
         options.update(kwargs)
@@ -175,15 +188,8 @@ class HTTPServer(HTTPProtocol):
             else:
                 self.response.set_header(b'Connection', b'close')
 
-            i = len(self._middlewares['response'])
-
-            while i > 0:
-                i -= 1
-
-                if await self._handle_middleware(
-                        self._middlewares['response'][i][1],
-                        self._middlewares['response'][i][2]):
-                    return
+            if await self.run_middlewares('response', reverse=True):
+                return
 
             if self.request.method == b'HEAD' or no_content:
                 await self.response.write(None)
@@ -237,15 +243,8 @@ class HTTPServer(HTTPProtocol):
                 b'Connection', KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
             )
 
-            i = len(self._middlewares['response'])
-
-            while i > 0:
-                i -= 1
-
-                if await self._handle_middleware(
-                        self._middlewares['response'][i][1],
-                        self._middlewares['response'][i][2]):
-                    return
+            if await self.run_middlewares('response', reverse=True):
+                return
 
             if self.request.method == b'HEAD' or no_content:
                 await self.response.write(None)
@@ -269,9 +268,8 @@ class HTTPServer(HTTPProtocol):
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
 
-        for middleware in self._middlewares['request']:
-            if await self._handle_middleware(middleware[1], middleware[2]):
-                return
+        if await self.run_middlewares('request'):
+            return
 
         if not self.request.is_valid:
             # bad request
