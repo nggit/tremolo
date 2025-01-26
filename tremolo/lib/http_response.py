@@ -268,7 +268,7 @@ class HTTPResponse(Response):
         else:
             await self.send(data, **kwargs)
 
-    async def sendfile(self, path, file_size=None, buffer_size=16384,
+    async def sendfile(self, path, offset=0, count=-1, buffer_size=16384,
                        content_type=b'application/octet-stream', executor=None,
                        **kwargs):
         if isinstance(content_type, str):
@@ -293,7 +293,7 @@ class HTTPResponse(Response):
 
         try:
             handle = self.request.protocol.context.RESPONSE_SENDFILE_HANDLE
-            await run_sync(handle.seek, 0)
+            await run_sync(handle.seek, offset)  # OSError on a negative offset
         except AttributeError:
             handle = await run_sync(open, path, 'rb')
             self.request.protocol.context.RESPONSE_SENDFILE_HANDLE = handle
@@ -303,9 +303,10 @@ class HTTPResponse(Response):
             )
 
         st = os.stat(path)
+        file_size = st.st_size - offset
 
-        if not file_size:
-            file_size = st.st_size
+        if count > 0:
+            file_size = min(count, file_size)
 
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT',
                               time.gmtime(st.st_mtime)).encode('latin-1')
