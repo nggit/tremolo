@@ -307,7 +307,10 @@ async def download(request, response):
                 TEST_FILE, content_type='text/plain', executor=executor
             )
     else:
-        await response.sendfile(TEST_FILE, content_type=b'text/plain')
+        await response.sendfile(
+            TEST_FILE,
+            count=os.stat(TEST_FILE).st_size + 10, content_type=b'text/plain'
+        )
 
 
 @app.route('/ws')
