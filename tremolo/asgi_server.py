@@ -21,7 +21,7 @@ _WSS_OR_WS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('response', '_scope', '_read', '_websocket')
+    __slots__ = ('response', '_scope', '_read', '_websocket', '_waiter')
 
     def __init__(self, context, **kwargs):
         super().__init__(context, **kwargs)
@@ -34,6 +34,7 @@ class ASGIServer(HTTPProtocol):
         self.response = None  # set in headers_received
         self._read = None
         self._websocket = None
+        self._waiter = None
 
     def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
@@ -93,6 +94,9 @@ class ASGIServer(HTTPProtocol):
     def connection_lost(self, exc):
         super().connection_lost(exc)
 
+        if self._waiter is not None and not self._waiter.done():
+            self._waiter.set_result(None)
+
         self.response = None
         self._scope = None
 
@@ -144,6 +148,8 @@ class ASGIServer(HTTPProtocol):
             )
             return
 
+        data = None
+
         try:
             data = await self._read.__anext__()
 
@@ -161,9 +167,18 @@ class ASGIServer(HTTPProtocol):
                     'calling receive() after the connection is closed'
                 )
             elif isinstance(exc, StopAsyncIteration):
+                # delay http.disconnect (a workaround for Quart)
+                # https://github.com/nggit/tremolo/issues/202
+                if self._waiter is None:
+                    self._waiter = self.loop.create_future()
+
+                    if data is None:
+                        return {'type': 'http.request'}
+
                 self.logger.info(
                     'calling receive() when there is no more body'
                 )
+                await self._waiter
             else:
                 self.print_exception(exc)
 
