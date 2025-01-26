@@ -124,7 +124,11 @@ class ASGIServer(HTTPProtocol):
                 if isinstance(exc, WebSocketClientClosed):
                     code = exc.code
 
-                if not (self._websocket is None or self.request is None):
+                if self._websocket is None or self.request is None:
+                    self.logger.info(
+                        'calling receive() after the connection is closed'
+                    )
+                else:
                     self.print_exception(exc)
 
                 self.set_handler_timeout(self.options['app_close_timeout'])
@@ -152,8 +156,15 @@ class ASGIServer(HTTPProtocol):
                 )
             }
         except (asyncio.CancelledError, Exception) as exc:
-            if not (self._read is None or self.request is None or
-                    isinstance(exc, StopAsyncIteration)):
+            if self._read is None or self.request is None:
+                self.logger.info(
+                    'calling receive() after the connection is closed'
+                )
+            elif isinstance(exc, StopAsyncIteration):
+                self.logger.info(
+                    'calling receive() when there is no more body'
+                )
+            else:
                 self.print_exception(exc)
 
             self.set_handler_timeout(self.options['app_close_timeout'])
@@ -241,5 +252,9 @@ class ASGIServer(HTTPProtocol):
         except asyncio.CancelledError:
             pass
         except Exception as exc:
-            if not (self.request is None or self.response is None):
+            if self.request is None or self.response is None:
+                self.logger.info(
+                    'calling send() after the connection is closed'
+                )
+            else:
                 self.print_exception(exc)
