@@ -128,7 +128,7 @@ class ASGIServer(HTTPProtocol):
                 if isinstance(exc, WebSocketClientClosed):
                     code = exc.code
 
-                if self._websocket is None or self.request is None:
+                if self._websocket is None:
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
@@ -152,21 +152,25 @@ class ASGIServer(HTTPProtocol):
 
         try:
             data = await self._read.__anext__()
+            more_body = (
+                (data != b'' and self.request.content_length == -1) or
+                self.request.body_consumed < self.request.content_length
+            )
+
+            if not more_body:
+                self._read = None
 
             return {
                 'type': 'http.request',
                 'body': data,
-                'more_body': (
-                    (data != b'' and self.request.content_length == -1) or
-                    self.request.body_consumed < self.request.content_length
-                )
+                'more_body': more_body
             }
         except (asyncio.CancelledError, Exception) as exc:
-            if self._read is None or self.request is None:
+            if self.request is None:
                 self.logger.info(
                     'calling receive() after the connection is closed'
                 )
-            elif isinstance(exc, StopAsyncIteration):
+            elif self._read is None or isinstance(exc, StopAsyncIteration):
                 # delay http.disconnect (a workaround for Quart)
                 # https://github.com/nggit/tremolo/issues/202
                 if self._waiter is None:
