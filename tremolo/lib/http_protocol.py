@@ -379,8 +379,8 @@ class HTTPProtocol(asyncio.Protocol):
                 if data is None:
                     # close the transport, unless keepalive is enabled
                     if self.request is not None:
-                        if (self.request.http_keepalive and
-                                self._header_buf is None):
+                        if self.request.http_keepalive:
+                            self.request.http_keepalive = False
                             await self._handle_keepalive()
                             continue
 
