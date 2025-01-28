@@ -345,7 +345,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             return
 
-        # resumed in put_to_queue or _handle_keepalive
+        # resumed in put_to_queue or _send_data
         self.transport.pause_reading()
 
         if 'receive' in self._waiters:
