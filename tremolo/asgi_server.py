@@ -173,7 +173,7 @@ class ASGIServer(HTTPProtocol):
             elif self._read is None or isinstance(exc, StopAsyncIteration):
                 # delay http.disconnect (a workaround for Quart)
                 # https://github.com/nggit/tremolo/issues/202
-                if self._waiter is None:
+                if self._waiter is None or self._waiter.done():
                     self._waiter = self.loop.create_future()
 
                     if data is None:
@@ -258,6 +258,9 @@ class ASGIServer(HTTPProtocol):
                     await self.response.write(b'')
                     self.response.close(keepalive=True)
                     self._read = None
+
+                    if self._waiter is not None:
+                        self._waiter.cancel()
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
                     await self._websocket.send(data['bytes'])
