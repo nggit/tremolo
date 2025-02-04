@@ -419,10 +419,11 @@ class Tremolo:
             getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
 
-        handler = logging.StreamHandler()
         formatter = logging.Formatter(
-            '[%(asctime)s] %(module)s: %(levelname)s: %(message)s'
+            kwargs.get('log_fmt',
+                       '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
         )
+        handler = logging.StreamHandler()
 
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
