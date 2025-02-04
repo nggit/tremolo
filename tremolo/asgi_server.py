@@ -68,9 +68,9 @@ class ASGIServer(HTTPProtocol):
             client=self.request.client
         )
 
-        if (self.options['ws'] and b'upgrade' in self.request.headers and
-                b'connection' in self.request.headers and
+        if (self.options['ws'] and
                 b'sec-websocket-key' in self.request.headers and
+                b'upgrade' in self.request.headers and
                 self.request.headers[b'upgrade'].lower() == b'websocket'):
             self._handle_websocket()
         else:
