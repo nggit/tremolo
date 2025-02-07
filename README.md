@@ -92,7 +92,6 @@ async def app(scope, receive, send):
             (b'content-type', b'text/plain')
         ]
     })
-
     await send({
         'type': 'http.response.body',
         'body': b'Hello world!'
