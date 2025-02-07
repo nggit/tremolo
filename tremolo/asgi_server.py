@@ -34,7 +34,7 @@ class ASGIServer(HTTPProtocol):
         self.response = None  # set in headers_received
         self._read = None
         self._websocket = None
-        self._waiter = None
+        self._waiter = self.loop.create_future()
 
     def _handle_websocket(self):
         self._websocket = WebSocket(self.request, self.response)
@@ -78,6 +78,10 @@ class ASGIServer(HTTPProtocol):
 
         try:
             await self.options['_app'](self._scope, self.receive, self.send)
+
+            if not self._waiter.done():
+                self.logger.info('handler exited early (no close?)')
+                await self._waiter
         except (asyncio.CancelledError, Exception) as exc:
             if (self.request is not None and self.request.upgraded and
                     self._websocket is not None):
@@ -94,7 +98,7 @@ class ASGIServer(HTTPProtocol):
     def connection_lost(self, exc):
         super().connection_lost(exc)
 
-        if self._waiter is not None and not self._waiter.done():
+        if not self._waiter.done():
             self._waiter.set_result(None)
 
         self.response = None
@@ -148,8 +152,6 @@ class ASGIServer(HTTPProtocol):
             )
             return
 
-        data = None
-
         try:
             data = await self._read.__anext__()
             more_body = (
@@ -173,11 +175,12 @@ class ASGIServer(HTTPProtocol):
             elif self._read is None or isinstance(exc, StopAsyncIteration):
                 # delay http.disconnect (a workaround for Quart)
                 # https://github.com/nggit/tremolo/issues/202
-                if self._waiter is None or self._waiter.done():
+                if self._waiter.done():
                     self._waiter = self.loop.create_future()
 
-                    if data is None:
-                        return {'type': 'http.request'}
+                if self._read is not None:
+                    self._read = None
+                    return {'type': 'http.request'}
 
                 self.logger.info(
                     'calling receive() when there is no more body'
@@ -257,10 +260,8 @@ class ASGIServer(HTTPProtocol):
                 if 'more_body' not in data or data['more_body'] is False:
                     await self.response.write(b'')
                     self.response.close(keepalive=True)
-                    self._read = None
-
-                    if self._waiter is not None:
-                        self._waiter.cancel()
+                    self._read = None  # disallows further receive()
+                    self._waiter.cancel()
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
                     await self._websocket.send(data['bytes'])
@@ -271,6 +272,7 @@ class ASGIServer(HTTPProtocol):
             elif data['type'] == 'websocket.close':
                 await self._websocket.close(data.get('code', 1000))
                 self._websocket = None
+                self._waiter.cancel()
         except asyncio.CancelledError:
             pass
         except Exception as exc:
