@@ -78,6 +78,7 @@ class HTTPProtocol(asyncio.Protocol):
                 self.print_exception(exc, 'handle_task_done')
 
     def connection_made(self, transport):
+        self.globals.connections.add(self)
         self.context.update(transport=transport)
         self.fileno = transport.get_extra_info('socket').fileno()
 
@@ -387,9 +388,14 @@ class HTTPProtocol(asyncio.Protocol):
                         if self.request.http_keepalive:
                             self.request.http_keepalive = False
 
-                            await self._handle_keepalive()
-                            self.transport.resume_reading()
-                            continue
+                            if self in self.globals.connections:
+                                await self._handle_keepalive()
+                                self.transport.resume_reading()
+                                continue
+
+                            self.logger.info(
+                                'keepalive connection dropped: %d', self.fileno
+                            )
 
                         self.request.clear_body()
 
@@ -427,17 +433,6 @@ class HTTPProtocol(asyncio.Protocol):
                 break
 
     async def _handle_keepalive(self):
-        if len(self.handlers) == 1:
-            # store this keepalive connection
-            self.globals.connections.add(self)
-
-        if self not in self.globals.connections:
-            self.logger.info(
-                'a keepalive connection is kicked out of the list'
-            )
-            self.close()
-            return
-
         if self.request.upgraded:
             self._waiters.setdefault('receive', self._waiters.pop('request'))
         else:
