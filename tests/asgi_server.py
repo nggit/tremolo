@@ -48,7 +48,6 @@ async def app(scope, receive, send):
         await send({
             'type': 'websocket.accept'
         })
-
         await send({
             'type': 'websocket.send',
             'bytes': (await receive()).get('bytes', b'')
@@ -71,8 +70,8 @@ async def app(scope, receive, send):
             assert body == b''
 
         print(
-            '%s: received %d bytes: %s%s' % (
-                data['type'], len(body), '.' * min(3, len(body)), body[-10:])
+            '%s: received %d bytes: %s%s' %
+            (data['type'], len(body), '.' * min(3, len(body)), body[-10:])
         )
 
         more_body = data.get('more_body', False)
@@ -114,7 +113,6 @@ async def app(scope, receive, send):
         'status': 200,
         'headers': headers
     })
-
     await send({
         'type': 'http.response.body',
         'body': b'Hello world!'
