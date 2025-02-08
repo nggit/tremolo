@@ -557,6 +557,7 @@ class Tremolo:
         else:
             self.manager.spawn(
                 self._worker, args=args, kwargs=kwargs,
+                name=process.name,
                 exit_cb=self._handle_reload
             )
 
