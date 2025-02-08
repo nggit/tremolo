@@ -136,6 +136,9 @@ python3 -m tremolo --log-level ERROR example:app
 
 You will find that Tremolo is reasonably fast.
 
+If it's not, it could be due to `--upload-rate` or `--download-rate` limits, which take effect when the payload is slightly larger.
+Despite causing benchmarks to show poor results, it prevents any single client from monopolizing bandwidth, ensuring responsiveness under heavy load.
+
 However, it should be noted that bottlenecks often occur on the application side.
 Which means that in real-world usage, throughput reflects more on the application than the server.
 
