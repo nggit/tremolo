@@ -78,7 +78,6 @@ class HTTPProtocol(asyncio.Protocol):
                 self.print_exception(exc, 'handle_task_done')
 
     def connection_made(self, transport):
-        self.globals.connections.add(self)
         self.context.update(transport=transport)
         self.fileno = transport.get_extra_info('socket').fileno()
 
@@ -238,8 +237,10 @@ class HTTPProtocol(asyncio.Protocol):
                     if v.strip().lower() == b'close':
                         break
                 else:
+                    self.globals.connections.add(self)
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
+                self.globals.connections.add(self)
                 self.request.http_keepalive = True
 
             if self.request.has_body:
