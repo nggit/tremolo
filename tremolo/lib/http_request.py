@@ -174,7 +174,7 @@ class HTTPRequest(Request):
             buf = bytearray()
             agen = super().recv()
             paused = False
-            unread_bytes = 0
+            bytes_unread = 0
 
             while True:
                 if not paused:
@@ -187,15 +187,15 @@ class HTTPRequest(Request):
                                 'bad chunked encoding: incomplete read'
                             ) from exc
 
-                if unread_bytes > 0:
-                    data = buf[:unread_bytes]
+                if bytes_unread > 0:
+                    data = buf[:bytes_unread]
 
                     yield data
-                    del buf[:unread_bytes]
+                    del buf[:bytes_unread]
 
-                    unread_bytes -= len(data)
+                    bytes_unread -= len(data)
 
-                    if unread_bytes > 0:
+                    if bytes_unread > 0:
                         continue
 
                     paused = True
@@ -223,11 +223,11 @@ class HTTPRequest(Request):
                         break
 
                     data = buf[i + 2:i + 2 + chunk_size]
-                    unread_bytes = chunk_size - len(data)
+                    bytes_unread = chunk_size - len(data)
 
                     yield data
 
-                    if unread_bytes > 0:
+                    if bytes_unread > 0:
                         paused = False
                         del buf[:]
                     else:
