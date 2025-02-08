@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
 
-import asyncio
-
-try:
-    import uvloop
-
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-except ImportError:
-    print('INFO: uvloop is not installed')
-
 import tremolo
 
 
@@ -29,4 +20,4 @@ async def app(scope, receive, send):
 
 
 if __name__ == '__main__':
-    tremolo.run(app, host='0.0.0.0', port=8000, debug=True, reload=True)
+    tremolo.run(app, host='0.0.0.0', port=8000, debug=True, loop='uvloop')
