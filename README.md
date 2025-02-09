@@ -69,15 +69,13 @@ if __name__ == '__main__':
 Well, `latin-1` on the right side is not required. The default is `utf-8`.
 
 You can save it as `hello.py` and just run it with `python3 hello.py`.
-
-Your first *hello world* page with Tremolo will be at http://localhost:8000/hello.
+And your first *hello world* page with Tremolo will be at http://localhost:8000/hello.
 
 ## ASGI Server
 Tremolo is an HTTP Server framework. You can build abstractions on top of it, say an ASGI server.
 
 In fact, Tremolo already has ASGI server (plus WebSocket) implementation.
-
-So you can immediately use existing [ASGI applications / frameworks](https://asgi.readthedocs.io/en/latest/implementations.html#application-frameworks), behind Tremolo (ASGI server).
+So you can immediately use existing [ASGI applications / frameworks](https://asgi.readthedocs.io/en/latest/implementations.html#application-frameworks), on top of Tremolo (ASGI server).
 
 For example, If a minimal ASGI application with the name `example.py`:
 
