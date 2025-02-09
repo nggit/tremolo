@@ -4,7 +4,11 @@ import asyncio
 
 from .contexts import ConnectionContext
 from .http_exceptions import (
-    HTTPException, BadRequest, ExpectationFailed, RequestTimeout
+    HTTPException,
+    BadRequest,
+    ExpectationFailed,
+    InternalServerError,
+    RequestTimeout
 )
 from .http_header import HTTPHeader
 from .http_request import HTTPRequest
@@ -78,7 +82,6 @@ class HTTPProtocol(asyncio.Protocol):
                 self.print_exception(exc, 'handle_task_done')
 
     def connection_made(self, transport):
-        self.globals.connections.add(self)
         self.context.update(transport=transport)
         self.fileno = transport.get_extra_info('socket').fileno()
 
@@ -238,8 +241,10 @@ class HTTPProtocol(asyncio.Protocol):
                     if v.strip().lower() == b'close':
                         break
                 else:
+                    self.globals.connections.add(self)
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
+                self.globals.connections.add(self)
                 self.request.http_keepalive = True
 
             if self.request.has_body:
@@ -440,10 +445,15 @@ class HTTPProtocol(asyncio.Protocol):
                 # waits for all incoming data to enter the queue
                 await self._waiters.pop('receive')
 
+            if self.request.body_size < self.request.content_length:
+                raise InternalServerError(
+                    'request body was not fully consumed'
+                )
+
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
-            self._header_buf = bytearray()
             self.request.clear_body()
+            self._header_buf = bytearray()
 
             self._waiters['request'] = self.loop.create_future()
 
