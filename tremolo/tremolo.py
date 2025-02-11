@@ -32,7 +32,9 @@ _REUSEPORT_OR_REUSEADDR = {
 
 
 class Tremolo:
-    def __init__(self):
+    def __init__(self, name=None):
+        self.logger = logging.getLogger(name or mp.current_process().name)
+        self.context = WorkerContext()
         self.manager = ProcessManager()
         self.routes = Routes()
         self.middlewares = {
@@ -46,8 +48,18 @@ class Tremolo:
             'worker_stop': []
         }
         self.ports = {}
-        self.loop = None
-        self.logger = None
+
+    @property
+    def loop(self):
+        return asyncio.get_event_loop()
+
+    def create_task(self, coro):
+        task = self.loop.create_task(coro)
+
+        self.context.tasks.add(task)
+        task.add_done_callback(self.context.tasks.discard)
+
+        return task
 
     def route(self, path):
         if isinstance(path, int):
@@ -158,7 +170,9 @@ class Tremolo:
         self.ports[(host, port)] = options
         return (host, port) in self.ports
 
-    async def _serve(self, host, port, **options):
+    async def _serve(self, host, port, **kwargs):
+        options = self.context.options
+        options.update(kwargs)
         backlog = options.get('backlog', 100)
 
         if hasattr(options['_sock'], 'share'):
@@ -192,18 +206,16 @@ class Tremolo:
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
-        context = WorkerContext()
-        context.update(connections=connections)
-        context.options.update(options)
+        self.context.update(connections=connections)
 
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
-            options['_routes'].compile()
+            self.routes.compile()
 
             for _, func in self.hooks['worker_start']:
-                if await func(globals=context,
-                              context=context,
+                if await func(globals=self.context,
+                              context=self.context,
                               app=self,
                               loop=self.loop,
                               logger=self.logger):
@@ -220,15 +232,13 @@ class Tremolo:
                 options['app'] += ':app'
 
             path, attr_name = options['app'].rsplit(':', 1)
-            context.options['app_dir'], base_name = os.path.split(
-                os.path.abspath(path)
-            )
-            module_name = os.path.splitext(base_name)[0]
+            options['app_dir'], basename = os.path.split(os.path.abspath(path))
+            module_name = os.path.splitext(basename)[0]
 
-            if context.options['app_dir'] == '':
-                context.options['app_dir'] = os.getcwd()
+            if options['app_dir'] == '':
+                options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, context.options['app_dir'])
+            sys.path.insert(0, options['app_dir'])
             options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
@@ -244,12 +254,12 @@ class Tremolo:
             if server_name != b'':
                 server_name += b' (ASGI)'
 
-            context.options['_lifespan'] = ASGILifespan(
+            options['_lifespan'] = ASGILifespan(
                 options['app'], loop=self.loop, logger=self.logger
             )
-            context.options['_lifespan'].startup()
-            exc = await context.options['_lifespan'].exception(
-                timeout=context.options['shutdown_timeout'] / 2
+            options['_lifespan'].startup()
+            exc = await options['_lifespan'].exception(
+                timeout=options['shutdown_timeout'] / 2
             )
 
             if exc:
@@ -258,58 +268,42 @@ class Tremolo:
         sockname = sock.getsockname()
 
         if isinstance(sockname, tuple):
-            context.info['server'] = sockname[:2]
+            self.context.info['server'] = sockname[:2]
         else:
-            context.info['server'] = (sockname, None)
+            self.context.info['server'] = (sockname, None)
 
-        context.info['server_date'] = server_date()
-        context.info['server_name'] = server_name
+        self.context.info['server_date'] = server_date()
+        self.context.info['server_name'] = server_name
+
+        options.setdefault('debug', False)
+        options.setdefault('ws', True)
+        options.setdefault('ws_max_payload_size', 2 * 1048576)
+        options.setdefault('download_rate', 1048576)
+        options.setdefault('upload_rate', 1048576)
+        options.setdefault('buffer_size', 16384)
+        options.setdefault('client_max_body_size', 2 * 1048576)
+        options.setdefault('client_max_header_size', 8192)
+        options.setdefault('max_queue_size', 128)
+        options.setdefault('request_timeout', 30)
+        options.setdefault('keepalive_timeout', 30)
+        options.setdefault('app_handler_timeout', 120)
+        options.setdefault('app_close_timeout', 30)
+        options.setdefault('root_path', '')
 
         server = await self.loop.create_server(
-            lambda: Server(context,
-                           loop=self.loop,
-                           logger=self.logger,
-                           lock=lock,
-                           debug=options.get('debug', False),
-                           ws=options.get('ws', True),
-                           ws_max_payload_size=options.get(
-                               'ws_max_payload_size', 2 * 1048576
-                           ),
-                           download_rate=options.get('download_rate', 1048576),
-                           upload_rate=options.get('upload_rate', 1048576),
-                           buffer_size=options.get('buffer_size', 16384),
-                           client_max_body_size=options.get(
-                               'client_max_body_size', 2 * 1048576
-                           ),
-                           client_max_header_size=options.get(
-                               'client_max_header_size', 8192
-                           ),
-                           max_queue_size=options.get('max_queue_size', 128),
-                           request_timeout=options.get('request_timeout', 30),
-                           keepalive_timeout=options.get(
-                               'keepalive_timeout', 30
-                           ),
-                           app_handler_timeout=options.get(
-                               'app_handler_timeout', 120
-                           ),
-                           app_close_timeout=options.get(
-                               'app_close_timeout', 30
-                           ),
-                           _app=options['app'],
-                           _root_path=options.get('root_path', ''),
-                           _routes=options['_routes'],
-                           _middlewares=options['_middlewares']),
-            sock=sock, backlog=backlog, ssl=ssl_context)
+            lambda: Server(app=self, lock=lock, options=options),
+            sock=sock, backlog=backlog, ssl=ssl_context
+        )
 
         print(log_date(), end=' ')
         sys.stdout.flush()
         sys.stdout.buffer.write(
             b'%s worker (pid %d) is started at ' % (server_name, os.getpid())
         )
-        print(context.info['server'][0], end='')
+        print(self.context.info['server'][0], end='')
 
-        if context.info['server'][1] is not None:
-            print(' port %d' % context.info['server'][1], end='')
+        if self.context.info['server'][1] is not None:
+            print(' port %d' % self.context.info['server'][1], end='')
 
         if ssl_context is not None:
             sys.stdout.flush()
@@ -318,40 +312,39 @@ class Tremolo:
         print()
 
         try:
-            await self._serve_forever(context)
+            await self._serve_forever()
         except asyncio.CancelledError:
             self.logger.info('Shutting down')
 
-            if context.tasks:
+            if self.context.tasks:
                 _, pending = await asyncio.wait(
-                    context.tasks,
-                    timeout=context.options['shutdown_timeout'] / 2
+                    self.context.tasks, timeout=options['shutdown_timeout'] / 2
                 )
                 for task in pending:
                     task.cancel()
         finally:
             server.close()
 
-            while context.tasks:
-                await context.tasks.pop()
+            while self.context.tasks:
+                await self.context.tasks.pop()
 
             await server.wait_closed()
-            await self._worker_stop(context)
+            await self._worker_stop()
 
-    async def _serve_forever(self, context):
-        limit_memory = context.options.get('limit_memory', 0)
+    async def _serve_forever(self):
+        limit_memory = self.context.options.get('limit_memory', 0)
         paths = [path for path in sys.path
-                 if not context.options['app_dir'].startswith(path)]
+                 if not self.context.options['app_dir'].startswith(path)]
         modules = {}
 
         while True:
             await asyncio.sleep(1)
 
             # update server date
-            context.info['server_date'] = server_date()
+            self.context.info['server_date'] = server_date()
 
             # detect code changes
-            if 'reload' in context.options and context.options['reload']:
+            if self.context.options.get('reload', False):
                 for module in (dict(modules) or sys.modules.values()):
                     module_file = getattr(module, '__file__', None)
 
@@ -384,49 +377,47 @@ class Tremolo:
                         sys.exit(3)
 
             if limit_memory > 0 and memory_usage() > limit_memory:
-                while context.tasks:
-                    context.tasks.pop().cancel()
+                while self.context.tasks:
+                    self.context.tasks.pop().cancel()
 
                 self.logger.error('memory limit exceeded')
                 sys.exit(1)
 
-    async def _worker_stop(self, context):
-        if context.options['app'] is None:
+    async def _worker_stop(self):
+        if self.context.options['app'] is None:
             i = len(self.hooks['worker_stop'])
 
             while i > 0:
                 i -= 1
 
                 if await self.hooks['worker_stop'][i][1](
-                        globals=context,
-                        context=context,
+                        globals=self.context,
+                        context=self.context,
                         app=self,
                         loop=self.loop,
                         logger=self.logger):
                     break
         else:
-            context.options['_lifespan'].shutdown()
-            exc = await context.options['_lifespan'].exception(
-                timeout=context.options['shutdown_timeout'] / 2
+            self.context.options['_lifespan'].shutdown()
+            exc = await self.context.options['_lifespan'].exception(
+                timeout=self.context.options['shutdown_timeout'] / 2
             )
 
             if exc:
                 self.logger.error(exc)
 
     def _worker(self, host, port, **kwargs):
-        self.logger = logging.getLogger(mp.current_process().name)
         self.logger.setLevel(
             getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
-
         formatter = logging.Formatter(
             kwargs.get('log_fmt',
                        '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
         )
         handler = logging.StreamHandler()
-
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
+
         loop_name = kwargs.get('loop', 'asyncio.')
 
         if '.' not in loop_name:
@@ -436,19 +427,19 @@ class Tremolo:
         # 'asyncio', '.', 'SelectorEventLoop'
         module_name, _, class_name = loop_name.rpartition('.')
         module = import_module(module_name or 'asyncio')
-        self.loop = getattr(module, class_name or 'new_event_loop')()
+        loop = getattr(module, class_name or 'new_event_loop')()
 
-        asyncio.set_event_loop(self.loop)
-        task = self.loop.create_task(self._serve(host, port, **kwargs))
+        asyncio.set_event_loop(loop)
+        task = loop.create_task(self._serve(host, port, **kwargs))
 
-        task.add_done_callback(lambda fut: self.loop.stop())
+        task.add_done_callback(lambda fut: loop.stop())
         signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
         signal.signal(signal.SIGTERM, lambda signum, frame: task.cancel())
 
         try:
-            self.loop.run_forever()  # until loop.stop() is called
+            loop.run_forever()  # until loop.stop() is called
         finally:
-            self.loop.close()
+            loop.close()
 
             if not task.cancelled():
                 exc = task.exception()
@@ -539,14 +530,10 @@ class Tremolo:
                 module = import_module(kwargs['module_name'])
 
                 # we need to update/rebind objects like
-                # routes, middleware, etc.
+                # routes, middlewares, etc.
                 for attr in module.__dict__.values():
                     if isinstance(attr, self.__class__):
                         self.__dict__.update(attr.__dict__)
-
-                # update some references
-                kwargs['_routes'] = self.routes
-                kwargs['_middlewares'] = self.middlewares
         elif process.exitcode != 0:
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
@@ -599,10 +586,10 @@ class Tremolo:
             locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
             if hasattr(__main__, '__file__'):
-                kwargs['app_dir'], base_name = os.path.split(
+                kwargs['app_dir'], basename = os.path.split(
                     os.path.abspath(__main__.__file__)
                 )
-                kwargs['module_name'] = os.path.splitext(base_name)[0]
+                kwargs['module_name'] = os.path.splitext(basename)[0]
             else:
                 kwargs['app_dir'] = os.getcwd()
                 kwargs['module_name'] = '__main__'
@@ -667,9 +654,7 @@ class Tremolo:
                 self.manager.spawn(
                     self._worker,
                     args=args,
-                    kwargs=dict(options, _locks=locks, _sock=socks[args],
-                                _routes=self.routes,
-                                _middlewares=self.middlewares),
+                    kwargs=dict(options, _locks=locks, _sock=socks[args]),
                     exit_cb=self._handle_reload
                 )
 

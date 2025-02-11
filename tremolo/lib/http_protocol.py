@@ -20,6 +20,7 @@ class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('globals',
                  'context',
                  'options',
+                 'app',
                  'loop',
                  'logger',
                  'fileno',
@@ -30,12 +31,13 @@ class HTTPProtocol(asyncio.Protocol):
                  '_header_buf',
                  '_waiters')
 
-    def __init__(self, context, loop=None, logger=None, **kwargs):
-        self.globals = context  # a worker-level context
+    def __init__(self, app, **kwargs):
+        self.globals = app.context  # a worker-level context
         self.context = ConnectionContext()
-        self.options = kwargs
-        self.loop = loop
-        self.logger = logger
+        self.options = kwargs['options']
+        self.app = app
+        self.loop = app.loop
+        self.logger = app.logger
         self.fileno = -1
         self.queue = None
         self.handlers = set()
@@ -55,14 +57,6 @@ class HTTPProtocol(asyncio.Protocol):
 
     def add_close_callback(self, callback):
         self.tasks.add(callback)
-
-    def create_background_task(self, coro):
-        task = self.loop.create_task(coro)
-
-        self.globals.tasks.add(task)
-        task.add_done_callback(self.globals.tasks.discard)
-
-        return task
 
     def create_task(self, coro):
         task = self.loop.create_task(coro)
@@ -92,10 +86,8 @@ class HTTPProtocol(asyncio.Protocol):
 
         self._waiters['request'] = self.loop.create_future()
 
-        self.add_close_callback(
-            self.create_background_task(self._send_data()).cancel
-        )
-        self.add_close_callback(self.create_background_task(
+        self.add_close_callback(self.app.create_task(self._send_data()).cancel)
+        self.add_close_callback(self.app.create_task(
             self.set_timeout(self._waiters['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
@@ -334,9 +326,8 @@ class HTTPProtocol(asyncio.Protocol):
                                     excludes=[b'proxy'])
 
                 if header.is_request:
-                    task = self.create_background_task(
-                        self._handle_request(header)
-                    )
+                    task = self.app.create_task(self._handle_request(header))
+
                     self.handlers.add(task)
                     task.add_done_callback(self.handlers.discard)
                 else:
@@ -457,7 +448,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._waiters['request'] = self.loop.create_future()
 
-            self.add_close_callback(self.create_background_task(
+            self.add_close_callback(self.app.create_task(
                 self.set_timeout(self._waiters['request'],
                                  timeout=self.options['keepalive_timeout'],
                                  timeout_cb=self.keepalive_timeout)

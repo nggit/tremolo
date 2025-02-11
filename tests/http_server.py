@@ -68,6 +68,7 @@ async def on_connect(**server):
 @app.on_close
 async def on_close(**server):
     assert server['context'].foo == 'bar'
+    server['globals'].options['max_queue_size'] = 128
 
     return True
 
