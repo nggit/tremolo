@@ -23,12 +23,12 @@ _WSS_OR_WS = {
 class ASGIServer(HTTPProtocol):
     __slots__ = ('response', '_scope', '_read', '_websocket', '_waiter')
 
-    def __init__(self, context, **kwargs):
-        super().__init__(context, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
         self._scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},
-            'root_path': self.options['_root_path'],
+            'root_path': self.options['root_path'],
             'server': self.globals.info['server']
         }
         self.response = None  # set in headers_received
@@ -77,7 +77,7 @@ class ASGIServer(HTTPProtocol):
             self._handle_http()
 
         try:
-            await self.options['_app'](self._scope, self.receive, self.send)
+            await self.options['app'](self._scope, self.receive, self.send)
 
             if not self._waiter.done():
                 self.logger.info('handler exited early (no close?)')

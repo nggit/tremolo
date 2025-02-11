@@ -9,17 +9,18 @@ from .lib.websocket import WebSocket
 class HTTPServer(HTTPProtocol):
     __slots__ = ('_routes', '_middlewares', '_server')
 
-    def __init__(self, context, _routes=None, _middlewares=None, **kwargs):
-        super().__init__(context, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self._routes = _routes
-        self._middlewares = _middlewares
+        self._routes = self.app.routes
+        self._middlewares = self.app.middlewares
         self._server = {
             'response': None,  # set in headers_received
-            'globals': context,
+            'globals': self.globals,
             'context': self.context,
-            'loop': kwargs['loop'],
-            'logger': kwargs['logger'],
+            'app': self.app,
+            'loop': self.loop,
+            'logger': self.logger,
             'lock': kwargs['lock']
         }
 
@@ -48,14 +49,14 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self._middlewares['connect']:
-            self.context.ON_CONNECT = self.create_background_task(
+            self.context.ON_CONNECT = self.app.create_task(
                 self._connection_made()
             )
             self.add_close_callback(self.context.ON_CONNECT.cancel)
 
     def connection_lost(self, exc):
         if self._middlewares['close']:
-            task = self.create_background_task(self._connection_lost(exc))
+            task = self.app.create_task(self._connection_lost(exc))
             self.loop.call_at(
                 self.loop.time() + self.options['app_close_timeout'],
                 task.cancel
