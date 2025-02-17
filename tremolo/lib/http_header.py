@@ -51,7 +51,7 @@ class HTTPHeader:
 
         self.headers.clear()
         self._headers.clear()
-        self.body = data[header_size + 2:]  # store data after the header
+        self.body = bytes(data[header_size + 2:])  # store excess data
         start = 0
 
         while True:

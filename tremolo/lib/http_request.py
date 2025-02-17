@@ -150,7 +150,7 @@ class HTTPRequest(Request):
             self._read_instance = self.stream(raw=raw)
 
         if size == -1:
-            return bytes(await self._read_instance.__anext__())
+            return await self._read_instance.__anext__()
 
         if len(self._read_buf) < size:
             async for data in self._read_instance:
@@ -159,9 +159,9 @@ class HTTPRequest(Request):
                 if len(self._read_buf) >= size:
                     break
 
-        buf = self._read_buf[:size]
+        data = bytes(self._read_buf[:size])
         del self._read_buf[:size]
-        return bytes(buf)
+        return data
 
     async def stream(self, raw=False):
         if self._eof:
@@ -188,7 +188,7 @@ class HTTPRequest(Request):
                             ) from exc
 
                 if bytes_unread > 0:
-                    data = buf[:bytes_unread]
+                    data = bytes(buf[:bytes_unread])
 
                     yield data
                     del buf[:bytes_unread]
@@ -222,7 +222,7 @@ class HTTPRequest(Request):
                     if chunk_size < 1:
                         break
 
-                    data = buf[i + 2:i + 2 + chunk_size]
+                    data = bytes(buf[i + 2:i + 2 + chunk_size])
                     bytes_unread = chunk_size - len(data)
 
                     yield data
