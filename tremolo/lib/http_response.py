@@ -32,14 +32,12 @@ UPGRADE_OR_KEEPALIVE = {
 
 
 class HTTPResponse(Response):
-    __slots__ = ('request', 'http_chunked', '_headers')
+    __slots__ = ('http_chunked', '_headers')
 
     def __init__(self, request):
         super().__init__(request)
 
-        self.request = request
         self.http_chunked = None
-
         self._headers = {}
 
     @property
