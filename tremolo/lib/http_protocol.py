@@ -354,9 +354,6 @@ class HTTPProtocol(asyncio.Protocol):
             self._receive_data(data, waiter)
         )
 
-    def eof_received(self):
-        self.queue[0].put_nowait(None)
-
     def resume_writing(self):
         if 'send' in self._waiters and not self._waiters['send'].done():
             self._waiters['send'].set_result(None)

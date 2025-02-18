@@ -150,7 +150,7 @@ class HTTPRequest(Request):
             self._read_instance = self.stream(raw=raw)
 
         if size == -1:
-            return bytes(await self._read_instance.__anext__())
+            return await self._read_instance.__anext__()
 
         if len(self._read_buf) < size:
             async for data in self._read_instance:
@@ -159,9 +159,9 @@ class HTTPRequest(Request):
                 if len(self._read_buf) >= size:
                     break
 
-        buf = self._read_buf[:size]
+        data = bytes(self._read_buf[:size])
         del self._read_buf[:size]
-        return bytes(buf)
+        return data
 
     async def stream(self, raw=False):
         if self._eof:
@@ -188,7 +188,7 @@ class HTTPRequest(Request):
                             ) from exc
 
                 if bytes_unread > 0:
-                    data = buf[:bytes_unread]
+                    data = bytes(buf[:bytes_unread])
 
                     yield data
                     del buf[:bytes_unread]
@@ -222,7 +222,7 @@ class HTTPRequest(Request):
                     if chunk_size < 1:
                         break
 
-                    data = buf[i + 2:i + 2 + chunk_size]
+                    data = bytes(buf[i + 2:i + 2 + chunk_size])
                     bytes_unread = chunk_size - len(data)
 
                     yield data
@@ -322,33 +322,35 @@ class HTTPRequest(Request):
             raise BadRequest('missing boundary')
 
         boundary_size = len(boundary)
-        header = None
         body = bytearray()
 
         header_size = 0
         body_size = 0
         content_length = 0
-        part = {}  # represents a file received in a multipart request
         paused = False
+        part = None  # represents a file received in a multipart request
 
         if self._read_instance is None:
             self._read_instance = self.stream()
 
-        while max_files > 0 and not self._read_buf.startswith(b'--%s--' %
-                                                              boundary):
+        while max_files > 0:
             data = b''
 
             if not paused:
                 try:
                     data = await self._read_instance.__anext__()
                 except StopAsyncIteration as exc:
+                    if self._read_buf.startswith(b'--%s--' % boundary):
+                        del self._read_buf[:]  # set eof()
+                        return
+
                     if header_size == 1 or body_size == -1:
                         del body[:]
                         raise BadRequest(
                             'malformed multipart/form-data: incomplete read'
                         ) from exc
 
-            if header is None:
+            if part is None:
                 self._read_buf.extend(data)
                 header_size = self._read_buf.find(b'\r\n\r\n') + 2
 
@@ -361,6 +363,7 @@ class HTTPRequest(Request):
                     paused = False
                 else:
                     body.extend(self._read_buf[header_size + 2:])
+                    part = {}
 
                     # use find() instead of startswith() to ignore the preamble
                     if self._read_buf.find(b'--%s\r\n' % boundary,
@@ -383,9 +386,6 @@ class HTTPRequest(Request):
                         if b'content-type' in header:
                             part['type'] = header[
                                            b'content-type'].decode('latin-1')
-                    else:
-                        header = {}
-
                 continue
 
             body.extend(data)
@@ -411,10 +411,9 @@ class HTTPRequest(Request):
             yield part
 
             self._read_buf[:] = body[body_size + 2:]
-            header = None
             content_length = 0
-            part = {}
             paused = True
+            part = None
             max_files -= 1
 
             del body[:]
