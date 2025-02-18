@@ -30,7 +30,7 @@ class Response:
         else:
             await self.request.protocol.put_to_queue(
                 self._send_buf + data,
-                i=1,
+                name=1,
                 rate=rate,
                 buffer_size=buffer_size
             )

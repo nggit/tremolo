@@ -143,13 +143,13 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(self, data, i=0, rate=-1, buffer_size=16384):
+    async def put_to_queue(self, data, name=0, rate=-1, buffer_size=16384):
         if data:
             mv = memoryview(data)
 
             while mv and self.queue is not None:
-                self.queue[i].put_nowait(mv[:buffer_size].tobytes())
-                queue_size = self.queue[i].qsize()
+                self.queue[name].put_nowait(mv[:buffer_size].tobytes())
+                queue_size = self.queue[name].qsize()
 
                 if queue_size > self.options['max_queue_size']:
                     self.logger.error('%d exceeds the value of max_queue_size',
@@ -162,10 +162,11 @@ class HTTPProtocol(asyncio.Protocol):
                                              mv[:buffer_size].nbytes))
                 mv = mv[buffer_size:]
         elif self.queue is not None:
-            self.queue[i].put_nowait(data)
+            self.queue[name].put_nowait(data)
 
         # maybe resume reading, or close
-        if i == 0 and self.transport is not None and self.request is not None:
+        if (name == 0 and
+                self.transport is not None and self.request is not None):
             if not data or self.request.upgraded:
                 self.transport.resume_reading()
                 return
@@ -175,7 +176,7 @@ class HTTPProtocol(asyncio.Protocol):
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and
                     self.queue is not None):
-                self.queue[i].put_nowait(None)
+                self.queue[name].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
                 if self.request.has_body:
                     self.transport.resume_reading()
