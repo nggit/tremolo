@@ -103,7 +103,8 @@ class HTTPRequest(Request):
 
     @upgraded.setter
     def upgraded(self, value):
-        self.clear_body()
+        del self._body[:]
+        del self._read_buf[:]
         self._upgraded = value
 
     @property
@@ -125,10 +126,13 @@ class HTTPRequest(Request):
 
         return prefix + os.urandom(max(4, length - len(prefix)))
 
-    def clear_body(self):
+    def clear(self):
+        self.header.clear()
+        self.headers.clear()
+
         del self._body[:]
         del self._read_buf[:]
-        super().clear_body()
+        super().clear()
 
     async def body(self, raw=False):
         async for data in self.stream(raw=raw):

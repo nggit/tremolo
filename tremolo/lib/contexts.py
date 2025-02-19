@@ -8,6 +8,9 @@ class Context:
     def __repr__(self):
         return self.__dict__.__repr__()
 
+    def clear(self):
+        self.__dict__.clear()
+
     def get(self, key, default=None):
         return self.__dict__.get(key, default)
 
@@ -57,13 +60,16 @@ class WorkerContext(Context):
 class ConnectionContext(Context):
     def __init__(self):
         self.__dict__ = {
-            'transport': None,
             'tasks': set()
         }
 
     @property
+    def tasks(self):
+        return self.__dict__['tasks']
+
+    @property
     def transport(self):
-        return self.__dict__['transport']
+        return self.__dict__.get('transport', None)
 
     @property
     def client(self):
@@ -75,10 +81,6 @@ class ConnectionContext(Context):
                 self.__dict__['client'] = self.__dict__['client'][:2]
 
         return self.__dict__.get('client', None)
-
-    @property
-    def tasks(self):
-        return self.__dict__['tasks']
 
 
 class RequestContext(Context):

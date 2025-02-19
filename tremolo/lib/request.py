@@ -34,9 +34,12 @@ class Request:
     def is_secure(self):
         return bool(self.transport.get_extra_info('sslcontext'))
 
-    def clear_body(self):
+    def clear(self):
         self.body_size = 0
         self.body_consumed = 0
+
+        self.context.clear()
+        self.protocol = None  # cut off access to the protocol object
 
     async def recv(self):
         while self.protocol.queue is not None:

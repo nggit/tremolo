@@ -27,9 +27,9 @@ class HTTPProtocol(asyncio.Protocol):
                  'queue',
                  'handlers',
                  'request',
-                 '_watermarks',
                  '_header_buf',
-                 '_waiters')
+                 '_waiters',
+                 '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
@@ -43,9 +43,9 @@ class HTTPProtocol(asyncio.Protocol):
         self.handlers = set()
         self.request = None
 
-        self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
         self._waiters = {}
+        self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
     def transport(self):
@@ -392,7 +392,7 @@ class HTTPProtocol(asyncio.Protocol):
                                 'keepalive connection dropped: %d', self.fileno
                             )
 
-                        self.request.clear_body()
+                        self.request.clear()
 
                     self.close()
                     return
@@ -442,7 +442,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
-            self.request.clear_body()
+            self.request.clear()
             self._header_buf = bytearray()
 
             self._waiters['request'] = self.loop.create_future()
@@ -477,9 +477,12 @@ class HTTPProtocol(asyncio.Protocol):
 
             self.queue = None
 
-        self.context.update(transport=None)
         self.request = None
         self._header_buf = None
+
+        self.context.clear()
+        self._waiters.clear()
+        self._watermarks.clear()
 
         self.set_handler_timeout(self.options['app_close_timeout'])
         self.globals.connections.discard(self)
