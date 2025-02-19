@@ -145,10 +145,11 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def put_to_queue(self, data, name=0, rate=-1, buffer_size=16384):
         if data:
-            mv = memoryview(data)
+            start = 0
 
-            while mv and self.queue is not None:
-                self.queue[name].put_nowait(mv[:buffer_size].tobytes())
+            while start < len(data) and self.queue is not None:
+                buf = data[start:start + buffer_size]
+                self.queue[name].put_nowait(buf)
                 queue_size = self.queue[name].qsize()
 
                 if queue_size > self.options['max_queue_size']:
@@ -157,10 +158,10 @@ class HTTPProtocol(asyncio.Protocol):
                     self.close()
                     return
 
-                if rate > 0:
-                    await asyncio.sleep(1 / (rate / max(queue_size, 1) /
-                                             mv[:buffer_size].nbytes))
-                mv = mv[buffer_size:]
+                if rate > 0 and queue_size > 0:
+                    await asyncio.sleep(1 / (rate / queue_size / len(buf)))
+
+                start += buffer_size
         elif self.queue is not None:
             self.queue[name].put_nowait(data)
 
