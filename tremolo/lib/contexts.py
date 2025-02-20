@@ -28,13 +28,18 @@ class Context:
 
 
 class WorkerContext(Context):
+    _tasks = set()
+
     def __init__(self):
         self.__dict__ = {
             'info': {},
             'options': {},
-            'queues': {},
-            'tasks': set()
+            'queues': {}
         }
+
+    @property
+    def tasks(self):
+        return self._tasks
 
     @property
     def info(self):
@@ -49,23 +54,20 @@ class WorkerContext(Context):
         return self.__dict__['queues']
 
     @property
-    def tasks(self):
-        return self.__dict__['tasks']
-
-    @property
     def connections(self):
         return self.__dict__.get('connections', None)
 
 
 class ConnectionContext(Context):
+    __slots__ = ('_tasks',)
+
     def __init__(self):
-        self.__dict__ = {
-            'tasks': set()
-        }
+        self.__dict__ = {}
+        self._tasks = set()
 
     @property
     def tasks(self):
-        return self.__dict__['tasks']
+        return self._tasks
 
     @property
     def transport(self):

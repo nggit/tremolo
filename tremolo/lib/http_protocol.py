@@ -51,23 +51,21 @@ class HTTPProtocol(asyncio.Protocol):
     def transport(self):
         return self.context.transport
 
-    @property
-    def tasks(self):
-        return self.context.tasks
-
     def add_close_callback(self, callback):
-        self.tasks.add(callback)
+        self.context.tasks.add(callback)
+
+    def add_task(self, task):
+        self.context.tasks.add(task)
+        task.add_done_callback(self.handle_task_done)
 
     def create_task(self, coro):
         task = self.loop.create_task(coro)
-
-        self.tasks.add(task)
-        task.add_done_callback(self.handle_task_done)
+        self.add_task(task)
 
         return task
 
     def handle_task_done(self, task):
-        self.tasks.discard(task)
+        self.context.tasks.discard(task)
 
         if not task.cancelled():
             exc = task.exception()
@@ -87,11 +85,11 @@ class HTTPProtocol(asyncio.Protocol):
         self._waiters['request'] = self.loop.create_future()
 
         self.add_close_callback(self.app.create_task(self._send_data()).cancel)
-        self.add_close_callback(self.app.create_task(
+        self.add_task(self.app.create_task(
             self.set_timeout(self._waiters['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
-        ).cancel)
+        ))
 
     def is_closing(self):
         return self.transport is None or self.transport.is_closing()
@@ -447,19 +445,19 @@ class HTTPProtocol(asyncio.Protocol):
 
             self._waiters['request'] = self.loop.create_future()
 
-            self.add_close_callback(self.app.create_task(
+            self.add_task(self.app.create_task(
                 self.set_timeout(self._waiters['request'],
                                  timeout=self.options['keepalive_timeout'],
                                  timeout_cb=self.keepalive_timeout)
-            ).cancel)
+            ))
 
             while not self.request.has_body and self.queue[0].qsize():
                 # this data is supposed to be the next header
                 self.data_received(self.queue[0].get_nowait())
 
     def connection_lost(self, _):
-        while self.tasks:
-            task = self.tasks.pop()
+        while self.context.tasks:
+            task = self.context.tasks.pop()
 
             try:
                 if callable(task):

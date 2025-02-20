@@ -15,7 +15,6 @@ class HTTPServer(HTTPProtocol):
         self._routes = self.app.routes
         self._middlewares = self.app.middlewares
         self._server = {
-            'response': None,  # set in headers_received
             'globals': self.globals,
             'context': self.context,
             'app': self.app,
@@ -26,7 +25,7 @@ class HTTPServer(HTTPProtocol):
 
     @property
     def response(self):
-        return self._server['response']
+        return self._server.get('response', None)
 
     async def _connection_made(self):
         for _, func, _ in self._middlewares['connect']:
@@ -44,6 +43,7 @@ class HTTPServer(HTTPProtocol):
                     break
         finally:
             super().connection_lost(exc)
+            self._server.clear()
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -52,7 +52,7 @@ class HTTPServer(HTTPProtocol):
             self.context.ON_CONNECT = self.app.create_task(
                 self._connection_made()
             )
-            self.add_close_callback(self.context.ON_CONNECT.cancel)
+            self.add_task(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
         if self._middlewares['close']:
@@ -63,8 +63,7 @@ class HTTPServer(HTTPProtocol):
             )
         else:
             super().connection_lost(exc)
-
-        self._server['response'] = None
+            self._server.clear()
 
     async def run_middlewares(self, name, reverse=False, start=0, step=1):
         if reverse:
