@@ -1,10 +1,12 @@
 # Copyright (c) 2023 nggit
 
-import multiprocessing as mp
-import os
-import signal
+__all__ = ('ProcessManager',)
 
-from threading import Thread
+import multiprocessing as mp  # noqa: E402
+import os  # noqa: E402
+import signal  # noqa: E402
+
+from threading import Thread  # noqa: E402
 
 PARENT = 0
 CHILD = 1
