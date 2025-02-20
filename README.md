@@ -49,6 +49,11 @@ With only **3k** lines of code, with **no dependencies** other than the [Python 
 * ASGI server
 * PyPy compatible
 
+## Installation
+```
+python3 -m pip install --upgrade tremolo
+```
+
 ## Example
 Here is a complete *hello world* example in case you missed the usual `return`.
 
@@ -114,6 +119,18 @@ It's also possible to run the ASGI server programmatically ([example with uvloop
 python3 example_uvloop.py
 ```
 
+## Testing
+Just run `python3 alltests.py` for all tests. Or individual *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/main/tests) folder, for example `python3 tests/test_cli.py`.
+
+If you also want measurements with [coverage](https://coverage.readthedocs.io/):
+
+```
+coverage run alltests.py
+coverage combine
+coverage report
+coverage html # to generate html reports
+```
+
 ## Benchmarking
 The first thing to note is that Tremolo is a pure Python server framework.
 
@@ -163,23 +180,6 @@ python3 -m tremolo --loop uvloop --log-level ERROR example:app
 ```
 
 See: [--loop](https://nggit.github.io/tremolo-docs/configuration.html#loop)
-
-## Installing
-```
-python3 -m pip install --upgrade tremolo
-```
-
-## Testing
-Just run `python3 alltests.py` for all tests. Or individual *test_\*.py* in the [tests/](https://github.com/nggit/tremolo/tree/main/tests) folder, for example `python3 tests/test_cli.py`.
-
-If you also want measurements with [coverage](https://coverage.readthedocs.io/):
-
-```
-coverage run alltests.py
-coverage combine
-coverage report
-coverage html # to generate html reports
-```
 
 ## License
 MIT License

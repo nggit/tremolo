@@ -1,9 +1,7 @@
 # Copyright (c) 2023 nggit
 
-__all__ = (
-    'file_signature', 'html_escape', 'log_date', 'memory_usage',
-    'server_date', 'getoptions', 'parse_fields', 'parse_args'
-)
+__all__ = ('file_signature', 'html_escape', 'log_date', 'memory_usage',
+           'server_date', 'getoptions', 'parse_fields', 'parse_args')
 
 import os  # noqa: E402
 import stat  # noqa: E402
