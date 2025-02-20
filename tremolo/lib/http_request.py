@@ -11,26 +11,11 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('_ip',
-                 '_scheme',
-                 'header',
-                 'headers',
-                 'is_valid',
-                 'host',
-                 'method',
-                 'url',
-                 'path',
-                 'query_string',
-                 'version',
-                 'content_length',
-                 'transfer_encoding',
-                 'http_continue',
-                 'http_keepalive',
-                 '_upgraded',
-                 '_body',
-                 '_eof',
-                 '_read_instance',
-                 '_read_buf')
+    __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
+                 'host', 'method', 'url', 'path', 'query_string', 'version',
+                 'content_length', 'transfer_encoding', 'http_continue',
+                 'http_keepalive', '_upgraded', '_body', '_eof',
+                 '_read_instance', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -103,7 +88,8 @@ class HTTPRequest(Request):
 
     @upgraded.setter
     def upgraded(self, value):
-        self.clear_body()
+        del self._body[:]
+        del self._read_buf[:]
         self._upgraded = value
 
     @property
@@ -125,10 +111,13 @@ class HTTPRequest(Request):
 
         return prefix + os.urandom(max(4, length - len(prefix)))
 
-    def clear_body(self):
+    def clear(self):
+        self.header.clear()
+        self.headers.clear()
+
         del self._body[:]
         del self._read_buf[:]
-        super().clear_body()
+        super().clear()
 
     async def body(self, raw=False):
         async for data in self.stream(raw=raw):

@@ -8,6 +8,9 @@ class Context:
     def __repr__(self):
         return self.__dict__.__repr__()
 
+    def clear(self):
+        self.__dict__.clear()
+
     def get(self, key, default=None):
         return self.__dict__.get(key, default)
 
@@ -25,13 +28,18 @@ class Context:
 
 
 class WorkerContext(Context):
+    _tasks = set()
+
     def __init__(self):
         self.__dict__ = {
             'info': {},
             'options': {},
-            'queues': {},
-            'tasks': set()
+            'queues': {}
         }
+
+    @property
+    def tasks(self):
+        return self._tasks
 
     @property
     def info(self):
@@ -46,24 +54,24 @@ class WorkerContext(Context):
         return self.__dict__['queues']
 
     @property
-    def tasks(self):
-        return self.__dict__['tasks']
-
-    @property
     def connections(self):
         return self.__dict__.get('connections', None)
 
 
 class ConnectionContext(Context):
+    __slots__ = ('_tasks',)
+
     def __init__(self):
-        self.__dict__ = {
-            'transport': None,
-            'tasks': set()
-        }
+        self.__dict__ = {}
+        self._tasks = set()
+
+    @property
+    def tasks(self):
+        return self._tasks
 
     @property
     def transport(self):
-        return self.__dict__['transport']
+        return self.__dict__.get('transport', None)
 
     @property
     def client(self):
@@ -75,10 +83,6 @@ class ConnectionContext(Context):
                 self.__dict__['client'] = self.__dict__['client'][:2]
 
         return self.__dict__.get('client', None)
-
-    @property
-    def tasks(self):
-        return self.__dict__['tasks']
 
 
 class RequestContext(Context):

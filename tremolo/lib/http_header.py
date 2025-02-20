@@ -34,6 +34,10 @@ class HTTPHeader:
 
         self.parse(data, **kwargs)
 
+    def clear(self):
+        self.headers.clear()
+        self._headers.clear()
+
     def parse(self, data, header_size=-1, header_max_size=65536, excludes=(),
               max_lines=100, max_line_size=8190):
         if not data:
@@ -49,8 +53,7 @@ class HTTPHeader:
         self.is_response = False
         self.is_valid = False
 
-        self.headers.clear()
-        self._headers.clear()
+        self.clear()
         self.body = bytes(data[header_size + 2:])  # store excess data
         start = 0
 

@@ -17,19 +17,9 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('globals',
-                 'context',
-                 'options',
-                 'app',
-                 'loop',
-                 'logger',
-                 'fileno',
-                 'queue',
-                 'handlers',
-                 'request',
-                 '_watermarks',
-                 '_header_buf',
-                 '_waiters')
+    __slots__ = ('globals', 'context', 'options', 'app', 'loop', 'logger',
+                 'fileno', 'queue', 'handlers', 'request',
+                 '_header_buf', '_waiters', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
@@ -43,31 +33,29 @@ class HTTPProtocol(asyncio.Protocol):
         self.handlers = set()
         self.request = None
 
-        self._watermarks = {'high': 65536, 'low': 8192}
         self._header_buf = bytearray()
         self._waiters = {}
+        self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
     def transport(self):
         return self.context.transport
 
-    @property
-    def tasks(self):
-        return self.context.tasks
-
     def add_close_callback(self, callback):
-        self.tasks.add(callback)
+        self.context.tasks.add(callback)
+
+    def add_task(self, task):
+        self.context.tasks.add(task)
+        task.add_done_callback(self.handle_task_done)
 
     def create_task(self, coro):
         task = self.loop.create_task(coro)
-
-        self.tasks.add(task)
-        task.add_done_callback(self.handle_task_done)
+        self.add_task(task)
 
         return task
 
     def handle_task_done(self, task):
-        self.tasks.discard(task)
+        self.context.tasks.discard(task)
 
         if not task.cancelled():
             exc = task.exception()
@@ -87,11 +75,11 @@ class HTTPProtocol(asyncio.Protocol):
         self._waiters['request'] = self.loop.create_future()
 
         self.add_close_callback(self.app.create_task(self._send_data()).cancel)
-        self.add_close_callback(self.app.create_task(
+        self.add_task(self.app.create_task(
             self.set_timeout(self._waiters['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
-        ).cancel)
+        ))
 
     def is_closing(self):
         return self.transport is None or self.transport.is_closing()
@@ -143,13 +131,14 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(self, data, i=0, rate=-1, buffer_size=16384):
+    async def put_to_queue(self, data, name=0, rate=-1, buffer_size=16384):
         if data:
-            mv = memoryview(data)
+            start = 0
 
-            while mv and self.queue is not None:
-                self.queue[i].put_nowait(mv[:buffer_size].tobytes())
-                queue_size = self.queue[i].qsize()
+            while start < len(data) and self.queue is not None:
+                buf = data[start:start + buffer_size]
+                self.queue[name].put_nowait(buf)
+                queue_size = self.queue[name].qsize()
 
                 if queue_size > self.options['max_queue_size']:
                     self.logger.error('%d exceeds the value of max_queue_size',
@@ -157,15 +146,16 @@ class HTTPProtocol(asyncio.Protocol):
                     self.close()
                     return
 
-                if rate > 0:
-                    await asyncio.sleep(1 / (rate / max(queue_size, 1) /
-                                             mv[:buffer_size].nbytes))
-                mv = mv[buffer_size:]
+                if rate > 0 and queue_size > 0:
+                    await asyncio.sleep(1 / (rate / queue_size / len(buf)))
+
+                start += buffer_size
         elif self.queue is not None:
-            self.queue[i].put_nowait(data)
+            self.queue[name].put_nowait(data)
 
         # maybe resume reading, or close
-        if i == 0 and self.transport is not None and self.request is not None:
+        if (name == 0 and
+                self.transport is not None and self.request is not None):
             if not data or self.request.upgraded:
                 self.transport.resume_reading()
                 return
@@ -175,7 +165,7 @@ class HTTPProtocol(asyncio.Protocol):
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and
                     self.queue is not None):
-                self.queue[i].put_nowait(None)
+                self.queue[name].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
                 if self.request.has_body:
                     self.transport.resume_reading()
@@ -390,7 +380,7 @@ class HTTPProtocol(asyncio.Protocol):
                                 'keepalive connection dropped: %d', self.fileno
                             )
 
-                        self.request.clear_body()
+                        self.request.clear()
 
                     self.close()
                     return
@@ -440,24 +430,24 @@ class HTTPProtocol(asyncio.Protocol):
 
             # reset. so the next data in data_received will be considered as
             # a fresh http request (not a continuation data)
-            self.request.clear_body()
+            self.request.clear()
             self._header_buf = bytearray()
 
             self._waiters['request'] = self.loop.create_future()
 
-            self.add_close_callback(self.app.create_task(
+            self.add_task(self.app.create_task(
                 self.set_timeout(self._waiters['request'],
                                  timeout=self.options['keepalive_timeout'],
                                  timeout_cb=self.keepalive_timeout)
-            ).cancel)
+            ))
 
             while not self.request.has_body and self.queue[0].qsize():
                 # this data is supposed to be the next header
                 self.data_received(self.queue[0].get_nowait())
 
     def connection_lost(self, _):
-        while self.tasks:
-            task = self.tasks.pop()
+        while self.context.tasks:
+            task = self.context.tasks.pop()
 
             try:
                 if callable(task):
@@ -475,9 +465,12 @@ class HTTPProtocol(asyncio.Protocol):
 
             self.queue = None
 
-        self.context.update(transport=None)
         self.request = None
         self._header_buf = None
+
+        self.context.clear()
+        self._waiters.clear()
+        self._watermarks.clear()
 
         self.set_handler_timeout(self.options['app_close_timeout'])
         self.globals.connections.discard(self)

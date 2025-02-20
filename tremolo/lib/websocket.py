@@ -13,7 +13,6 @@ class WebSocket:
     def __init__(self, request, response):
         self.request = request
         self.response = response
-        self.protocol = request.protocol
 
     def __aiter__(self):
         return self
@@ -60,11 +59,12 @@ class WebSocket:
             payload_length = int.from_bytes(await self.request.recv(8),
                                             byteorder='big')
 
-            if payload_length > self.protocol.options['ws_max_payload_size']:
+            if (payload_length >
+                    self.request.protocol.options['ws_max_payload_size']):
                 raise WebSocketServerClosed(
                     '%d exceeds maximum payload size (%d)' %
                     (payload_length,
-                     self.protocol.options['ws_max_payload_size']),
+                     self.request.protocol.options['ws_max_payload_size']),
                     code=1009
                 )
 
@@ -116,9 +116,9 @@ class WebSocket:
         while payload == b'':
             # got empty bytes (pong)
             # ping until non-empty bytes received
-            timer = self.protocol.loop.call_at(
-                self.protocol.loop.time() +
-                self.protocol.options['keepalive_timeout'] / 2,
+            timer = self.request.protocol.loop.call_at(
+                self.request.protocol.loop.time() +
+                self.request.protocol.options['keepalive_timeout'] / 2,
                 self._ping
             )
 
@@ -179,8 +179,8 @@ class WebSocket:
     def _ping(self):
         # ping only if this connection is still listed,
         # otherwise let the recv timeout drop it
-        if self.protocol in self.protocol.globals.connections:
-            self.protocol.create_task(self.ping())
+        if self.request.protocol in self.request.protocol.globals.connections:
+            self.request.protocol.create_task(self.ping())
 
     async def ping(self, data=b''):
         await self.send(data, opcode=9)

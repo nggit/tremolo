@@ -2,10 +2,10 @@
 
 
 class Response:
-    __slots__ = ('_protocol', '_send_buf')
+    __slots__ = ('request', '_send_buf')
 
     def __init__(self, request):
-        self._protocol = request.protocol
+        self.request = request
         self._send_buf = bytearray()
 
     def close(self):
@@ -28,9 +28,9 @@ class Response:
                 len(self._send_buf) < buffer_min_size):
             self._send_buf.extend(data)
         else:
-            await self._protocol.put_to_queue(
+            await self.request.protocol.put_to_queue(
                 self._send_buf + data,
-                i=1,
+                name=1,
                 rate=rate,
                 buffer_size=buffer_size
             )
@@ -38,5 +38,5 @@ class Response:
             del self._send_buf[:]
 
     def send_nowait(self, data):
-        if self._protocol.queue is not None:
-            self._protocol.queue[1].put_nowait(data)
+        if self.request.protocol.queue is not None:
+            self.request.protocol.queue[1].put_nowait(data)

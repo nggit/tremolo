@@ -7,7 +7,6 @@ class SSE:
     def __init__(self, request, response):
         self.request = request
         self.response = response
-        self.protocol = request.protocol
 
         response.set_content_type(b'text/event-stream')
         response.set_header(b'Cache-Control', b'no-cache, must-revalidate')

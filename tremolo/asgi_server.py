@@ -102,7 +102,7 @@ class ASGIServer(HTTPProtocol):
             self._waiter.set_result(None)
 
         self.response = None
-        self._scope = None
+        self._scope.clear()
 
     async def receive(self):
         if self._scope['type'] == 'websocket':
