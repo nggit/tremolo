@@ -11,26 +11,11 @@ from .request import Request
 
 
 class HTTPRequest(Request):
-    __slots__ = ('_ip',
-                 '_scheme',
-                 'header',
-                 'headers',
-                 'is_valid',
-                 'host',
-                 'method',
-                 'url',
-                 'path',
-                 'query_string',
-                 'version',
-                 'content_length',
-                 'transfer_encoding',
-                 'http_continue',
-                 'http_keepalive',
-                 '_upgraded',
-                 '_body',
-                 '_eof',
-                 '_read_instance',
-                 '_read_buf')
+    __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
+                 'host', 'method', 'url', 'path', 'query_string', 'version',
+                 'content_length', 'transfer_encoding', 'http_continue',
+                 'http_keepalive', '_upgraded', '_body', '_eof',
+                 '_read_instance', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)

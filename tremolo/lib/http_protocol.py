@@ -17,19 +17,9 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('globals',
-                 'context',
-                 'options',
-                 'app',
-                 'loop',
-                 'logger',
-                 'fileno',
-                 'queue',
-                 'handlers',
-                 'request',
-                 '_header_buf',
-                 '_waiters',
-                 '_watermarks')
+    __slots__ = ('globals', 'context', 'options', 'app', 'loop', 'logger',
+                 'fileno', 'queue', 'handlers', 'request',
+                 '_header_buf', '_waiters', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
