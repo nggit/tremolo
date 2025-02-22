@@ -23,10 +23,6 @@ class HTTPServer(HTTPProtocol):
             'lock': kwargs['lock']
         }
 
-    @property
-    def response(self):
-        return self._server.get('response', None)
-
     async def _connection_made(self):
         for _, func, _ in self._middlewares['connect']:
             if await func(**self._server):
@@ -79,7 +75,8 @@ class HTTPServer(HTTPProtocol):
             start += step
 
     async def _handle_middleware(self, func, kwargs):
-        options = self.request.context.options
+        response = self._server['response']
+        options = response.request.context.options
         options.update(kwargs)
 
         data = await func(**self._server)
@@ -89,10 +86,10 @@ class HTTPServer(HTTPProtocol):
 
         if isinstance(data, (bytes, bytearray, str, tuple)):
             if 'status' in options:
-                self.response.set_status(*options['status'])
+                response.set_status(*options['status'])
 
             if 'content_type' in options:
-                self.response.set_content_type(options['content_type'])
+                response.set_content_type(options['content_type'])
 
             encoding = ('utf-8',)
 
@@ -102,38 +99,36 @@ class HTTPServer(HTTPProtocol):
             if isinstance(data, str):
                 data = data.encode(encoding[0])
 
-            await self.response.end(data)
+            await response.end(data)
         else:
             self.logger.info('middleware %s has exited with the connection '
                              'possibly left open', func.__name__)
 
         return True
 
-    def _handle_websocket(self):
-        if (self.options['ws'] and
-                b'sec-websocket-key' in self.request.headers and
-                b'upgrade' in self.request.headers and
-                self.request.headers[b'upgrade'].lower() == b'websocket'):
-            self._server['websocket'] = WebSocket(self.request, self.response)
-
     async def _handle_response(self, func, kwargs):
-        options = self.request.context.options
+        response = self._server['response']
+        request = response.request
+        options = request.context.options
         options.update(kwargs)
         options.setdefault('rate', self.options['download_rate'])
         options.setdefault('buffer_size', self.options['buffer_size'])
 
-        if not self.request.has_body:
-            if 'websocket' in options:
-                self._handle_websocket()
+        if not request.has_body:
+            if ('websocket' in options and self.options['ws'] and
+                    b'sec-websocket-key' in request.headers and
+                    b'upgrade' in request.headers and
+                    request.headers[b'upgrade'].lower() == b'websocket'):
+                self._server['websocket'] = WebSocket(request, response)
 
             if 'sse' in options:
-                self._server['sse'] = SSE(self.request, self.response)
+                self._server['sse'] = SSE(request, response)
 
         if 'status' in options:
-            self.response.set_status(*options['status'])
+            response.set_status(*options['status'])
 
         if 'content_type' in options:
-            self.response.set_content_type(options['content_type'])
+            response.set_content_type(options['content_type'])
 
         try:
             agen = func(**self._server)
@@ -148,7 +143,7 @@ class HTTPServer(HTTPProtocol):
             data = await agen
 
             if data is None:
-                self.response.close()
+                response.close()
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
@@ -156,47 +151,44 @@ class HTTPServer(HTTPProtocol):
                                  'possibly left open', func.__name__)
                 return
 
-        status = self.response.get_status()
+        status = response.get_status()
         no_content = status[0] in (204, 205, 304) or 100 <= status[0] < 200
-        self.response.http_chunked = options.get(
-            'chunked', self.request.version == b'1.1' and not no_content
+        response.http_chunked = options.get(
+            'chunked', request.version == b'1.1' and not no_content
         )
-        self.response.set_status(*status)
+        response.set_status(*status)
 
         if not no_content:
-            self.response.set_header(
-                b'Content-Type', self.response.get_content_type()
-            )
+            response.set_header(b'Content-Type', response.get_content_type())
 
-        if self.response.http_chunked:
-            self.response.set_header(b'Transfer-Encoding', b'chunked')
+        if response.http_chunked:
+            response.set_header(b'Transfer-Encoding', b'chunked')
 
         if next_data:
-            if self.request.http_keepalive:
+            if request.http_keepalive:
                 if status[0] == 101:
-                    self.request.upgraded = True
-                elif not (self.response.http_chunked or
-                          b'content-length' in self.response.headers):
+                    request.upgraded = True
+                elif not (response.http_chunked or
+                          b'content-length' in response.headers):
                     # no chunk, no close, no size.
                     # Assume close to signal end
-                    self.request.http_keepalive = False
+                    request.http_keepalive = False
 
-                self.response.set_header(
+                response.set_header(
                     b'Connection',
                     UPGRADE_OR_KEEPALIVE[status[0] in (101, 426)]
                 )
             else:
-                self.response.set_header(b'Connection', b'close')
+                response.set_header(b'Connection', b'close')
 
             if await self.run_middlewares('response', reverse=True):
                 return
 
-            if self.request.method == b'HEAD' or no_content:
-                await self.response.write(None)
+            if request.method == b'HEAD' or no_content:
+                await response.write(None)
                 return
 
             buffer_min_size = options['buffer_size'] // 2
-
             self.set_watermarks(high=options['buffer_size'] * 4,
                                 low=buffer_min_size)
 
@@ -204,10 +196,10 @@ class HTTPServer(HTTPProtocol):
                 buffer_min_size = None
 
             if data != b'':
-                await self.response.write(data,
-                                          rate=options['rate'],
-                                          buffer_size=options['buffer_size'],
-                                          buffer_min_size=buffer_min_size)
+                await response.write(data,
+                                     rate=options['rate'],
+                                     buffer_size=options['buffer_size'],
+                                     buffer_min_size=buffer_min_size)
 
             while True:
                 try:
@@ -216,16 +208,12 @@ class HTTPServer(HTTPProtocol):
                     if data == b'':
                         continue
 
-                    await self.response.write(
-                        data,
-                        rate=options['rate'],
-                        buffer_size=options['buffer_size'],
-                        buffer_min_size=buffer_min_size
-                    )
+                    await response.write(data,
+                                         rate=options['rate'],
+                                         buffer_size=options['buffer_size'],
+                                         buffer_min_size=buffer_min_size)
                 except StopAsyncIteration:
-                    await self.response.write(
-                        b'', buffer_min_size=buffer_min_size
-                    )
+                    await response.write(b'', buffer_min_size=buffer_min_size)
                     break
         else:
             encoding = ('utf-8',)
@@ -236,30 +224,30 @@ class HTTPServer(HTTPProtocol):
             if isinstance(data, str):
                 data = data.encode(encoding[0])
 
-            if not (no_content or self.response.http_chunked):
-                self.response.set_header(b'Content-Length', b'%d' % len(data))
+            if not (no_content or response.http_chunked):
+                response.set_header(b'Content-Length', b'%d' % len(data))
 
-            self.response.set_header(
-                b'Connection', KEEPALIVE_OR_CLOSE[self.request.http_keepalive]
+            response.set_header(
+                b'Connection', KEEPALIVE_OR_CLOSE[request.http_keepalive]
             )
 
             if await self.run_middlewares('response', reverse=True):
                 return
 
-            if self.request.method == b'HEAD' or no_content:
-                await self.response.write(None)
+            if request.method == b'HEAD' or no_content:
+                await response.write(None)
                 return
 
             if data != b'':
                 self.set_watermarks(high=options['buffer_size'] * 4,
                                     low=options['buffer_size'] // 2)
-                await self.response.write(data,
-                                          rate=options['rate'],
-                                          buffer_size=options['buffer_size'])
+                await response.write(data,
+                                     rate=options['rate'],
+                                     buffer_size=options['buffer_size'])
 
-            await self.response.write(b'')
+            await response.write(b'')
 
-        self.response.close(keepalive=True)
+        response.close(keepalive=True)
 
     async def request_received(self, request, response):
         self._server['request'] = request
@@ -271,14 +259,14 @@ class HTTPServer(HTTPProtocol):
         if await self.run_middlewares('request'):
             return
 
-        if not self.request.is_valid:
+        if not request.is_valid:
             # bad request
             await self._handle_response(
                 self._routes[0][0][1], self._routes[0][0][2]
             )
             return
 
-        path = self.request.path.strip(b'/')
+        path = request.path.strip(b'/')
 
         if path == b'':
             key = 1
@@ -288,7 +276,7 @@ class HTTPServer(HTTPProtocol):
 
         if key in self._routes:
             for (pattern, func, kwargs) in self._routes[key]:
-                m = pattern.search(self.request.url)
+                m = pattern.search(request.url)
 
                 if m:
                     matches = m.groupdict()
@@ -296,7 +284,7 @@ class HTTPServer(HTTPProtocol):
                     if not matches:
                         matches = m.groups()
 
-                    self.request.params['path'] = matches
+                    request.params['path'] = matches
 
                     await self._handle_response(func, kwargs)
                     return
@@ -306,7 +294,7 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
                 pattern, func, kwargs = self._routes[-1][i]
-                m = pattern.search(self.request.url)
+                m = pattern.search(request.url)
 
                 if m:
                     if key in self._routes:
@@ -319,7 +307,7 @@ class HTTPServer(HTTPProtocol):
                     if not matches:
                         matches = m.groups()
 
-                    self.request.params['path'] = matches
+                    request.params['path'] = matches
 
                     await self._handle_response(func, kwargs)
                     del self._routes[-1][i]
