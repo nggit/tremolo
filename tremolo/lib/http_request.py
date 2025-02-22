@@ -15,7 +15,7 @@ class HTTPRequest(Request):
                  'host', 'method', 'url', 'path', 'query_string', 'version',
                  'content_length', 'transfer_encoding', 'http_continue',
                  'http_keepalive', '_upgraded', '_body', '_eof',
-                 '_read_instance', '_read_buf')
+                 '_stream', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -45,7 +45,7 @@ class HTTPRequest(Request):
         self._upgraded = False
         self._body = bytearray()
         self._eof = False
-        self._read_instance = None
+        self._stream = None
         self._read_buf = bytearray()
 
     @property
@@ -135,14 +135,14 @@ class HTTPRequest(Request):
         if size == 0 or self.eof():
             return b''
 
-        if self._read_instance is None:
-            self._read_instance = self.stream(raw=raw)
+        if self._stream is None:
+            self._stream = self.stream(raw=raw)
 
         if size == -1:
-            return await self._read_instance.__anext__()
+            return await self._stream.__anext__()
 
         if len(self._read_buf) < size:
-            async for data in self._read_instance:
+            async for data in self._stream:
                 self._read_buf.extend(data)
 
                 if len(self._read_buf) >= size:
@@ -319,15 +319,15 @@ class HTTPRequest(Request):
         paused = False
         part = None  # represents a file received in a multipart request
 
-        if self._read_instance is None:
-            self._read_instance = self.stream()
+        if self._stream is None:
+            self._stream = self.stream()
 
         while max_files > 0:
             data = b''
 
             if not paused:
                 try:
-                    data = await self._read_instance.__anext__()
+                    data = await self._stream.__anext__()
                 except StopAsyncIteration as exc:
                     if self._read_buf.startswith(b'--%s--' % boundary):
                         del self._read_buf[:]  # set eof()
