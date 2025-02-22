@@ -213,11 +213,10 @@ class HTTPProtocol(asyncio.Protocol):
         )
         self.queue[1].put_nowait(None)
 
-    async def _handle_request(self, header):
-        self.request = HTTPRequest(self, header)
-        response = HTTPResponse(self.request)
-
+    async def _handle_request(self):
         try:
+            response = HTTPResponse(self.request)
+
             if b'connection' in self.request.headers:
                 for v in self.request.headers[b'connection'].split(b',', 100):
                     if v.strip().lower() == b'close':
@@ -261,11 +260,11 @@ class HTTPProtocol(asyncio.Protocol):
             else:
                 await self.put_to_queue(b'')
 
-            if self.request.has_body or header.body:
+            if self.request.has_body or self.request.header.body:
                 # the initial body that accompanies the header
                 # or the next request header, if it's a bodyless request
                 await self.put_to_queue(
-                    header.body, rate=self.options['upload_rate']
+                    self.request.header.body, rate=self.options['upload_rate']
                 )
 
             # successfully got header,
@@ -278,16 +277,17 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
             try:
-                await self.request_received(response.request, response)
+                await self.request_received(self.request, response)
             finally:
                 timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
-            data = None
+            if self.request is not None:
+                data = None
 
-            try:
-                data = await self.error_received(exc, response)
-            finally:
-                await response.handle_exception(exc, data)
+                try:
+                    data = await self.error_received(exc, response)
+                finally:
+                    await response.handle_exception(exc, data)
 
     async def _receive_data(self, data, waiter):
         await waiter
@@ -301,7 +301,7 @@ class HTTPProtocol(asyncio.Protocol):
         if not data:
             return
 
-        if self._header_buf is not None:
+        if self.request is None:
             self._header_buf.extend(data)
             header_size = self._header_buf.find(b'\r\n\r\n') + 2
 
@@ -315,14 +315,13 @@ class HTTPProtocol(asyncio.Protocol):
                                     excludes=[b'proxy'])
 
                 if header.is_request:
-                    task = self.app.create_task(self._handle_request(header))
+                    self.request = HTTPRequest(self, header)
+                    task = self.app.create_task(self._handle_request())
 
                     self.handlers.add(task)
                     task.add_done_callback(self.handlers.discard)
                 else:
                     self.close(BadRequest('bad request: not a request'))
-
-                self._header_buf = None
             elif header_size > self.options['client_max_header_size']:
                 self.close(BadRequest('request header too large'))
             elif not (header_size == 1 and len(self._header_buf) <=
@@ -379,6 +378,7 @@ class HTTPProtocol(asyncio.Protocol):
                                 'keepalive connection dropped: %d', self.fileno
                             )
 
+                        del self._header_buf[:]
                         self.request.clear()
 
                     self.close()
@@ -422,15 +422,10 @@ class HTTPProtocol(asyncio.Protocol):
                 # waits for all incoming data to enter the queue
                 await self._waiters.pop('receive')
 
-            if self.request.body_size < self.request.content_length:
+            if self.request.has_body and not self.request.eof():
                 raise InternalServerError(
                     'request body was not fully consumed'
                 )
-
-            # reset. so the next data in data_received will be considered as
-            # a fresh http request (not a continuation data)
-            self.request.clear()
-            self._header_buf = bytearray()
 
             self._waiters['request'] = self.loop.create_future()
 
@@ -440,7 +435,13 @@ class HTTPProtocol(asyncio.Protocol):
                                  timeout_cb=self.keepalive_timeout)
             ))
 
-            while not self.request.has_body and self.queue[0].qsize():
+            # reset. so the next data in data_received will be considered as
+            # a fresh http request (not a continuation data)
+            del self._header_buf[:]
+            self.request.clear()
+            self.request = None
+
+            while self.queue[0].qsize():
                 # this data is supposed to be the next header
                 self.data_received(self.queue[0].get_nowait())
 
@@ -465,7 +466,6 @@ class HTTPProtocol(asyncio.Protocol):
             self.queue = None
 
         self.request = None
-        self._header_buf = None
 
         self.context.clear()
         self._waiters.clear()
