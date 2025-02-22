@@ -7,7 +7,6 @@ from .http_exceptions import (
     HTTPException,
     BadRequest,
     ExpectationFailed,
-    InternalServerError,
     RequestTimeout
 )
 from .http_header import HTTPHeader
@@ -423,9 +422,9 @@ class HTTPProtocol(asyncio.Protocol):
                 await self._waiters.pop('receive')
 
             if self.request.has_body and not self.request.eof():
-                raise InternalServerError(
-                    'request body was not fully consumed'
-                )
+                self.logger.info('request body was not fully consumed')
+                self.close()
+                return
 
             self._waiters['request'] = self.loop.create_future()
 
