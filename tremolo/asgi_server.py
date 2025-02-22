@@ -31,7 +31,7 @@ class ASGIServer(HTTPProtocol):
             'root_path': self.options['root_path'],
             'server': self.globals.info['server']
         }
-        self.response = None  # set in headers_received
+        self.response = None  # set in request_received
         self._read = None
         self._websocket = None
         self._waiter = self.loop.create_future()
@@ -52,7 +52,7 @@ class ASGIServer(HTTPProtocol):
         self._scope['method'] = self.request.method.decode('latin-1')
         self._scope['scheme'] = self.request.scheme.decode('latin-1')
 
-    async def headers_received(self, response):
+    async def request_received(self, request, response):
         self.response = response
 
         if not self.request.is_valid:
@@ -89,11 +89,10 @@ class ASGIServer(HTTPProtocol):
 
             await response.handle_exception(exc)
 
-    async def error_received(self, exc):
-        if self.request is not None and self.response is not None:
-            return await error_500(
-                request=self.request, response=self.response, exc=exc
-            )
+    async def error_received(self, exc, response):
+        return await error_500(
+            request=response.request, response=response, exc=exc
+        )
 
     def connection_lost(self, exc):
         super().connection_lost(exc)

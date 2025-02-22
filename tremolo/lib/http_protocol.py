@@ -172,10 +172,10 @@ class HTTPProtocol(asyncio.Protocol):
             else:
                 self.close(BadRequest('payload too large'))
 
-    async def headers_received(self, response):
+    async def request_received(self, request, response):
         raise NotImplementedError
 
-    async def error_received(self, exc):
+    async def error_received(self, exc, response):
         raise NotImplementedError
 
     def handlers_timeout(self):
@@ -278,15 +278,14 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
             try:
-                if self.request is not None:
-                    await self.headers_received(response)
+                await self.request_received(response.request, response)
             finally:
                 timer.cancel()
         except (asyncio.CancelledError, Exception) as exc:
             data = None
 
             try:
-                data = await self.error_received(exc)
+                data = await self.error_received(exc, response)
             finally:
                 await response.handle_exception(exc, data)
 

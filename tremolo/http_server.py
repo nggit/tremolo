@@ -261,9 +261,9 @@ class HTTPServer(HTTPProtocol):
 
         self.response.close(keepalive=True)
 
-    async def headers_received(self, response):
+    async def request_received(self, request, response):
+        self._server['request'] = request
         self._server['response'] = response
-        self._server['request'] = self.request
 
         if self._middlewares['connect']:
             await self.context.ON_CONNECT
@@ -330,9 +330,8 @@ class HTTPServer(HTTPProtocol):
             self._routes[0][1][1], self._routes[0][1][2]
         )
 
-    async def error_received(self, exc):
+    async def error_received(self, exc, response):
         # internal server error
-        if self.request is not None and self.response is not None:
-            return await self._routes[0][-1][1](request=self.request,
-                                                response=self.response,
-                                                exc=exc)
+        return await self._routes[0][-1][1](request=response.request,
+                                            response=response,
+                                            exc=exc)
