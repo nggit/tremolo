@@ -99,8 +99,10 @@ class HTTPProtocol(asyncio.Protocol):
 
             self.print_exception(exc, 'close')
 
-        if self.transport.can_write_eof():
+        try:
             self.transport.write_eof()
+        except (OSError, RuntimeError) as exc:
+            self.logger.info(exc)
 
         self.transport.close()
 
