@@ -2,40 +2,35 @@
 
 
 class Context:
-    def __init__(self):
-        self.__dict__ = {}
+    def __init__(self, *args, **kwargs):
+        self.__dict__.update(*args, **kwargs)
 
     def __repr__(self):
         return self.__dict__.__repr__()
 
-    def clear(self):
-        self.__dict__.clear()
+    def __getattr__(self, name):  # clear(), get(), update(), etc.
+        return getattr(self.__dict__, name)
 
-    def get(self, key, default=None):
-        return self.__dict__.get(key, default)
+    def __setitem__(self, key, value):
+        self.__setattr__(key, value)
 
-    def update(self, *args, **kwargs):
-        return self.__dict__.update(*args, **kwargs)
+    def __getitem__(self, key):
+        return self.__dict__[key]
 
-    def __setitem__(self, *args):
-        self.__setattr__(*args)
+    def __delitem__(self, key):
+        del self.__dict__[key]
 
-    def __getitem__(self, name):
-        return self.__dict__[name]
-
-    def __contains__(self, name):
-        return self.__dict__.__contains__(name)
+    def __contains__(self, key):
+        return self.__dict__.__contains__(key)
 
 
 class WorkerContext(Context):
     _tasks = set()
 
     def __init__(self):
-        self.__dict__ = {
-            'info': {},
-            'options': {},
-            'queues': {}
-        }
+        self.__dict__['info'] = {}
+        self.__dict__['options'] = {}
+        self.__dict__['queues'] = {}
 
     @property
     def tasks(self):
@@ -59,10 +54,9 @@ class WorkerContext(Context):
 
 
 class ConnectionContext(Context):
-    __slots__ = ('_tasks',)
+    __slots__ = ('_tasks',)  # won't appear in self.__dict__. safe from clear()
 
     def __init__(self):
-        self.__dict__ = {}
         self._tasks = set()
 
     @property
@@ -87,9 +81,7 @@ class ConnectionContext(Context):
 
 class RequestContext(Context):
     def __init__(self):
-        self.__dict__ = {
-            'options': {}
-        }
+        self.__dict__['options'] = {}
 
     @property
     def options(self):
