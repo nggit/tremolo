@@ -30,7 +30,6 @@ class WorkerContext(Context):
     def __init__(self):
         self.__dict__['info'] = {}
         self.__dict__['options'] = {}
-        self.__dict__['queues'] = {}
 
     @property
     def tasks(self):
@@ -43,10 +42,6 @@ class WorkerContext(Context):
     @property
     def options(self):
         return self.__dict__['options']
-
-    @property
-    def queues(self):
-        return self.__dict__['queues']
 
     @property
     def connections(self):
