@@ -2,6 +2,7 @@
 
 import asyncio
 
+from tremolo.utils import parse_int
 from .contexts import ConnectionContext
 from .http_exceptions import (
     HTTPException,
@@ -228,24 +229,22 @@ class HTTPProtocol(asyncio.Protocol):
                 # assuming a request with a body, such as POST
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
-                        raise BadRequest('unexpected chunked encoding')
+                        raise BadRequest('unexpected Transfer-Encoding')
 
                     self.request.transfer_encoding = self.request.headers[
                         b'transfer-encoding'
                     ].lower()
 
                 if b'content-length' in self.request.headers:
-                    try:
-                        self.request.content_length = int(
-                            b'+' + self.request.headers[b'content-length']
-                        )
-                    except (ValueError, TypeError) as exc:
-                        raise BadRequest('bad Content-Length') from exc
-
-                    if (b'%d' % self.request.content_length !=
-                            self.request.headers[b'content-length'] or
-                            b'chunked' in self.request.transfer_encoding):
+                    if b'chunked' in self.request.transfer_encoding:
                         raise BadRequest
+
+                    try:
+                        self.request.content_length = parse_int(
+                            self.request.headers[b'content-length']
+                        )
+                    except ValueError as exc:
+                        raise BadRequest('bad Content-Length') from exc
 
                 if (b'expect' in self.request.headers and
                         self.request.headers[b'expect']

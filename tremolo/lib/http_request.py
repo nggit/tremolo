@@ -5,7 +5,7 @@ import time
 
 from urllib.parse import parse_qs
 
-from tremolo.utils import parse_fields
+from tremolo.utils import parse_fields, parse_int
 from .http_exceptions import BadRequest, PayloadTooLarge
 from .request import Request
 
@@ -203,12 +203,12 @@ class HTTPRequest(Request):
                         continue
 
                     try:
-                        chunk_size = int(b'0x' + buf[:i].split(b';', 1)[0], 16)
+                        chunk_size = parse_int(buf[:i].split(b';', 1)[0], 16)
                     except ValueError as exc:
                         del buf[:]
                         raise BadRequest('bad chunked encoding') from exc
 
-                    if chunk_size < 1:
+                    if chunk_size <= 0:
                         break
 
                     data = bytes(buf[i + 2:i + 2 + chunk_size])
@@ -367,8 +367,8 @@ class HTTPRequest(Request):
                                 part[k.decode('latin-1')] = v.decode('latin-1')
 
                         if b'content-length' in header:
-                            content_length = int(
-                                b'+' + header[b'content-length']
+                            content_length = parse_int(
+                                header[b'content-length']
                             )
                             part['length'] = content_length
 
