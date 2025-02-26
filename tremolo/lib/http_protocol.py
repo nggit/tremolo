@@ -2,6 +2,7 @@
 
 import asyncio
 
+from tremolo.utils import parse_int
 from .contexts import ConnectionContext
 from .http_exceptions import (
     HTTPException,
@@ -28,7 +29,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.loop = app.loop
         self.logger = app.logger
         self.fileno = -1
-        self.queue = None
+        self.queue = [Queue(), Queue()]  # IN, OUT
         self.handlers = set()
         self.request = None
 
@@ -65,11 +66,6 @@ class HTTPProtocol(asyncio.Protocol):
     def connection_made(self, transport):
         self.context.update(transport=transport)
         self.fileno = transport.get_extra_info('socket').fileno()
-
-        try:
-            self.queue = self.globals.queues.pop(self.fileno)
-        except KeyError:
-            self.queue = [Queue(), Queue()]
 
         self._waiters['request'] = self.loop.create_future()
 
@@ -136,7 +132,7 @@ class HTTPProtocol(asyncio.Protocol):
         if data:
             start = 0
 
-            while start < len(data) and self.queue is not None:
+            while start < len(data) and self.queue:
                 buf = data[start:start + buffer_size]
                 self.queue[name].put_nowait(buf)
                 queue_size = self.queue[name].qsize()
@@ -151,7 +147,7 @@ class HTTPProtocol(asyncio.Protocol):
                     await asyncio.sleep(1 / (rate / queue_size / len(buf)))
 
                 start += buffer_size
-        elif self.queue is not None:
+        elif self.queue:
             self.queue[name].put_nowait(data)
 
         # maybe resume reading, or close
@@ -165,7 +161,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             if (b'content-length' in self.request.headers and
                     self.request.body_size >= self.request.content_length and
-                    self.queue is not None):
+                    self.queue):
                 self.queue[name].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
                 if self.request.has_body:
@@ -233,24 +229,22 @@ class HTTPProtocol(asyncio.Protocol):
                 # assuming a request with a body, such as POST
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
-                        raise BadRequest('unexpected chunked encoding')
+                        raise BadRequest('unexpected Transfer-Encoding')
 
                     self.request.transfer_encoding = self.request.headers[
                         b'transfer-encoding'
                     ].lower()
 
                 if b'content-length' in self.request.headers:
-                    try:
-                        self.request.content_length = int(
-                            b'+' + self.request.headers[b'content-length']
-                        )
-                    except (ValueError, TypeError) as exc:
-                        raise BadRequest('bad Content-Length') from exc
-
-                    if (b'%d' % self.request.content_length !=
-                            self.request.headers[b'content-length'] or
-                            b'chunked' in self.request.transfer_encoding):
+                    if b'chunked' in self.request.transfer_encoding:
                         raise BadRequest
+
+                    try:
+                        self.request.content_length = parse_int(
+                            self.request.headers[b'content-length']
+                        )
+                    except ValueError as exc:
+                        raise BadRequest('bad Content-Length') from exc
 
                 if (b'expect' in self.request.headers and
                         self.request.headers[b'expect']
@@ -355,7 +349,7 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.set_write_buffer_limits(high=high, low=low)
 
     async def _send_data(self):
-        while self.queue is not None:
+        while self.queue:
             try:
                 data = await self.queue[1].get()
 
@@ -460,11 +454,8 @@ class HTTPProtocol(asyncio.Protocol):
             except Exception as exc:
                 self.print_exception(exc, 'connection_lost')
 
-        if self.queue is not None:
-            if self.queue[0].clear() and self.queue[1].clear():
-                self.globals.queues[self.fileno] = self.queue
-
-            self.queue = None
+        while self.queue:
+            self.queue.pop().clear()
 
         self.request = None
 

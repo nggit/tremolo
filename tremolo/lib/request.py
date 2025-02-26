@@ -42,7 +42,7 @@ class Request:
         self.protocol = None  # cut off access to the protocol object
 
     async def recv(self):
-        while self.protocol.queue is not None:
+        while self.protocol.queue:
             task = self.protocol.loop.create_task(
                 self.protocol.queue[0].get()
             )
