@@ -142,7 +142,7 @@ def parse_fields(data, separator=b';', max_fields=100):
 
 
 def parse_int(string, base=10):
-    if not isinstance(string, (bytes, bytearray)) or len(string) > 16:
+    if not isinstance(string, (bytes, bytearray)) or not 0 < len(string) <= 16:
         raise ValueError('string must be bytes-like and <=16 in length')
 
     total = 0
