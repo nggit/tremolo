@@ -33,7 +33,7 @@ _REUSEPORT_OR_REUSEADDR = {
 
 class Tremolo:
     def __init__(self, name=None):
-        self.logger = logging.getLogger(name or mp.current_process().name)
+        self.logger = None if name is None else logging.getLogger(name)
         self.context = WorkerContext()
         self.manager = ProcessManager()
         self.routes = Routes()
@@ -407,6 +407,9 @@ class Tremolo:
                 self.logger.error(exc)
 
     def _worker(self, host, port, **kwargs):
+        if self.logger is None:
+            self.logger = logging.getLogger(mp.current_process().name)
+
         self.logger.setLevel(
             getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
