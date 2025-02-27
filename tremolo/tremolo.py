@@ -19,7 +19,7 @@ from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
 from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, log_date, memory_usage, server_date, getoptions
+    file_signature, getoptions, log_date, memory_usage, server_date
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
@@ -431,8 +431,6 @@ class Tremolo:
         module_name, _, class_name = loop_name.rpartition('.')
         module = import_module(module_name or 'asyncio')
         loop = getattr(module, class_name or 'new_event_loop')()
-
-        asyncio.set_event_loop(loop)
         task = loop.create_task(self._serve(host, port, **kwargs))
 
         task.add_done_callback(lambda fut: loop.stop())
