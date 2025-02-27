@@ -367,9 +367,13 @@ class HTTPRequest(Request):
                                 part[k.decode('latin-1')] = v.decode('latin-1')
 
                         if b'content-length' in header:
-                            content_length = parse_int(
-                                header[b'content-length']
-                            )
+                            try:
+                                content_length = parse_int(
+                                    header[b'content-length']
+                                )
+                            except ValueError as exc:
+                                raise BadRequest('bad Content-Length') from exc
+
                             part['length'] = content_length
 
                         if b'content-type' in header:
