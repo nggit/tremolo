@@ -19,7 +19,7 @@ from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
 from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, log_date, memory_usage, server_date, getoptions
+    file_signature, getoptions, log_date, memory_usage, server_date
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
@@ -33,7 +33,7 @@ _REUSEPORT_OR_REUSEADDR = {
 
 class Tremolo:
     def __init__(self, name=None):
-        self.logger = logging.getLogger(name or mp.current_process().name)
+        self.logger = None if name is None else logging.getLogger(name)
         self.context = WorkerContext()
         self.manager = ProcessManager()
         self.routes = Routes()
@@ -407,6 +407,9 @@ class Tremolo:
                 self.logger.error(exc)
 
     def _worker(self, host, port, **kwargs):
+        if self.logger is None:
+            self.logger = logging.getLogger(mp.current_process().name)
+
         self.logger.setLevel(
             getattr(logging, kwargs['log_level'], logging.DEBUG)
         )
@@ -428,8 +431,6 @@ class Tremolo:
         module_name, _, class_name = loop_name.rpartition('.')
         module = import_module(module_name or 'asyncio')
         loop = getattr(module, class_name or 'new_event_loop')()
-
-        asyncio.set_event_loop(loop)
         task = loop.create_task(self._serve(host, port, **kwargs))
 
         task.add_done_callback(lambda fut: loop.stop())

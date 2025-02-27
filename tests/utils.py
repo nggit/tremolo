@@ -217,7 +217,7 @@ def create_dummy_body(size, chunk_size=0):
 
 
 def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
-    body = bytearray(b'preamble')
+    body = bytearray(b'PREAMBLE')
 
     for name, data in parts.items():
         body.extend(b'--%s\r\nContent-Length: %d\r\n' % (boundary, len(data)))
@@ -227,7 +227,7 @@ def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
             b'Content-Type: application/octet-stream\r\n\r\n%s\r\n' % data
         )
 
-    return bytes(body) + b'--%s--\r\nepilogue' % boundary
+    return bytes(body) + b'--%s--\r\nEPILOGUE' % boundary
 
 
 logger = logging.getLogger(__name__)

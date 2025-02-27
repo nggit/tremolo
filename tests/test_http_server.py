@@ -532,6 +532,18 @@ class TestHTTPServer(unittest.TestCase):
                          b'HTTP/1.1 400 Bad Request')
         self.assertEqual(body, b'bad Content-Length')
 
+    def test_sec_empty_content_length(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Content-Length: \r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad Content-Length')
+
     def test_requesttimeout(self):
         header, body = getcontents(
             host=HTTP_HOST,
