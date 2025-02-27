@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Author: nggit
+# Description: A simple WebSocket Chat with HTML and vanilla JS.
 
 import time
 
 from tremolo import Application
-from tremolo.exceptions import BadRequest
+from tremolo.utils import html_escape
 
 app = Application()
-
-
-@app.on_request
-async def middleware_handler(**server):
-    for char in b'&<>"\'':
-        if char in server['request'].host:
-            raise BadRequest('illegal host')
-
-    # add more validations, CORS headers, etc if needed
 
 
 @app.route('/')
@@ -48,13 +42,10 @@ async def ws_handler(request, websocket=None, stream=False):
         <ul id="messages"></ul>
         <script>
     """
-    ws_scheme = b'ws'
+    ws_scheme = b'wss' if request.scheme == b'https' else b'ws'
 
-    if request.scheme == b'https':
-        ws_scheme += b's'
-
-    yield b"\
-        var socket = new WebSocket('%s://%s/');" % (ws_scheme, request.host)
+    yield b"var socket = new WebSocket('%s://%s/');" % (
+        ws_scheme, html_escape(request.host))
     yield b"""
             var messages = document.getElementById('messages');
             var sendButton = document.getElementById('send');
