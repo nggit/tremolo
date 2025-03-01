@@ -448,7 +448,7 @@ class HTTPResponse(Response):
         self.close(keepalive=True)
 
     async def handle_exception(self, exc, data=b''):
-        if self.request.protocol is None:
+        if self.request.protocol is None or self.request.transport is None:
             return
 
         if not isinstance(exc, asyncio.CancelledError):
@@ -456,8 +456,8 @@ class HTTPResponse(Response):
                 exc, quote(unquote_to_bytes(self.request.path))
             )
 
-        if self.request.protocol.is_closing():  # maybe stuck?
-            self.request.protocol.transport.abort()
+        if self.request.transport.is_closing():  # maybe stuck?
+            self.request.transport.abort()
             return
 
         # WebSocket
