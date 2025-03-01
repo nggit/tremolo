@@ -209,7 +209,12 @@ class HTTPRequest(Request):
                         raise BadRequest('bad chunked encoding') from exc
 
                     if chunk_size <= 0:
-                        break
+                        if b'\r\n\r\n' in buf:
+                            break
+
+                        raise BadRequest(
+                            'bad chunked encoding: invalid last-chunk'
+                        )
 
                     data = bytes(buf[i + 2:i + 2 + chunk_size])
                     bytes_unread = chunk_size - len(data)
