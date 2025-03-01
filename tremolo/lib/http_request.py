@@ -171,7 +171,6 @@ class HTTPRequest(Request):
                         buf.extend(await agen.__anext__())
                     except StopAsyncIteration as exc:
                         if b'\r\n\r\n' not in buf:
-                            del buf[:]
                             raise BadRequest(
                                 'bad chunked encoding: incomplete read'
                             ) from exc
@@ -194,7 +193,6 @@ class HTTPRequest(Request):
 
                     if i == -1:
                         if len(buf) > self.protocol.options['buffer_size'] * 4:
-                            del buf[:]
                             raise BadRequest(
                                 'bad chunked encoding: no chunk size'
                             )
@@ -205,11 +203,15 @@ class HTTPRequest(Request):
                     try:
                         chunk_size = parse_int(buf[:i].split(b';', 1)[0], 16)
                     except ValueError as exc:
-                        del buf[:]
                         raise BadRequest('bad chunked encoding') from exc
 
                     if chunk_size <= 0:
-                        break
+                        if b'\r\n\r\n' in buf:
+                            break
+
+                        raise BadRequest(
+                            'bad chunked encoding: invalid last-chunk'
+                        )
 
                     data = bytes(buf[i + 2:i + 2 + chunk_size])
                     bytes_unread = chunk_size - len(data)
@@ -334,7 +336,6 @@ class HTTPRequest(Request):
                         return
 
                     if header_size == 1 or body_size == -1:
-                        del body[:]
                         raise BadRequest(
                             'malformed multipart/form-data: incomplete read'
                         ) from exc
