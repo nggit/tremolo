@@ -231,7 +231,7 @@ class HTTPProtocol(asyncio.Protocol):
                     # by checking this state
                     self.request.http_continue = True
             else:
-                await self.put_to_queue(b'')
+                self.queue[0].put_nowait(b'')
 
             # successfully got header,
             # clear either the request or keepalive timeout
@@ -262,11 +262,17 @@ class HTTPProtocol(asyncio.Protocol):
         if self.request is None:
             return
 
+        excess = 0
+
         if not self.request.upgraded:
             self.request.body_size += len(self._receive_buf)
 
-        while self._receive_buf:
-            data = self._receive_buf[:self.options['buffer_size']]
+            if self.request.body_size > self.request.content_length > -1:
+                excess = self.request.body_size - self.request.content_length
+
+        while len(self._receive_buf) > excess:
+            data = self._receive_buf[:min(self.options['buffer_size'],
+                                          len(self._receive_buf) - excess)]
             del self._receive_buf[:len(data)]
 
             await self.put_to_queue(data, rate=self.options['upload_rate'])
@@ -397,14 +403,19 @@ class HTTPProtocol(asyncio.Protocol):
         if self.request.upgraded:
             return
 
-        while 'receive' in self._waiters:
+        if 'receive' in self._waiters:
             # waits for all incoming data to enter the queue
-            await self._waiters.pop('receive')
+            await self._waiters['receive']
 
-        if self.request.has_body and not self.request.eof():
-            self.logger.info('request body was not fully consumed')
-            self.close()
-            return
+        if self.request.has_body:
+            if not self.request.eof():
+                self.logger.info('request body was not fully consumed')
+                self.close()
+                return
+
+            if self.request.content_length == -1:
+                self.close()
+                return
 
         self._waiters['request'] = self.loop.create_future()
 
@@ -416,7 +427,6 @@ class HTTPProtocol(asyncio.Protocol):
 
         # reset. so the next data in data_received will be considered as
         # a fresh http request (not a continuation data)
-        del self._receive_buf[:]
         self.request.clear()
         self.request = None
 

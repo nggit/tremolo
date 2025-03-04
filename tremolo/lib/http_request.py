@@ -230,12 +230,7 @@ class HTTPRequest(Request):
                 raise PayloadTooLarge
 
             async for data in super().recv():
-                if -1 < self.content_length < self.body_consumed:
-                    # pipelining is not yet supported on a request with a body
-                    self.protocol.logger.info('Content-Length mismatch')
-                    yield data[:self.content_length - self.body_consumed]
-                else:
-                    yield data
+                yield data
 
         self._eof = True
 
