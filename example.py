@@ -9,7 +9,17 @@ async def app(scope, receive, send):
             (b'content-type', b'text/plain')
         ]
     })
+
+    body = b''
+
+    while True:
+        message = await receive()
+        body += message.get('body', b'')
+
+        if not message.get('more_body', False):
+            break
+
     await send({
         'type': 'http.response.body',
-        'body': b'Hello world!'
+        'body': body or b'Hello, World!'
     })
