@@ -19,7 +19,7 @@ from .queue import Queue
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('globals', 'context', 'options', 'app', 'loop', 'logger',
                  'fileno', 'queue', 'handlers', 'request',
-                 '_header_buf', '_waiters', '_watermarks')
+                 '_receive_buf', '_waiters', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
@@ -33,7 +33,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.handlers = set()
         self.request = None
 
-        self._header_buf = bytearray()
+        self._receive_buf = bytearray()
         self._waiters = {}
         self._watermarks = {'high': 65536, 'low': 8192}
 
@@ -99,8 +99,11 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.write_eof()
         except (OSError, RuntimeError) as exc:
             self.logger.info(exc)
+        finally:
+            self.transport.close()
 
-        self.transport.close()
+            while self.handlers:
+                self.handlers.pop().cancel()
 
     def request_timeout(self, timeout):
         raise RequestTimeout('request timeout after %gs' % timeout)
@@ -128,13 +131,11 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             timer.cancel()
 
-    async def put_to_queue(self, data, name=0, rate=-1, buffer_size=16384):
-        if data:
-            start = 0
+    async def put_to_queue(self, data, name=0, rate=-1):
+        if self.queue:
+            self.queue[name].put_nowait(data)
 
-            while start < len(data) and self.queue:
-                buf = data[start:start + buffer_size]
-                self.queue[name].put_nowait(buf)
+            if data:
                 queue_size = self.queue[name].qsize()
 
                 if queue_size > self.options['max_queue_size']:
@@ -144,30 +145,7 @@ class HTTPProtocol(asyncio.Protocol):
                     return
 
                 if rate > 0 and queue_size > 0:
-                    await asyncio.sleep(1 / (rate / queue_size / len(buf)))
-
-                start += buffer_size
-        elif self.queue:
-            self.queue[name].put_nowait(data)
-
-        # maybe resume reading, or close
-        if (name == 0 and
-                self.transport is not None and self.request is not None):
-            if not data or self.request.upgraded:
-                self.transport.resume_reading()
-                return
-
-            self.request.body_size += len(data)
-
-            if (b'content-length' in self.request.headers and
-                    self.request.body_size >= self.request.content_length and
-                    self.queue):
-                self.queue[name].put_nowait(None)
-            elif self.request.body_size < self.options['client_max_body_size']:
-                if self.request.has_body:
-                    self.transport.resume_reading()
-            else:
-                self.close(BadRequest('payload too large'))
+                    await asyncio.sleep(1 / (rate / queue_size / len(data)))
 
     async def request_received(self, request, response):
         raise NotImplementedError
@@ -215,10 +193,7 @@ class HTTPProtocol(asyncio.Protocol):
             response = HTTPResponse(self.request)
 
             if b'connection' in self.request.headers:
-                for v in self.request.headers[b'connection'].split(b',', 100):
-                    if v.strip().lower() == b'close':
-                        break
-                else:
+                if b'close' not in self.request.headers.getlist(b'connection'):
                     self.globals.connections.add(self)
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
@@ -230,10 +205,6 @@ class HTTPProtocol(asyncio.Protocol):
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
                         raise BadRequest('unexpected Transfer-Encoding')
-
-                    self.request.transfer_encoding = self.request.headers[
-                        b'transfer-encoding'
-                    ].lower()
 
                 if b'content-length' in self.request.headers:
                     if b'chunked' in self.request.transfer_encoding:
@@ -253,14 +224,7 @@ class HTTPProtocol(asyncio.Protocol):
                     # by checking this state
                     self.request.http_continue = True
             else:
-                await self.put_to_queue(b'')
-
-            if self.request.has_body or self.request.header.body:
-                # the initial body that accompanies the header
-                # or the next request header, if it's a bodyless request
-                await self.put_to_queue(
-                    self.request.header.body, rate=self.options['upload_rate']
-                )
+                self.queue[0].put_nowait(b'')
 
             # successfully got header,
             # clear either the request or keepalive timeout
@@ -284,30 +248,54 @@ class HTTPProtocol(asyncio.Protocol):
                 finally:
                     await response.handle_exception(exc, data)
 
-    async def _receive_data(self, data, waiter):
-        await waiter
-        await self.put_to_queue(
-            data,
-            rate=self.options['upload_rate'],
-            buffer_size=self.options['buffer_size']
-        )
+    async def _receive_data(self):
+        if 'request' in self._waiters:
+            await self._waiters['request']
+
+        if self.request is None:
+            return
+
+        excess = 0
+
+        if not self.request.upgraded:
+            self.request.body_size += len(self._receive_buf)
+
+            if self.request.body_size > self.request.content_length > -1:
+                excess = self.request.body_size - self.request.content_length
+
+        while len(self._receive_buf) > excess:
+            data = self._receive_buf[:min(self.options['buffer_size'],
+                                          len(self._receive_buf) - excess)]
+            del self._receive_buf[:len(data)]
+
+            await self.put_to_queue(data, rate=self.options['upload_rate'])
+
+        # maybe resume reading, or close
+        if self.request is not None:
+            if self.request.upgraded:
+                self.transport.resume_reading()
+            elif self.request.body_size >= self.request.content_length > -1:
+                self.queue[0].put_nowait(None)
+            elif self.request.body_size < self.options['client_max_body_size']:
+                if self.request.has_body:
+                    self.transport.resume_reading()
+            else:
+                self.close(BadRequest('payload too large'))
 
     def data_received(self, data):
         if not data:
             return
 
+        self._receive_buf.extend(data)
+
         if self.request is None:
-            self._header_buf.extend(data)
-            header_size = self._header_buf.find(b'\r\n\r\n') + 2
+            header_size = self._receive_buf.find(b'\r\n\r\n') + 2
 
             if 1 < header_size <= self.options['client_max_header_size']:
-                # this will keep blocking on bodyless requests forever, unless
-                # Response.close is called (resumed in _send_data)
-                self.transport.pause_reading()
-
-                header = HTTPHeader(self._header_buf,
+                header = HTTPHeader(self._receive_buf[:header_size],
                                     header_size=header_size,
                                     excludes=[b'proxy'])
+                del self._receive_buf[:header_size + 2]
 
                 if header.is_request:
                     self.request = HTTPRequest(self, header)
@@ -319,23 +307,18 @@ class HTTPProtocol(asyncio.Protocol):
                     self.close(BadRequest('bad request: not a request'))
             elif header_size > self.options['client_max_header_size']:
                 self.close(BadRequest('request header too large'))
-            elif not (header_size == 1 and len(self._header_buf) <=
+            elif not (header_size == 1 and len(self._receive_buf) <=
                       self.options['client_max_header_size']):
                 self.close(BadRequest('bad request'))
 
-            return
+            if self.request is None or not self._receive_buf:
+                return
 
-        # resumed in put_to_queue or _send_data
+        # resumed in _receive_data or _send_data
         self.transport.pause_reading()
 
-        if 'receive' in self._waiters:
-            waiter = self._waiters['receive']
-        else:
-            waiter = self._waiters['request']
-
-        self._waiters['receive'] = self.create_task(
-            self._receive_data(data, waiter)
-        )
+        if 'receive' not in self._waiters or self._waiters['receive'].done():
+            self._waiters['receive'] = self.create_task(self._receive_data())
 
     def resume_writing(self):
         if 'send' in self._waiters and not self._waiters['send'].done():
@@ -373,7 +356,7 @@ class HTTPProtocol(asyncio.Protocol):
                                 'keepalive connection dropped: %d', self.fileno
                             )
 
-                        del self._header_buf[:]
+                        del self._receive_buf[:]
                         self.request.clear()
 
                     self.close()
@@ -411,34 +394,38 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def _handle_keepalive(self):
         if self.request.upgraded:
-            self._waiters.setdefault('receive', self._waiters.pop('request'))
-        else:
-            if 'receive' in self._waiters:
-                # waits for all incoming data to enter the queue
-                await self._waiters.pop('receive')
+            return
 
-            if self.request.has_body and not self.request.eof():
+        if 'receive' in self._waiters:
+            # waits for all incoming data to enter the queue
+            await self._waiters['receive']
+
+        if self.request.has_body:
+            if self.request.content_length and not self.request.eof():
                 self.logger.info('request body was not fully consumed')
                 self.close()
                 return
 
-            self._waiters['request'] = self.loop.create_future()
+            if self.request.content_length == -1:
+                self.close()
+                return
 
-            self.add_task(self.app.create_task(
-                self.set_timeout(self._waiters['request'],
-                                 timeout=self.options['keepalive_timeout'],
-                                 timeout_cb=self.keepalive_timeout)
-            ))
+        self._waiters['request'] = self.loop.create_future()
 
-            # reset. so the next data in data_received will be considered as
-            # a fresh http request (not a continuation data)
-            del self._header_buf[:]
-            self.request.clear()
-            self.request = None
+        self.add_task(self.app.create_task(
+            self.set_timeout(self._waiters['request'],
+                             timeout=self.options['keepalive_timeout'],
+                             timeout_cb=self.keepalive_timeout)
+        ))
 
-            while self.queue[0].qsize():
-                # this data is supposed to be the next header
-                self.data_received(self.queue[0].get_nowait())
+        # reset. so the next data in data_received will be considered as
+        # a fresh http request (not a continuation data)
+        self.request.clear()
+        self.request = None
+
+        while self.queue[0].qsize():
+            # this data is supposed to be the next header
+            self.data_received(self.queue[0].get_nowait())
 
     def connection_lost(self, _):
         while self.context.tasks:

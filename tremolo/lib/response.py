@@ -24,18 +24,16 @@ class Response:
         if not isinstance(data, (bytes, bytearray)):
             raise TypeError('expected None or bytes-like object')
 
-        if (buffer_min_size is not None and
-                len(self._send_buf) < buffer_min_size):
-            self._send_buf.extend(data)
-        else:
-            await self.request.protocol.put_to_queue(
-                self._send_buf + data,
-                name=1,
-                rate=rate,
-                buffer_size=buffer_size
-            )
+        self._send_buf.extend(data)
 
-            del self._send_buf[:]
+        if buffer_min_size is None or len(self._send_buf) >= buffer_min_size:
+            while self._send_buf:
+                data = self._send_buf[:buffer_size]
+                del self._send_buf[:len(data)]
+
+                await self.request.protocol.put_to_queue(
+                    data, name=1, rate=rate
+                )
 
     def send_nowait(self, data):
         if self.request.protocol.queue:

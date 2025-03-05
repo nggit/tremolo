@@ -32,6 +32,9 @@ async def error_404(request, globals, **_):
 
 
 async def error_500(request, exc=None, **_):
+    if exc is None or request.protocol is None:
+        return
+
     if request.protocol.options['debug']:
         te = TracebackException.from_exception(exc)
         return '<ul><li>%s</li></ul>' % '</li><li>'.join(

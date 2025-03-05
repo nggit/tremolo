@@ -157,7 +157,7 @@ class TestHTTPServer(unittest.TestCase):
                                    ])
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'a=123, a=xxx, yyy')
+        self.assertEqual(read_chunked(body), b'a=123, yyy, a=xxx')
 
     def test_head_10(self):
         header, body = getcontents(host=HTTP_HOST,

@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+from tremolo.utils import parse_fields
+
 
 class Headers(dict):
     def copy(self):
@@ -7,16 +9,17 @@ class Headers(dict):
 
     def getlist(self, name):
         values = self.get(name, [])
+        result = []
 
         if isinstance(values, list):
-            result = []
+            for value in values:
+                for v in parse_fields(value, b',', split=None):
+                    result.append(v)
+        else:
+            for v in parse_fields(values, b',', split=None):
+                result.append(v)
 
-            for v in values:
-                result.extend(v.replace(b', ', b',').split(b',', 100))
-
-            return result
-
-        return values.replace(b', ', b',').split(b',', 100)
+        return result
 
 
 class HTTPHeader:

@@ -341,9 +341,7 @@ class HTTPResponse(Response):
                     raise BadRequest('bad range')
 
                 try:
-                    for v in _bytes.split(b',', 100):
-                        v = v.strip()
-
+                    for v in parse_fields(_bytes, b',', split=None):
                         if v.startswith(b'-'):
                             start = file_size + int(v)
 
@@ -451,14 +449,14 @@ class HTTPResponse(Response):
         if self.request.protocol is None or self.request.transport is None:
             return
 
+        if self.request.transport.is_closing():  # maybe stuck?
+            self.request.transport.abort()
+            return
+
         if not isinstance(exc, asyncio.CancelledError):
             self.request.protocol.print_exception(
                 exc, quote(unquote_to_bytes(self.request.path))
             )
-
-        if self.request.transport.is_closing():  # maybe stuck?
-            self.request.transport.abort()
-            return
 
         # WebSocket
         if isinstance(exc, WebSocketException):

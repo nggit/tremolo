@@ -13,9 +13,8 @@ from .request import Request
 class HTTPRequest(Request):
     __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
                  'host', 'method', 'url', 'path', 'query_string', 'version',
-                 'content_length', 'transfer_encoding', 'http_continue',
-                 'http_keepalive', '_upgraded', '_body', '_eof',
-                 '_stream', '_read_buf')
+                 'content_length', 'http_continue', 'http_keepalive',
+                 '_upgraded', '_body', '_eof', '_stream', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -39,7 +38,6 @@ class HTTPRequest(Request):
             self.version = b'1.1'
 
         self.content_length = -1
-        self.transfer_encoding = b'none'
         self.http_continue = False
         self.http_keepalive = False
         self._upgraded = False
@@ -81,6 +79,10 @@ class HTTPRequest(Request):
     def content_type(self):
         # don't lower() content-type, as it may contain a boundary
         return self.headers.get(b'content-type', b'application/octet-stream')
+
+    @property
+    def transfer_encoding(self):
+        return self.headers.getlist(b'transfer-encoding')
 
     @property
     def upgraded(self):
@@ -230,12 +232,7 @@ class HTTPRequest(Request):
                 raise PayloadTooLarge
 
             async for data in super().recv():
-                if -1 < self.content_length < self.body_consumed:
-                    # pipelining is not yet supported on a request with a body
-                    self.protocol.logger.info('Content-Length mismatch')
-                    yield data[:self.content_length - self.body_consumed]
-                else:
-                    yield data
+                yield data
 
         self._eof = True
 
