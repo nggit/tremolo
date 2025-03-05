@@ -67,4 +67,6 @@ async def download(request, response):
 
 
 if __name__ == '__main__':
+    # 100MiB is a nice limit due to the default `app_handler_timeout=120`
+    # (120 seconds). however, it's perfectly fine to increase those limits
     app.run('0.0.0.0', 8000, client_max_body_size=100 * 1048576)
