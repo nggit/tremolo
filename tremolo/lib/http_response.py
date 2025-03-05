@@ -341,9 +341,7 @@ class HTTPResponse(Response):
                     raise BadRequest('bad range')
 
                 try:
-                    for v in _bytes.split(b',', 100):
-                        v = v.strip()
-
+                    for v in parse_fields(_bytes, b',', split=None):
                         if v.startswith(b'-'):
                             start = file_size + int(v)
 

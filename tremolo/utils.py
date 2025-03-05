@@ -122,7 +122,7 @@ def parse_args(**callbacks):
     return options
 
 
-def parse_fields(data, separator=b';', max_fields=100):
+def parse_fields(data, separator=b';', split=b'=', max_fields=100):
     if len(separator) != 1:
         raise ValueError('separator must be a single one-byte character')
 
@@ -130,10 +130,14 @@ def parse_fields(data, separator=b';', max_fields=100):
 
     while max_fields > 0:
         start = data.rfind(separator, 0, end) + 1
-        name, _, value = data[start:end].partition(b'=')
 
-        if name:
-            yield (name.strip().lower(), unquote(value.strip(b' \t"')))
+        if split:
+            name, _, value = data[start:end].partition(split)
+
+            if name:
+                yield (name.strip().lower(), unquote(value.strip(b' \t"')))
+        else:
+            yield data[start:end].strip().lower()
 
         if start == 0:
             break

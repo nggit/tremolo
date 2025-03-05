@@ -193,10 +193,7 @@ class HTTPProtocol(asyncio.Protocol):
             response = HTTPResponse(self.request)
 
             if b'connection' in self.request.headers:
-                for v in self.request.headers[b'connection'].split(b',', 100):
-                    if v.strip().lower() == b'close':
-                        break
-                else:
+                if b'close' not in self.request.headers.getlist(b'connection'):
                     self.globals.connections.add(self)
                     self.request.http_keepalive = True
             elif self.request.version == b'1.1':
@@ -208,10 +205,6 @@ class HTTPProtocol(asyncio.Protocol):
                 if b'transfer-encoding' in self.request.headers:
                     if self.request.version == b'1.0':
                         raise BadRequest('unexpected Transfer-Encoding')
-
-                    self.request.transfer_encoding = self.request.headers[
-                        b'transfer-encoding'
-                    ].lower()
 
                 if b'content-length' in self.request.headers:
                     if b'chunked' in self.request.transfer_encoding:
