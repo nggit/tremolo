@@ -6,13 +6,12 @@ from .contexts import RequestContext
 
 
 class Request:
-    __slots__ = ('protocol', 'context', 'body_size', 'body_consumed')
+    __slots__ = ('protocol', 'context', 'body_size')
 
     def __init__(self, protocol):
         self.protocol = protocol
         self.context = RequestContext()
         self.body_size = 0
-        self.body_consumed = 0
 
     @property
     def ctx(self):
@@ -36,31 +35,21 @@ class Request:
 
     def clear(self):
         self.body_size = 0
-        self.body_consumed = 0
 
         self.context.clear()
         self.protocol = None  # cut off access to the protocol object
 
-    async def recv(self):
-        while self.protocol.queue:
-            task = self.protocol.loop.create_task(
-                self.protocol.queue[0].get()
-            )
-            timer = self.protocol.loop.call_at(
-                self.protocol.loop.time() +
-                self.protocol.options['keepalive_timeout'],
-                task.cancel
-            )
+    async def recv(self, timeout=None):
+        if timeout is None:
+            timeout = self.protocol.options['keepalive_timeout']
 
+        while self.protocol.queue:
             try:
-                data = await task
+                data = await self.protocol.queue[0].get(timeout)
             except asyncio.CancelledError as exc:
                 raise TimeoutError('recv timeout') from exc
-            finally:
-                timer.cancel()
 
             if data is None:
                 break
 
-            self.body_consumed += len(data)
             yield data

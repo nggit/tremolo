@@ -121,24 +121,24 @@ class HTTPRequest(Request):
         del self._read_buf[:]
         super().clear()
 
-    async def body(self, raw=False):
-        async for data in self.stream(raw=raw):
+    async def body(self, **kwargs):
+        async for data in self.stream(**kwargs):
             self._body.extend(data)
 
         return self._body
 
-    def read(self, size=-1):
-        return self.recv(size=size, raw=False)
+    def read(self, size=-1, timeout=None):
+        return self.recv(size, timeout, raw=False)
 
     def eof(self):
         return self._eof and self._read_buf == b''
 
-    async def recv(self, size=-1, raw=True):
+    async def recv(self, size=-1, timeout=None, raw=True):
         if size == 0 or self.eof():
             return b''
 
         if self._stream is None:
-            self._stream = self.stream(raw=raw)
+            self._stream = self.stream(timeout, raw)
 
         if size == -1:
             return await self._stream.__anext__()
@@ -154,7 +154,7 @@ class HTTPRequest(Request):
         del self._read_buf[:size]
         return data
 
-    async def stream(self, raw=False):
+    async def stream(self, timeout=None, raw=False):
         if self._eof:
             return
 
@@ -163,7 +163,7 @@ class HTTPRequest(Request):
 
         if not raw and b'chunked' in self.transfer_encoding:
             buf = bytearray()
-            agen = super().recv()
+            agen = super().recv(timeout)
             paused = False
             bytes_unread = 0
 
@@ -231,7 +231,7 @@ class HTTPRequest(Request):
                     self.protocol.options['client_max_body_size']):
                 raise PayloadTooLarge
 
-            async for data in super().recv():
+            async for data in super().recv(timeout):
                 yield data
 
         self._eof = True
