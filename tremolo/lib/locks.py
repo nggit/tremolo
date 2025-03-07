@@ -7,10 +7,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 class ServerLock:
     def __init__(self, locks, name=0, timeout=30, loop=None, executors=None):
-        try:
+        if locks:
             self.name = name % len(locks)
-        except ZeroDivisionError:
-            return
+        else:
+            self.name = name
 
         self.locks = locks
         self._timeout = timeout
@@ -35,10 +35,7 @@ class ServerLock:
                               executors=self._executors)
 
     async def __aenter__(self):
-        try:
-            await self.acquire()
-        except TimeoutError:
-            self.release()
+        await self.acquire()
 
     async def __aexit__(self, exc_type, exc, tb):
         self.release()
@@ -52,12 +49,11 @@ class ServerLock:
             self.locks[self.name].acquire, True, timeout)
 
         timer = self._loop.call_at(self._loop.time() + timeout, fut.cancel)
-        result = False
 
         try:
             result = await fut
         except asyncio.CancelledError:
-            pass
+            result = False
         finally:
             timer.cancel()
 

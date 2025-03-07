@@ -24,7 +24,7 @@ class Queue:
 
         self._queue.append(item)
 
-    async def get(self):
+    async def get(self, timeout=None):
         if self._getters:
             await self._getters[-1]
 
@@ -34,7 +34,15 @@ class Queue:
             fut = self._loop.create_future()
             self._getters.append(fut)
 
-            return await fut
+            if timeout is None:
+                return await fut
+
+            timer = self._loop.call_at(self._loop.time() + timeout, fut.cancel)
+
+            try:
+                return await fut
+            finally:
+                timer.cancel()
 
     def get_nowait(self):
         return self._queue.popleft()

@@ -102,9 +102,6 @@ class HTTPProtocol(asyncio.Protocol):
         finally:
             self.transport.close()
 
-            while self.handlers:
-                self.handlers.pop().cancel()
-
     def request_timeout(self, timeout):
         raise RequestTimeout('request timeout after %gs' % timeout)
 
