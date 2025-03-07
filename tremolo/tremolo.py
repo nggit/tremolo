@@ -254,11 +254,10 @@ class Tremolo:
             if server_name != b'':
                 server_name += b' (ASGI)'
 
-            options['_lifespan'] = ASGILifespan(
-                options['app'], loop=self.loop, logger=self.logger
-            )
-            options['_lifespan'].startup()
-            exc = await options['_lifespan'].exception(
+            options['state'] = {}
+            self.context.lifespan = ASGILifespan(self, options=options)
+            self.context.lifespan.startup()
+            exc = await self.context.lifespan.exception(
                 timeout=options['shutdown_timeout'] / 2
             )
 
@@ -276,6 +275,7 @@ class Tremolo:
         self.context.info['server_name'] = server_name
 
         options.setdefault('debug', False)
+        options.setdefault('experimental', False)
         options.setdefault('ws', True)
         options.setdefault('ws_max_payload_size', 2 * 1048576)
         options.setdefault('download_rate', 1048576)
@@ -398,8 +398,8 @@ class Tremolo:
                         logger=self.logger):
                     break
         else:
-            self.context.options['_lifespan'].shutdown()
-            exc = await self.context.options['_lifespan'].exception(
+            self.context.lifespan.shutdown()
+            exc = await self.context.lifespan.exception(
                 timeout=self.context.options['shutdown_timeout'] / 2
             )
 

@@ -71,7 +71,7 @@ def parse_args(**callbacks):
 
         if sys.argv[i - 1] == '--no-ws':
             options['ws'] = False
-        elif sys.argv[i - 1] in ('--debug', '--reload'):
+        elif sys.argv[i - 1] in ('--debug', '--experimental', '--reload'):
             options[name] = True
         elif sys.argv[i - 1] in ('--host',
                                  '--log-level',

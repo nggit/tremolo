@@ -48,8 +48,18 @@ class ASGIServer(HTTPProtocol):
             'path': unquote_to_bytes(request.path).decode('latin-1'),
             'raw_path': request.path,
             'query_string': request.query_string,
-            'headers': request.header.getheaders()
+            'headers': request.header.getheaders(),
+            'state': self.options['state'].copy()
         }
+
+        if self.options['experimental']:
+            # provide direct access to server objects
+            scope['state']['server'] = {
+                'request': request,
+                'response': response,
+                'loop': self.loop,
+                'logger': self.logger
+            }
 
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
                 b'upgrade' in request.headers and

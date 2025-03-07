@@ -36,6 +36,7 @@ def usage(**context):
     print('                            E.g. "/path/to/privkey.pem"')
     print('  --debug                   Enable debug mode')
     print('                            Intended for development')
+    print('  --experimental            Enable experimental features')
     print('  --reload                  Enable auto reload on code changes')
     print('                            Intended for development')
     print('  --no-ws                   Disable built-in WebSocket support')

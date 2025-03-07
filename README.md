@@ -97,7 +97,7 @@ async def app(scope, receive, send):
     })
     await send({
         'type': 'http.response.body',
-        'body': b'Hello world!'
+        'body': b'Hello, World!'
     })
 ```
 
@@ -117,6 +117,36 @@ It's also possible to run the ASGI server programmatically ([example with uvloop
 
 ```
 python3 example_uvloop.py
+```
+
+## Experimental Features
+Experimental features can be enabled with `experimental=True` or `--experimental`.
+Since they require user awareness, they are not enabled by default.
+
+For example, even in ASGI server mode, Tremolo gives apps direct access to the server objects.
+Which means that even if you use an app/framework like Starlette/FastAPI,
+you can still use Tremolo's `request` and `response` objects for more optimized [streaming features](https://nggit.github.io/tremolo-docs/body.html#multipart).
+```python
+from starlette.applications import Starlette
+from starlette.routing import Route
+
+
+async def homepage(request):
+    # Tremolo's `request` and `response` objects
+    req = request.state.server['request']
+    res = request.state.server['response']
+
+    async for data in req.stream():
+        await res.write(data)
+
+    await res.end()
+
+
+routes = [
+    Route('/', homepage, methods=['GET', 'POST']),
+]
+
+app = Starlette(routes=routes)
 ```
 
 ## Testing
