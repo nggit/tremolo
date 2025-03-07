@@ -6,19 +6,21 @@ from .exceptions import LifespanError, LifespanProtocolUnsupported
 
 
 class ASGILifespan:
-    def __init__(self, app, **kwargs):
-        self._loop = kwargs['loop']
-        self._logger = kwargs['logger']
+    def __init__(self, app, options):
+        self._loop = app.loop
+        self._logger = app.logger
+        self._options = options
 
         self._queue = asyncio.Queue()
         self._waiter = self._loop.create_future()
-        self._task = self._loop.create_task(self.main(app))
+        self._task = self._loop.create_task(self.main(options['app']))
 
     async def main(self, app):
         try:
             scope = {
                 'type': 'lifespan',
-                'asgi': {'version': '3.0'}
+                'asgi': {'version': '3.0', 'spec_version': '2.0'},
+                'state': self._options['state']
             }
 
             await app(scope, self.receive, self.send)

@@ -39,6 +39,16 @@ class ASGIServer(HTTPProtocol):
             await error_400(request=request, response=response)
             return
 
+        state = self.options['state'].copy()
+
+        if self.options['experimental']:
+            state['server'] = {  # provide direct access to server objects
+                'request': request,
+                'response': response,
+                'loop': self.loop,
+                'logger': self.logger
+            }
+
         scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},
             'root_path': self.options['root_path'],
@@ -48,7 +58,8 @@ class ASGIServer(HTTPProtocol):
             'path': unquote_to_bytes(request.path).decode('latin-1'),
             'raw_path': request.path,
             'query_string': request.query_string,
-            'headers': request.header.getheaders()
+            'headers': request.header.getheaders(),
+            'state': state
         }
 
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
