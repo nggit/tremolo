@@ -20,7 +20,7 @@ class HTTPServer(HTTPProtocol):
             'app': self.app,
             'loop': self.loop,
             'logger': self.logger,
-            'lock': kwargs['lock']
+            'lock': self.extras['lock']
         }
 
     async def _connection_made(self):

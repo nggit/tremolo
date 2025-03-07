@@ -580,11 +580,8 @@ class Tremolo:
                     attr_name = 'app'
 
                 kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
-
-            locks = []
         else:
             kwargs['app'] = None
-            locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
 
             if hasattr(__main__, '__file__'):
                 kwargs['app_dir'], basename = os.path.split(
@@ -629,6 +626,7 @@ class Tremolo:
         except AttributeError:
             worker_num = min(worker_num, os.cpu_count() or 1)
 
+        locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
         socks = {}
         print('Options:')
 
