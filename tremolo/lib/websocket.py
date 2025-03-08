@@ -115,11 +115,12 @@ class WebSocket:
 
         while payload == b'':
             # got empty bytes (pong)
-            # ping until non-empty bytes received
+            # ping until non-empty bytes are received
+            coro = self.ping()
             timer = self.request.protocol.loop.call_at(
                 self.request.protocol.loop.time() +
                 self.request.protocol.options['keepalive_timeout'] / 2,
-                self._ping
+                self.request.protocol.create_task, coro
             )
 
             try:
@@ -129,6 +130,7 @@ class WebSocket:
                                             code=1000) from exc
             finally:
                 timer.cancel()
+                coro.close()
 
         return payload
 
@@ -176,14 +178,11 @@ class WebSocket:
             __class__.create_frame(payload_data, fin=fin, opcode=opcode)
         )
 
-    def _ping(self):
+    async def ping(self, data=b''):
         # ping only if this connection is still listed,
         # otherwise let the recv timeout drop it
         if self.request.protocol in self.request.protocol.globals.connections:
-            self.request.protocol.create_task(self.ping())
-
-    async def ping(self, data=b''):
-        await self.send(data, opcode=9)
+            await self.send(data, opcode=9)
 
     async def pong(self, data=b''):
         await self.send(data, opcode=10)
