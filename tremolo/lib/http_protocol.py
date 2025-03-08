@@ -17,14 +17,14 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('globals', 'context', 'options', 'app', 'loop', 'logger',
+    __slots__ = ('globals', 'context', 'extras', 'app', 'loop', 'logger',
                  'fileno', 'queue', 'handlers', 'request',
                  '_receive_buf', '_waiters', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
         self.context = ConnectionContext()
-        self.options = kwargs['options']
+        self.extras = kwargs
         self.app = app
         self.loop = app.loop
         self.logger = app.logger
@@ -36,6 +36,10 @@ class HTTPProtocol(asyncio.Protocol):
         self._receive_buf = bytearray()
         self._waiters = {}
         self._watermarks = {'high': 65536, 'low': 8192}
+
+    @property
+    def options(self):
+        return self.extras['options']
 
     @property
     def transport(self):

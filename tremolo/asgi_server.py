@@ -58,7 +58,8 @@ class ASGIServer(HTTPProtocol):
                 'request': request,
                 'response': response,
                 'loop': self.loop,
-                'logger': self.logger
+                'logger': self.logger,
+                'lock': self.extras['lock']
             }
 
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
