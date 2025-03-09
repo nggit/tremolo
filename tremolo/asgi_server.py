@@ -292,9 +292,10 @@ class ASGIWrapper:
         except asyncio.CancelledError:
             pass
         except Exception as exc:
-            if self.protocol is None or self.protocol.is_closing():
+            if self.response is None:
                 self.logger.info(
                     'calling send() after the connection is closed'
                 )
             else:
                 self.protocol.print_exception(exc)
+                self.response = None
