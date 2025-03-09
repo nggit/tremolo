@@ -3,6 +3,7 @@
 # Author: nggit
 # Description: Upload, stream multipart/form-data and save.
 
+import os
 from urllib.parse import quote
 
 from tremolo import Application
@@ -25,35 +26,42 @@ async def index():
 async def upload(request, response):
     # no worries, if the file is larger than `max_file_size`
     # it can still be read continuously bit by bit according to this size
-    files = request.files(max_file_size=16384)
+    files = request.files(max_file_size=16384)  # 16KiB
 
     fp = None
+    filename = None
 
-    # read while writing the file(s).
-    async for part in files:
-        filename = quote(part.get('filename', ''))
+    try:
+        # read while writing the file(s).
+        async for part in files:
+            filename = quote(part.get('filename', ''))
 
-        if not filename:
-            continue
+            if not filename:
+                continue
 
-        if fp is None:
-            fp = open('Uploaded_' + filename, 'wb')
+            if fp is None:
+                fp = open('Uploaded_' + filename, 'wb')
 
-        print('Writing %s (len=%d, eof=%s)' % (filename,
-                                               len(part['data']),
-                                               part['eof']))
-        fp.write(part['data'])
+            print('Writing %s (len=%d, eof=%s)' % (filename,
+                                                   len(part['data']),
+                                                   part['eof']))
+            fp.write(part['data'])
 
-        if part['eof']:
+            if part['eof']:
+                fp.close()
+                fp = None  # the next iteration will be another file
+                filename = filename.encode()
+                content_type = quote(part['type']).encode()
+
+                yield (
+                    b'File <a href="/download?type=%s&filename=%s">%s</a> '
+                    b'was uploaded.<br />' % (content_type, filename, filename)
+                )
+    finally:
+        if fp is not None:
             fp.close()
-            fp = None
-            filename = filename.encode()
-            content_type = quote(part['type']).encode()
-
-            yield (
-                b'File <a href="/download?type=%s&filename=%s">%s</a> '
-                b'was uploaded.<br />' % (content_type, filename, filename)
-            )
+            print('Upload canceled, removing incomplete file: %s' % filename)
+            os.unlink('Uploaded_' + filename)
 
     yield b''
 
