@@ -150,6 +150,12 @@ def parse_int(string, base=10):
     if not isinstance(string, (bytes, bytearray)) or not 0 < len(string) <= 16:
         raise ValueError('string must be bytes-like and <=16 in length')
 
+    if string == b'0':
+        return 0
+
+    if string.startswith(b'0'):
+        raise ValueError('string cannot contain leading zeros')
+
     total = 0
 
     for c in string:
