@@ -199,27 +199,25 @@ class Tremolo:
         if isinstance(server_name, str):
             server_name = server_name.encode('latin-1')
 
-        if isinstance(host, str):
-            host = host.encode('latin-1')
-
         lock = ServerLock(options['_locks'], loop=self.loop)
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
         self.context.update(connections=connections)
+        options['state'] = {}
+
+        for _, func in self.hooks['worker_start']:
+            if await func(globals=self.context,
+                          context=self.context,
+                          app=self,
+                          loop=self.loop,
+                          logger=self.logger):
+                break
 
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
             self.routes.compile()
-
-            for _, func in self.hooks['worker_start']:
-                if await func(globals=self.context,
-                              context=self.context,
-                              app=self,
-                              loop=self.loop,
-                              logger=self.logger):
-                    break
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server
@@ -254,7 +252,6 @@ class Tremolo:
             if server_name != b'':
                 server_name += b' (ASGI)'
 
-            options['state'] = {}
             self.context.lifespan = ASGILifespan(self, options=options)
             self.context.lifespan.startup()
             exc = await self.context.lifespan.exception(
@@ -384,7 +381,16 @@ class Tremolo:
                 sys.exit(1)
 
     async def _worker_stop(self):
-        if self.context.options['app'] is None:
+        try:
+            if self.context.options['app'] is not None:
+                self.context.lifespan.shutdown()
+                exc = await self.context.lifespan.exception(
+                    timeout=self.context.options['shutdown_timeout'] / 2
+                )
+
+                if exc:
+                    self.logger.error(exc)
+        finally:
             i = len(self.hooks['worker_stop'])
 
             while i > 0:
@@ -397,14 +403,6 @@ class Tremolo:
                         loop=self.loop,
                         logger=self.logger):
                     break
-        else:
-            self.context.lifespan.shutdown()
-            exc = await self.context.lifespan.exception(
-                timeout=self.context.options['shutdown_timeout'] / 2
-            )
-
-            if exc:
-                self.logger.error(exc)
 
     def _worker(self, host, port, **kwargs):
         if self.logger is None:
