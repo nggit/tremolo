@@ -10,7 +10,7 @@ from .exceptions import (
     WebSocketClientClosed,
     WebSocketServerClosed
 )
-from .handlers import error_400, error_500
+from .handlers import error_400
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
@@ -88,11 +88,6 @@ class ASGIServer(HTTPProtocol):
             await response.handle_exception(exc)
         finally:
             scope.clear()
-
-    async def error_received(self, exc, response):
-        return await error_500(
-            request=response.request, response=response, exc=exc
-        )
 
 
 class ASGIWrapper:

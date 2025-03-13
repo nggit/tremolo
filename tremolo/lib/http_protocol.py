@@ -152,7 +152,10 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     async def error_received(self, exc, response):
-        raise NotImplementedError
+        # internal server error
+        return await self.app.routes[0][-1][1](request=response.request,
+                                               response=response,
+                                               exc=exc)
 
     def handlers_timeout(self):
         if self.request is None or not self.request.upgraded:

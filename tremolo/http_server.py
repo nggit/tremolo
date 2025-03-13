@@ -317,9 +317,3 @@ class HTTPServer(HTTPProtocol):
         await self._handle_response(
             self._routes[0][1][1], self._routes[0][1][2]
         )
-
-    async def error_received(self, exc, response):
-        # internal server error
-        return await self._routes[0][-1][1](request=response.request,
-                                            response=response,
-                                            exc=exc)
