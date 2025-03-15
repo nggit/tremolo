@@ -292,15 +292,13 @@ class HTTPResponse(Response):
             return asyncio.wrap_future(fut, loop=loop)
 
         try:
-            handle = self.request.protocol.context.RESPONSE_SENDFILE_HANDLE
+            handle = self.request.protocol.context[path]
             await run_sync(handle.seek, offset)  # OSError on a negative offset
-        except AttributeError:
+        except KeyError:
             handle = await run_sync(open, path, 'rb')
-            self.request.protocol.context.RESPONSE_SENDFILE_HANDLE = handle
+            self.request.protocol.context[path] = handle
 
-            self.request.protocol.add_close_callback(
-                self.request.protocol.context.RESPONSE_SENDFILE_HANDLE.close
-            )
+            self.request.protocol.add_close_callback(handle.close)
 
         st = os.stat(path)
         file_size = st.st_size - offset
