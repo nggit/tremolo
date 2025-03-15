@@ -293,4 +293,4 @@ class ASGIWrapper:
                 )
             else:
                 self.protocol.print_exception(exc)
-                self.response = None
+                self.response = None  # disallows further send()
