@@ -22,7 +22,7 @@ async def index():
 async def upload(request, response):
     # no worries, if the file is larger than `max_file_size`
     # it can still be read continuously bit by bit according to this size
-    files = request.files(max_file_size=16384)
+    files = request.files(max_file_size=16384)  # 16KiB
 
     # read the initial part to get `Content-Type` information
     part = await anext(files)

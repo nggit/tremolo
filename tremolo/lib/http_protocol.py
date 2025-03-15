@@ -152,7 +152,10 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     async def error_received(self, exc, response):
-        raise NotImplementedError
+        # internal server error
+        return await self.app.routes[0][-1][1](request=response.request,
+                                               response=response,
+                                               exc=exc)
 
     def handlers_timeout(self):
         if self.request is None or not self.request.upgraded:
@@ -349,7 +352,9 @@ class HTTPProtocol(asyncio.Protocol):
                             self.request.http_keepalive = False
 
                             if self in self.globals.connections:
-                                await self._handle_keepalive()
+                                if not self.request.upgraded:
+                                    await self._handle_keepalive()
+
                                 self.transport.resume_reading()
                                 continue
 
@@ -394,9 +399,6 @@ class HTTPProtocol(asyncio.Protocol):
                 break
 
     async def _handle_keepalive(self):
-        if self.request.upgraded:
-            return
-
         if 'receive' in self._waiters:
             # waits for all incoming data to enter the queue
             await self._waiters['receive']
