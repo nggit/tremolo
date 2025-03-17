@@ -7,13 +7,11 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_routes', '_middlewares', '_server')
+    __slots__ = ('_server',)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self._routes = self.app.routes
-        self._middlewares = self.app.middlewares
         self._server = {
             'globals': self.globals,
             'context': self.context,
@@ -24,18 +22,18 @@ class HTTPServer(HTTPProtocol):
         }
 
     async def _connection_made(self):
-        for _, func, _ in self._middlewares['connect']:
+        for _, func, _ in self.app.middlewares['connect']:
             if await func(**self._server):
                 break
 
     async def _connection_lost(self, exc):
         try:
-            i = len(self._middlewares['close'])
+            i = len(self.app.middlewares['close'])
 
             while i > 0:
                 i -= 1
 
-                if await self._middlewares['close'][i][1](**self._server):
+                if await self.app.middlewares['close'][i][1](**self._server):
                     break
         finally:
             super().connection_lost(exc)
@@ -44,14 +42,14 @@ class HTTPServer(HTTPProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
 
-        if self._middlewares['connect']:
+        if self.app.middlewares['connect']:
             self.context.ON_CONNECT = self.app.create_task(
                 self._connection_made()
             )
             self.add_task(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
-        if self._middlewares['close']:
+        if self.app.middlewares['close']:
             task = self.app.create_task(self._connection_lost(exc))
             self.loop.call_at(
                 self.loop.time() + self.options['app_close_timeout'],
@@ -61,18 +59,23 @@ class HTTPServer(HTTPProtocol):
             super().connection_lost(exc)
             self._server.clear()
 
-    async def run_middlewares(self, name, reverse=False, start=0, step=1):
-        if reverse:
-            start = len(self._middlewares[name]) - 1
+    async def run_middlewares(self, name, reverse=False, step=1):
+        if reverse and self._server['next'] != -1:
+            self._server['next'] = len(self.app.middlewares[name]) - 1
             step = -1
 
-        while 0 <= start < len(self._middlewares[name]):
-            if await self._handle_middleware(
-                    self._middlewares[name][start][1],
-                    self._middlewares[name][start][2]):
+        while -1 < self._server['next'] < len(self.app.middlewares[name]):
+            middleware = self.app.middlewares[name][self._server['next']]
+
+            if await self._handle_middleware(middleware[1], middleware[2]):
+                if reverse:
+                    self._server['next'] = -1
+                else:
+                    self._server['next'] = len(self.app.middlewares[name])
+
                 return True
 
-            start += step
+            self._server['next'] += step
 
     async def _handle_middleware(self, func, kwargs):
         response = self._server['response']
@@ -252,17 +255,19 @@ class HTTPServer(HTTPProtocol):
     async def request_received(self, request, response):
         self._server['request'] = request
         self._server['response'] = response
+        self._server['next'] = 0
 
-        if self._middlewares['connect']:
+        if self.app.middlewares['connect']:
             await self.context.ON_CONNECT
 
         if await self.run_middlewares('request'):
+            await self.run_middlewares('response', reverse=True)
             return
 
         if not request.is_valid:
             # bad request
             await self._handle_response(
-                self._routes[0][0][1], self._routes[0][0][2]
+                self.app.routes[0][0][1], self.app.routes[0][0][2]
             )
             return
 
@@ -274,8 +279,8 @@ class HTTPServer(HTTPProtocol):
             parts = path.split(b'/', 254)
             key = bytes([len(parts)]) + parts[0]
 
-        if key in self._routes:
-            for (pattern, func, kwargs) in self._routes[key]:
+        if key in self.app.routes:
+            for (pattern, func, kwargs) in self.app.routes[key]:
                 m = pattern.search(request.url)
 
                 if m:
@@ -289,18 +294,18 @@ class HTTPServer(HTTPProtocol):
                     await self._handle_response(func, kwargs)
                     return
         else:
-            i = len(self._routes[-1])
+            i = len(self.app.routes[-1])
 
             while i > 0:
                 i -= 1
-                pattern, func, kwargs = self._routes[-1][i]
+                pattern, func, kwargs = self.app.routes[-1][i]
                 m = pattern.search(request.url)
 
                 if m:
-                    if key in self._routes:
-                        self._routes[key].append((pattern, func, kwargs))
+                    if key in self.app.routes:
+                        self.app.routes[key].append((pattern, func, kwargs))
                     else:
-                        self._routes[key] = [(pattern, func, kwargs)]
+                        self.app.routes[key] = [(pattern, func, kwargs)]
 
                     matches = m.groupdict()
 
@@ -310,10 +315,10 @@ class HTTPServer(HTTPProtocol):
                     request.params['path'] = matches
 
                     await self._handle_response(func, kwargs)
-                    del self._routes[-1][i]
+                    del self.app.routes[-1][i]
                     return
 
         # not found
         await self._handle_response(
-            self._routes[0][1][1], self._routes[0][1][2]
+            self.app.routes[0][1][1], self.app.routes[0][1][2]
         )
