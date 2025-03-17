@@ -23,9 +23,9 @@ class WebSocket:
 
         try:
             return await self.receive()
-        except WebSocketClientClosed:
+        except WebSocketClientClosed as exc:
             await self.close()
-            raise StopAsyncIteration
+            raise StopAsyncIteration from exc
 
     async def accept(self):
         sha1_hash = hashlib.sha1(  # nosec B303, B324
