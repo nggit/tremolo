@@ -817,7 +817,7 @@ class TestHTTPServer(unittest.TestCase):
                 (b'receive', b'i' * 81920, b'\x88\x02\x03\xf1', 2),
                 (b'ping', b'', b'\x8a\x00', 9),
                 (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8),
-                (b'', b'\x03\xe8CLOSE_NORMAL', b'', 8),
+                (b'', b'\x03\xe8CLOSE_NORMAL', b'\x88\x02\x03\xe8', 8),
                 (b'', b'', b'\x88\x02\x03\xf0', 0xc)):
             header, body = getcontents(
                 host=HTTP_HOST,
