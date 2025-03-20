@@ -276,6 +276,8 @@ class HTTPProtocol(asyncio.Protocol):
 
         # maybe resume reading, or close
         if self.request is not None:
+            del self._waiters['receive']
+
             if self.request.upgraded:
                 self.transport.resume_reading()
             elif self.request.body_size >= self.request.content_length > -1:
@@ -321,7 +323,7 @@ class HTTPProtocol(asyncio.Protocol):
         # resumed in _receive_data or _send_data
         self.transport.pause_reading()
 
-        if 'receive' not in self._waiters or self._waiters['receive'].done():
+        if 'receive' not in self._waiters:
             self._waiters['receive'] = self.create_task(self._receive_data())
 
     def resume_writing(self):
