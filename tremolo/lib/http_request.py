@@ -281,21 +281,23 @@ class HTTPRequest(Request):
         try:
             return self.params['post']
         except KeyError as exc:
+            if (b'application/x-www-form-urlencoded' not in
+                    self.headers.getlist(b'content-type', b';')):
+                raise BadRequest('invalid Content-Type') from exc
+
+            async for data in self.stream():
+                self._body.extend(data)
+
+                if self.body_size > max_size:
+                    raise ValueError('form size limit reached') from exc
+
             self.params['post'] = {}
 
-            if self.content_type.lower().startswith(
-                    b'application/x-www-form-urlencoded'):
-                async for data in self.stream():
-                    self._body.extend(data)
-
-                    if self.body_size > max_size:
-                        raise ValueError('form size limit reached') from exc
-
-                if 2 < self.body_size <= max_size:
-                    self.params['post'] = parse_qs(
-                        self._body.decode('latin-1'),
-                        max_num_fields=max_fields
-                    )
+            if 2 < self.body_size <= max_size:
+                self.params['post'] = parse_qs(
+                    self._body.decode('latin-1'),
+                    max_num_fields=max_fields
+                )
 
             return self.params['post']
 
