@@ -60,6 +60,9 @@ class HTTPServer(HTTPProtocol):
             self._server.clear()
 
     async def run_middlewares(self, name, reverse=False, step=1):
+        if self.is_closing():
+            return
+
         if reverse and self._server['next'] != -1:
             self._server['next'] = len(self.app.middlewares[name]) - 1
             step = -1

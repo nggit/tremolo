@@ -217,6 +217,18 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(read_chunked(body),
                          b'username=myuser&password=mypass')
 
+    def test_post_form_invalid_content_type(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'POST /submitform HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Content-Type: application/json\r\n\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'invalid Content-Type')
+
     def test_post_form_limit(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,

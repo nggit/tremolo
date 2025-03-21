@@ -7,16 +7,16 @@ class Headers(dict):
     def copy(self):
         return self.__class__(self)
 
-    def getlist(self, name):
+    def getlist(self, name, separator=b',', split=None):
         values = self.get(name, [])
         result = []
 
         if isinstance(values, list):
             for value in values:
-                for v in parse_fields(value, b',', split=None):
+                for v in parse_fields(value, separator, split):
                     result.append(v)
         else:
-            for v in parse_fields(values, b',', split=None):
+            for v in parse_fields(values, separator, split):
                 result.append(v)
 
         return result
