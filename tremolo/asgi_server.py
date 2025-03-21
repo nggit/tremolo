@@ -137,15 +137,15 @@ class ASGIWrapper:
             except (asyncio.CancelledError, Exception) as exc:
                 code = 1005
 
-                if isinstance(exc, WebSocketClientClosed):
-                    code = exc.code
-
                 if self._websocket is None:
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
                 else:
-                    self.protocol.print_exception(exc)
+                    if isinstance(exc, WebSocketClientClosed):
+                        code = exc.code
+                    else:
+                        self.protocol.print_exception(exc)
 
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
