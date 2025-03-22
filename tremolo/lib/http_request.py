@@ -59,7 +59,7 @@ class HTTPRequest(Request):
             if ip == b'' and self.client is not None:
                 self._ip = self.client[0].encode('utf-8')
             else:
-                self._ip = ip[:(ip + b',').find(b',')]
+                self._ip = ip.split(b',', 1)[0]
 
         return self._ip
 
