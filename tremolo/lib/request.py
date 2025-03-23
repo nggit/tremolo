@@ -6,12 +6,19 @@ from .contexts import RequestContext
 
 
 class Request:
-    __slots__ = ('protocol', 'context', 'body_size')
+    __slots__ = ('_protocol', 'context', 'body_size')
 
     def __init__(self, protocol):
-        self.protocol = protocol
+        self._protocol = protocol
         self.context = RequestContext()
         self.body_size = 0
+
+    @property
+    def protocol(self):
+        if self._protocol is None:
+            raise RuntimeError('protocol object has been closed')
+
+        return self._protocol
 
     @property
     def ctx(self):
@@ -37,7 +44,7 @@ class Request:
         self.body_size = 0
 
         self.context.clear()
-        self.protocol = None  # cut off access to the protocol object
+        self._protocol = None  # cut off access to the protocol object
 
     async def recv(self, timeout=None):
         if timeout is None:
