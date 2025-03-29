@@ -200,7 +200,8 @@ class HTTPResponse(Response):
 
         self.close(keepalive=keepalive)
 
-    async def write(self, data, chunked=None, buffer_size=16384, **kwargs):
+    async def write(self, data=None, *, chunked=None, buffer_size=16384,
+                    **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
@@ -424,7 +425,7 @@ class HTTPResponse(Response):
             if (b'if-modified-since' in self.request.headers and
                     self.request.headers[b'if-modified-since'] == mdate):
                 self.set_status(304, b'Not Modified')
-                await self.write(None)
+                await self.write()
                 return
 
             self.set_content_type(content_type)

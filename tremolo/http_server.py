@@ -191,7 +191,7 @@ class HTTPServer(HTTPProtocol):
                 return
 
             if request.method == b'HEAD' or no_content:
-                await response.write(None)
+                await response.write()
                 return
 
             buffer_min_size = options['buffer_size'] // 2
@@ -241,7 +241,7 @@ class HTTPServer(HTTPProtocol):
                 return
 
             if request.method == b'HEAD' or no_content:
-                await response.write(None)
+                await response.write()
                 return
 
             if data != b'':
