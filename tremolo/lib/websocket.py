@@ -36,7 +36,7 @@ class WebSocket:
         self.response.set_status(101, b'Switching Protocols')
         self.response.set_header(b'Upgrade', b'websocket')
         self.response.set_header(b'Sec-WebSocket-Accept', accept_key)
-        await self.response.write(None)
+        await self.response.write()
 
     async def recv(self):
         try:

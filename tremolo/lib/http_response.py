@@ -91,7 +91,7 @@ class HTTPResponse(Response):
                 self.request.protocol.globals.info['server_name']
             )
 
-    def set_cookie(self, name, value='', expires=0, path='/', domain=None,
+    def set_cookie(self, name, value='', *, expires=0, path='/', domain=None,
                    secure=False, httponly=False, samesite=None):
         if isinstance(name, str):
             name = name.encode('latin-1')
@@ -167,7 +167,7 @@ class HTTPResponse(Response):
 
         super().close()
 
-    async def end(self, data=b'', keepalive=True, **kwargs):
+    async def end(self, data=b'', *, keepalive=True, **kwargs):
         if self.headers_sent():
             await self.write(data)
         else:
@@ -200,7 +200,8 @@ class HTTPResponse(Response):
 
         self.close(keepalive=keepalive)
 
-    async def write(self, data, chunked=None, buffer_size=16384, **kwargs):
+    async def write(self, data=None, *, chunked=None, buffer_size=16384,
+                    **kwargs):
         kwargs['buffer_size'] = buffer_size
 
         if not self.headers_sent():
@@ -424,7 +425,7 @@ class HTTPResponse(Response):
             if (b'if-modified-since' in self.request.headers and
                     self.request.headers[b'if-modified-since'] == mdate):
                 self.set_status(304, b'Not Modified')
-                await self.write(None)
+                await self.write()
                 return
 
             self.set_content_type(content_type)
@@ -443,7 +444,7 @@ class HTTPResponse(Response):
 
         self.close(keepalive=True)
 
-    async def handle_exception(self, exc, data=b''):
+    async def handle_exception(self, exc, data=None):
         if self.request.protocol is None or self.request.transport is None:
             return
 

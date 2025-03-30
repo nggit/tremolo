@@ -547,9 +547,9 @@ class Tremolo:
                 exit_cb=self._handle_reload
             )
 
-    def run(self, host=None, port=0, reuse_port=True, worker_num=1, **kwargs):
-        kwargs['reuse_port'] = reuse_port
+    def run(self, host=None, port=0, *, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
+        kwargs.setdefault('reuse_port', True)
         kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
