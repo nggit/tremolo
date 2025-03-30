@@ -29,7 +29,7 @@ class HTTPRequest(Request):
         if isinstance(self.host, list):
             self.host = self.host[0]
 
-        self.method = header.getmethod().upper()
+        self.method = header.getmethod()
         self.url = header.geturl()
         self.path, _, self.query_string = self.url.partition(b'?')
         self.version = header.getversion()
@@ -127,13 +127,13 @@ class HTTPRequest(Request):
 
         return self._body
 
-    def read(self, size=-1, timeout=None):
-        return self.recv(size, timeout, raw=False)
+    def read(self, size=-1, *, timeout=None):
+        return self.recv(size, timeout=timeout, raw=False)
 
     def eof(self):
         return self._eof and self._read_buf == b''
 
-    async def recv(self, size=-1, timeout=None, raw=True):
+    async def recv(self, size=-1, *, timeout=None, raw=True):
         if size == 0 or self.eof():
             return b''
 

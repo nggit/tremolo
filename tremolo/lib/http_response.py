@@ -91,7 +91,7 @@ class HTTPResponse(Response):
                 self.request.protocol.globals.info['server_name']
             )
 
-    def set_cookie(self, name, value='', expires=0, path='/', domain=None,
+    def set_cookie(self, name, value='', *, expires=0, path='/', domain=None,
                    secure=False, httponly=False, samesite=None):
         if isinstance(name, str):
             name = name.encode('latin-1')
@@ -167,7 +167,7 @@ class HTTPResponse(Response):
 
         super().close()
 
-    async def end(self, data=b'', keepalive=True, **kwargs):
+    async def end(self, data=b'', *, keepalive=True, **kwargs):
         if self.headers_sent():
             await self.write(data)
         else:
@@ -444,7 +444,7 @@ class HTTPResponse(Response):
 
         self.close(keepalive=True)
 
-    async def handle_exception(self, exc, data=b''):
+    async def handle_exception(self, exc, data=None):
         if self.request.protocol is None or self.request.transport is None:
             return
 

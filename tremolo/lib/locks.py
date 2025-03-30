@@ -24,7 +24,7 @@ class ServerLock:
         if self.name not in executors:
             self._executors[self.name] = ThreadPoolExecutor(max_workers=1)
 
-    def __call__(self, name=0, timeout=None):
+    def __call__(self, name=0, *, timeout=None):
         if timeout is None:
             timeout = self._timeout
 
