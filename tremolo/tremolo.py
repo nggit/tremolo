@@ -437,6 +437,13 @@ class Tremolo:
 
         try:
             loop.run_forever()  # until loop.stop() is called
+        except BaseException:
+            while self.context.tasks:
+                self.context.tasks.pop().cancel()
+
+            task.cancel()
+            loop.run_forever()
+            raise
         finally:
             loop.close()
 
