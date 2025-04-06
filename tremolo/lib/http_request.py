@@ -96,7 +96,8 @@ class HTTPRequest(Request):
 
     @property
     def has_body(self):
-        return (b'content-length' in self.headers or
+        return (b'content-length' in self.headers and
+                self.headers[b'content-length'] != b'0' or
                 b'transfer-encoding' in self.headers)
 
     def uid(self, length=32):
