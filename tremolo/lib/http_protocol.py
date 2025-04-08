@@ -135,18 +135,18 @@ class HTTPProtocol(asyncio.Protocol):
     async def put_to_queue(self, data, name=0, rate=-1):
         if self.queue:
             self.queue[name].put_nowait(data)
+            queue_size = self.queue[name].qsize()
 
-            if data:
-                queue_size = self.queue[name].qsize()
-
-                if queue_size > self.options['max_queue_size']:
-                    self.logger.error('%d exceeds the value of max_queue_size',
-                                      queue_size)
-                    self.close()
-                    return
-
-                if rate > 0 and queue_size > 0:
+            if queue_size <= self.options['max_queue_size']:
+                if data and rate > 0 and queue_size > 0:
                     await asyncio.sleep(1 / (rate / queue_size / len(data)))
+
+                return True
+
+            self.logger.error('%d exceeds the value of max_queue_size',
+                              queue_size)
+
+        self.close()
 
     async def request_received(self, request, response):
         raise NotImplementedError
