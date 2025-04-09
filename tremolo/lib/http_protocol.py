@@ -270,9 +270,12 @@ class HTTPProtocol(asyncio.Protocol):
         while len(self._receive_buf) > excess:
             data = self._receive_buf[:min(self.options['buffer_size'],
                                           len(self._receive_buf) - excess)]
-            del self._receive_buf[:len(data)]
 
-            await self.put_to_queue(data, rate=self.options['upload_rate'])
+            if await self.put_to_queue(data, rate=self.options['upload_rate']):
+                del self._receive_buf[:len(data)]
+            else:
+                del self._receive_buf[:]
+                return
 
         # maybe resume reading, or close
         if self.request is not None:
