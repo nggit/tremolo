@@ -283,7 +283,7 @@ class HTTPServer(HTTPProtocol):
             key = bytes([len(parts)]) + parts[0]
 
         if key in self.app.routes:
-            for (pattern, func, kwargs) in self.app.routes[key]:
+            for pattern, func, kwargs in self.app.routes[key]:
                 m = pattern.search(request.url)
 
                 if m:
