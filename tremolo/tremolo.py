@@ -442,7 +442,10 @@ class Tremolo:
                 self.context.tasks.pop().cancel()
 
             task.cancel()
-            loop.run_forever()
+
+            if not task.done():
+                loop.run_forever()
+
             raise
         finally:
             loop.close()
