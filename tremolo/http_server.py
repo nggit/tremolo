@@ -7,23 +7,9 @@ from .lib.websocket import WebSocket
 
 
 class HTTPServer(HTTPProtocol):
-    __slots__ = ('_server',)
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-        self._server = {
-            'globals': self.globals,
-            'context': self.context,
-            'app': self.app,
-            'loop': self.loop,
-            'logger': self.logger,
-            'lock': self.extras['lock']
-        }
-
     async def _connection_made(self):
         for _, func, _ in self.app.middlewares['connect']:
-            if await func(**self._server):
+            if await func(**self.server):
                 break
 
     async def _connection_lost(self, exc):
@@ -33,11 +19,10 @@ class HTTPServer(HTTPProtocol):
             while i > 0:
                 i -= 1
 
-                if await self.app.middlewares['close'][i][1](**self._server):
+                if await self.app.middlewares['close'][i][1](**self.server):
                     break
         finally:
             super().connection_lost(exc)
-            self._server.clear()
 
     def connection_made(self, transport):
         super().connection_made(transport)
@@ -57,35 +42,34 @@ class HTTPServer(HTTPProtocol):
             )
         else:
             super().connection_lost(exc)
-            self._server.clear()
 
     async def run_middlewares(self, name, reverse=False, step=1):
         if self.is_closing():
             return
 
-        if reverse and self._server['next'] != -1:
-            self._server['next'] = len(self.app.middlewares[name]) - 1
+        if reverse and self.server['next'] != -1:
+            self.server['next'] = len(self.app.middlewares[name]) - 1
             step = -1
 
-        while -1 < self._server['next'] < len(self.app.middlewares[name]):
-            middleware = self.app.middlewares[name][self._server['next']]
+        while -1 < self.server['next'] < len(self.app.middlewares[name]):
+            middleware = self.app.middlewares[name][self.server['next']]
 
             if await self._handle_middleware(middleware[1], middleware[2]):
                 if reverse:
-                    self._server['next'] = -1
+                    self.server['next'] = -1
                 else:
-                    self._server['next'] = len(self.app.middlewares[name])
+                    self.server['next'] = len(self.app.middlewares[name])
 
                 return True
 
-            self._server['next'] += step
+            self.server['next'] += step
 
     async def _handle_middleware(self, func, kwargs):
-        response = self._server['response']
+        response = self.server['response']
         options = response.request.context.options
         options.update(kwargs)
 
-        data = await func(**self._server)
+        data = await func(**self.server)
 
         if data is None:
             return False
@@ -113,7 +97,7 @@ class HTTPServer(HTTPProtocol):
         return True
 
     async def _handle_response(self, func, kwargs):
-        response = self._server['response']
+        response = self.server['response']
         request = response.request
         options = request.context.options
         options.update(kwargs)
@@ -125,10 +109,10 @@ class HTTPServer(HTTPProtocol):
                     b'sec-websocket-key' in request.headers and
                     b'upgrade' in request.headers and
                     request.headers[b'upgrade'].lower() == b'websocket'):
-                self._server['websocket'] = WebSocket(request, response)
+                self.server['websocket'] = WebSocket(request, response)
 
             if 'sse' in options:
-                self._server['sse'] = SSE(request, response)
+                self.server['sse'] = SSE(request, response)
 
         if 'status' in options:
             response.set_status(*options['status'])
@@ -137,9 +121,9 @@ class HTTPServer(HTTPProtocol):
             response.set_content_type(options['content_type'])
 
         try:
-            agen = func(**self._server)
+            agen = func(**self.server)
         except TypeError:  # doesn't accept extra **kwargs
-            agen = func(**{k: self._server.get(k, kwargs[k]) for k in kwargs})
+            agen = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
 
         next_data = getattr(agen, '__anext__', False)
 
@@ -256,9 +240,8 @@ class HTTPServer(HTTPProtocol):
         response.close(keepalive=True)
 
     async def request_received(self, request, response):
-        self._server['request'] = request
-        self._server['response'] = response
-        self._server['next'] = 0
+        self.server['response'] = response
+        self.server['next'] = 0
 
         if self.app.middlewares['connect']:
             await self.context.ON_CONNECT
