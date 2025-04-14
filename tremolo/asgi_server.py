@@ -90,8 +90,8 @@ class ASGIWrapper:
         self.scope = scope
         self.request = request
         self.response = response
-        self.loop = request.protocol.loop
-        self.logger = request.protocol.logger
+        self.loop = request.server.loop
+        self.logger = request.server.logger
         self._websocket = None
 
         if self.scope['type'] == 'websocket':
@@ -131,7 +131,7 @@ class ASGIWrapper:
             except (asyncio.CancelledError, Exception) as exc:
                 code = 1005
 
-                if self._websocket is None:
+                if self._websocket is None or self.protocol is None:
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
@@ -281,7 +281,7 @@ class ASGIWrapper:
         except asyncio.CancelledError:
             pass
         except Exception as exc:
-            if self.response is None:
+            if self.response is None or self.protocol is None:
                 self.logger.info(
                     'calling send() after the connection is closed'
                 )

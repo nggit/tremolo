@@ -81,14 +81,12 @@ class HTTPResponse(Response):
 
     def set_base_headers(self):
         self.set_header(
-            b'Date',
-            self.request.protocol.globals.info['server_date']
+            b'Date', self.request.server.globals.info['server_date']
         )
 
-        if self.request.protocol.globals.info['server_name'] != b'':
+        if self.request.server.globals.info['server_name'] != b'':
             self.set_header(
-                b'Server',
-                self.request.protocol.globals.info['server_name']
+                b'Server', self.request.server.globals.info['server_name']
             )
 
     def set_cookie(self, name, value='', *, expires=0, path='/', domain=None,
@@ -251,7 +249,7 @@ class HTTPResponse(Response):
 
                     data = None
                 else:
-                    self.request.protocol.set_watermarks(
+                    self.request.server.set_watermarks(
                         high=buffer_size * 4,
                         low=kwargs.get('buffer_min_size', buffer_size // 2)
                     )
@@ -275,11 +273,9 @@ class HTTPResponse(Response):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
-        kwargs.setdefault(
-            'rate', self.request.protocol.options['download_rate']
-        )
+        kwargs.setdefault('rate', self.request.server.options['download_rate'])
         kwargs['buffer_size'] = buffer_size
-        loop = self.request.protocol.loop
+        loop = self.request.server.loop
 
         def run_sync(func, *args):
             if executor is None:
@@ -293,13 +289,13 @@ class HTTPResponse(Response):
             return asyncio.wrap_future(fut, loop=loop)
 
         try:
-            handle = self.request.protocol.context[path]
+            handle = self.request.server.context[path]
             await run_sync(handle.seek, offset)  # OSError on a negative offset
         except KeyError:
             handle = await run_sync(open, path, 'rb')
-            self.request.protocol.context[path] = handle
+            self.request.server.context[path] = handle
 
-            self.request.protocol.add_close_callback(handle.close)
+            self.request.server.add_close_callback(handle.close)
 
         st = os.stat(path)
         file_size = st.st_size - offset
