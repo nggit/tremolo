@@ -30,12 +30,12 @@ class Response:
             while self._send_buf:
                 data = self._send_buf[:buffer_size]
 
-                if await self.request.protocol.put_to_queue(
+                if await self.request.server.put_to_queue(
                         data, name=1, rate=rate):
                     del self._send_buf[:len(data)]
                 else:
                     del self._send_buf[:]
 
     def send_nowait(self, data):
-        if self.request.protocol.queue:
-            self.request.protocol.queue[1].put_nowait(data)
+        if self.request.server.queue:
+            self.request.server.queue[1].put_nowait(data)

@@ -160,7 +160,7 @@ class HTTPRequest(Request):
             return
 
         if self.http_continue:
-            self.protocol.send_continue()
+            self.server.send_continue()
 
         if not raw and b'chunked' in self.transfer_encoding:
             buf = bytearray()
@@ -195,7 +195,7 @@ class HTTPRequest(Request):
                     i = buf.find(b'\r\n')
 
                     if i == -1:
-                        if len(buf) > self.protocol.options['buffer_size'] * 4:
+                        if len(buf) > self.server.options['buffer_size'] * 4:
                             raise BadRequest(
                                 'bad chunked encoding: no chunk size'
                             )
@@ -229,7 +229,7 @@ class HTTPRequest(Request):
                         del buf[:chunk_size + i + 4]
         else:
             if (self.content_length >
-                    self.protocol.options['client_max_body_size']):
+                    self.server.options['client_max_body_size']):
                 raise PayloadTooLarge
 
             async for data in super().recv(timeout):
