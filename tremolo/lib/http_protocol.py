@@ -17,7 +17,7 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('__dict__', '_receive_buf', '_waiters', '_watermarks')
+    __slots__ = ('_receive_buf', '_waiters', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.globals = app.context  # a worker-level context
@@ -37,7 +37,7 @@ class HTTPProtocol(asyncio.Protocol):
         self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
-    def server(self):  # all properties above except those that are slotted
+    def server(self):  # all properties except those that are slotted
         return self.__dict__
 
     @property
