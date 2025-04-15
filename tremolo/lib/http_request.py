@@ -14,7 +14,7 @@ class HTTPRequest(Request):
     __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
                  'host', 'method', 'url', 'path', 'query_string', 'version',
                  'content_length', 'http_continue', 'http_keepalive',
-                 '_upgraded', '_body', '_eof', '_stream', '_read_buf')
+                 '_upgraded', '_body', '_stream', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -42,7 +42,6 @@ class HTTPRequest(Request):
         self.http_keepalive = False
         self._upgraded = False
         self._body = bytearray()
-        self._eof = False
         self._stream = None
         self._read_buf = bytearray()
 
@@ -132,7 +131,7 @@ class HTTPRequest(Request):
         return self.recv(size, timeout=timeout, raw=False)
 
     def eof(self):
-        return self._eof and self._read_buf == b''
+        return self.content_length == 0 and self._read_buf == b''
 
     async def recv(self, size=-1, *, timeout=None, raw=True):
         if size == 0 or self.eof():
@@ -156,7 +155,7 @@ class HTTPRequest(Request):
         return data
 
     async def stream(self, timeout=None, raw=False):
-        if self._eof:
+        if self.content_length == 0:
             return
 
         if self.http_continue:
@@ -235,7 +234,7 @@ class HTTPRequest(Request):
             async for data in super().recv(timeout):
                 yield data
 
-        self._eof = True
+        self.content_length = 0
 
     @property
     def params(self):
