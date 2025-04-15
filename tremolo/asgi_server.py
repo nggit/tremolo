@@ -21,8 +21,6 @@ _WSS_OR_WS = {
 
 
 class ASGIServer(HTTPProtocol):
-    __slots__ = ('ON_CLOSE',)
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
