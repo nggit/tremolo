@@ -20,9 +20,8 @@ jobs:
           - '3.9'
           - '3.8'
           - '3.7'
-          - '3.6'
           - 'pypy3.10'
-        os: ['ubuntu-20.04', 'windows-latest']
+        os: ['ubuntu-22.04', 'windows-latest']
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -59,7 +58,7 @@ jobs:
           python -m flake8 .
         if: |
           contains(env.FILES_MODIFIED, '.py') &&
-          matrix.os == 'ubuntu-20.04' && matrix.python_version == '3.13'
+          matrix.os == 'ubuntu-22.04' && matrix.python_version == '3.13'
 
       - name: Run tests
         run: python alltests.py
