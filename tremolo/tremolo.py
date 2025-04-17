@@ -627,12 +627,10 @@ class Tremolo:
             self.listen(port, host=host, **kwargs)
 
         if worker_num < 1:
-            raise ValueError('worker_num must be greater than 0')
-
-        try:
-            worker_num = min(worker_num, len(os.sched_getaffinity(0)))
-        except AttributeError:
-            worker_num = min(worker_num, os.cpu_count() or 1)
+            try:
+                worker_num = len(os.sched_getaffinity(0))
+            except AttributeError:
+                worker_num = os.cpu_count() or 1
 
         locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
         socks = {}
