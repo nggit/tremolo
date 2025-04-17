@@ -90,12 +90,9 @@ class ASGIWrapper:
         self.response = response
         self.loop = request.server.loop
         self.logger = request.server.logger
-        self._websocket = None
 
-        if self.scope['type'] == 'websocket':
-            self._websocket = WebSocket(request, response)
-        else:
-            self._stream = request.stream()
+        self._stream = request.stream()
+        self._websocket = None
 
     def __await__(self):
         return self.app(self.scope, self.receive, self.send).__await__()
@@ -111,6 +108,10 @@ class ASGIWrapper:
             # after the response status is set to 101:
             # Response.set_status(101) in WebSocket.accept()
             if not self.request.upgraded:
+                if self._websocket is None:
+                    await self._stream.aclose()
+                    self._websocket = WebSocket(self.request, self.response)
+
                 return {'type': 'websocket.connect'}
 
             try:
@@ -147,13 +148,6 @@ class ASGIWrapper:
                     'type': 'websocket.disconnect',
                     'code': code
                 }
-
-        if self.scope['type'] != 'http':
-            await self.response.handle_exception(
-                InternalServerError('unsupported scope type %s' %
-                                    self.scope['type'])
-            )
-            return
 
         try:
             data = await self._stream.__anext__()
