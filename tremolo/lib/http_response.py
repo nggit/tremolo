@@ -384,11 +384,10 @@ class HTTPResponse(Response):
                 await run_sync(handle.seek, start)
 
                 while size > 0:
-                    await self.write(
-                        await run_sync(handle.read, min(size, buffer_size)),
-                        chunked=False, **kwargs
-                    )
-                    size -= buffer_size
+                    data = await run_sync(handle.read, min(size, buffer_size))
+                    await self.write(data, chunked=False, **kwargs)
+
+                    size -= len(data)
             else:
                 boundary = b'----Boundary%s' % b64encode(self.request.uid(24))
 
@@ -406,12 +405,11 @@ class HTTPResponse(Response):
                     await run_sync(handle.seek, start)
 
                     while size > 0:
-                        await self.write(
-                            await run_sync(handle.read,
-                                           min(size, buffer_size)),
-                            **kwargs
-                        )
-                        size -= buffer_size
+                        data = await run_sync(handle.read,
+                                              min(size, buffer_size))
+                        await self.write(data, **kwargs)
+
+                        size -= len(data)
 
                     await self.write(b'\r\n', **kwargs)
 
