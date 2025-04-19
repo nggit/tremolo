@@ -107,6 +107,11 @@ class HTTPProtocol(asyncio.Protocol):
         except (OSError, RuntimeError) as exc:
             self.logger.info(exc)
         finally:
+            self.add_close_callback(
+                self.loop.call_at(self.loop.time() +
+                                  self.options['app_close_timeout'],
+                                  self.transport.abort).cancel
+            )
             self.transport.close()
 
     def request_timeout(self, timeout):
