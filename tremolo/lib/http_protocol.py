@@ -344,8 +344,8 @@ class HTTPProtocol(asyncio.Protocol):
             self.transport.set_write_buffer_limits(high=high, low=low)
 
     async def _send_data(self):
-        while self.queue:
-            try:
+        try:
+            while self.queue:
                 data = await self.queue[1].get()
 
                 if data is None:
@@ -399,12 +399,10 @@ class HTTPProtocol(asyncio.Protocol):
                         return
 
                 self.transport.write(data)
-            except asyncio.CancelledError:
-                self.close()
-                break
-            except Exception as exc:
-                self.close(exc)
-                break
+        except asyncio.CancelledError:
+            self.close()
+        except Exception as exc:
+            self.close(exc)
 
     async def _handle_keepalive(self):
         if 'receive' in self._waiters:
