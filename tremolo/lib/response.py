@@ -35,6 +35,7 @@ class Response:
                     del self._send_buf[:len(data)]
                 else:
                     del self._send_buf[:]
+                    self.request.clear()
 
     def send_nowait(self, data):
         if self.request.server.queue:
