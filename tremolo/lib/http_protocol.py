@@ -437,6 +437,10 @@ class HTTPProtocol(asyncio.Protocol):
         self.request.clear()
         self.request = None
 
+        if self._receive_buf:
+            self.queue[0].put_nowait(self._receive_buf[:])
+            del self._receive_buf[:]
+
         while self.queue[0].qsize():
             # this data is supposed to be the next header
             self.data_received(self.queue[0].get_nowait())
