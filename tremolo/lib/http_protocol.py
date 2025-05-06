@@ -12,7 +12,6 @@ from .http_exceptions import (
 )
 from .http_header import HTTPHeader
 from .http_request import HTTPRequest
-from .http_response import HTTPResponse
 from .queue import Queue
 
 
@@ -202,7 +201,7 @@ class HTTPProtocol(asyncio.Protocol):
 
     async def _handle_request(self):
         try:
-            response = HTTPResponse(self.request)
+            response = self.request.create_response()
 
             if b'connection' in self.request.headers:
                 if b'close' not in self.request.headers.getlist(b'connection'):
