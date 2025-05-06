@@ -7,6 +7,7 @@ from urllib.parse import parse_qs
 
 from tremolo.utils import parse_fields, parse_int
 from .http_exceptions import BadRequest, PayloadTooLarge
+from .http_response import HTTPResponse
 from .request import Request
 
 
@@ -110,6 +111,9 @@ class HTTPRequest(Request):
         )  # 12 Bytes
 
         return prefix + os.urandom(max(4, length - len(prefix)))
+
+    def create_response(self):
+        return HTTPResponse(self)
 
     def clear(self):
         self.header.clear()
