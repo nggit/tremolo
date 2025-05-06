@@ -14,7 +14,7 @@ class HTTPRequest(Request):
     __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
                  'host', 'method', 'url', 'path', 'query_string', 'version',
                  'content_length', 'http_continue', 'http_keepalive',
-                 '_upgraded', '_body', '_stream', '_read_buf')
+                 '_body', '_stream', '_read_buf')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -40,7 +40,6 @@ class HTTPRequest(Request):
         self.content_length = -1
         self.http_continue = False
         self.http_keepalive = False
-        self._upgraded = False
         self._body = bytearray()
         self._stream = None
         self._read_buf = bytearray()
@@ -85,13 +84,12 @@ class HTTPRequest(Request):
 
     @property
     def upgraded(self):
-        return self._upgraded
+        return self._body is None
 
     @upgraded.setter
     def upgraded(self, value):
-        del self._body[:]
+        self._body = None
         del self._read_buf[:]
-        self._upgraded = value
 
     @property
     def has_body(self):
@@ -117,7 +115,9 @@ class HTTPRequest(Request):
         self.header.clear()
         self.headers.clear()
 
-        del self._body[:]
+        if self._body:
+            del self._body[:]
+
         del self._read_buf[:]
         super().clear()
 
