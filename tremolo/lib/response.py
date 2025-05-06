@@ -9,7 +9,7 @@ class Response:
         self._send_buf = bytearray()
 
     def close(self):
-        if self._send_buf != b'':
+        if self._send_buf:
             self.send_nowait(self._send_buf[:])
             del self._send_buf[:]
 
