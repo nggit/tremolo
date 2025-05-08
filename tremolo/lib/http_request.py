@@ -181,24 +181,24 @@ class HTTPRequest(Request):
                                 'bad chunked encoding: incomplete read'
                             ) from exc
 
-                if bytes_unread > 0:
-                    data = bytes(buf[:bytes_unread])
+                if bytes_unread > 2:
+                    data = bytes(buf[:bytes_unread - 2])
 
                     yield data
-                    del buf[:bytes_unread]
+                    del buf[:bytes_unread - 2]
 
                     bytes_unread -= len(data)
 
-                    if bytes_unread > 0:
+                    if bytes_unread > 2:
                         continue
 
                     paused = True
-                    del buf[:2]
                 else:
-                    i = buf.find(b'\r\n')
+                    # bytes_unread should only be either 0 or 2 at this point
+                    i = buf.find(b'\r\n', bytes_unread)
 
                     if i == -1:
-                        if len(buf) > self.server.options['buffer_size'] * 4:
+                        if len(buf) > 64:
                             raise BadRequest(
                                 'bad chunked encoding: no chunk size'
                             )
@@ -207,29 +207,31 @@ class HTTPRequest(Request):
                         continue
 
                     try:
-                        chunk_size = parse_int(buf[:i].split(b';', 1)[0], 16)
+                        chunk_size = parse_int(
+                            buf[bytes_unread:i].split(b';', 1)[0], 16
+                        )
                     except ValueError as exc:
                         raise BadRequest('bad chunked encoding') from exc
 
-                    if chunk_size <= 0:
-                        if b'\r\n\r\n' in buf:
-                            break
-
-                        raise BadRequest(
-                            'bad chunked encoding: invalid last-chunk'
-                        )
-
                     data = bytes(buf[i + 2:i + 2 + chunk_size])
-                    bytes_unread = chunk_size - len(data)
+                    bytes_unread = chunk_size - len(data) + 2
 
-                    yield data
-
-                    if bytes_unread > 0:
+                    if bytes_unread > 2:
                         paused = False
                         del buf[:]
                     else:
                         paused = True
-                        del buf[:chunk_size + i + 4]
+                        del buf[:i + 2 + chunk_size]
+
+                    if bytes_unread == 2 and not b'\r\n'.startswith(buf[:2]):
+                        raise BadRequest(
+                            'bad chunked encoding: invalid chunk terminator'
+                        )
+
+                    if chunk_size <= 0:
+                        break
+
+                    yield data
         else:
             if (self.content_length >
                     self.server.options['client_max_body_size']):
