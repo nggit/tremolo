@@ -7,6 +7,7 @@ from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
     InternalServerError,
+    WebSocketException,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
@@ -128,17 +129,20 @@ class ASGIWrapper:
                     'bytes': payload
                 }
             except (asyncio.CancelledError, Exception) as exc:
-                code = 1005
+                code = 1011
 
                 if self._websocket is None or self.protocol is None:
+                    code = 1005
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
                 else:
-                    if isinstance(exc, WebSocketClientClosed):
+                    if isinstance(exc, WebSocketException):
                         code = exc.code
-                    else:
+
+                    if not isinstance(exc, WebSocketClientClosed):
                         self.protocol.print_exception(exc)
+                        await self._websocket.close(code)
 
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
@@ -182,7 +186,7 @@ class ASGIWrapper:
                     )
                     await self.protocol.ON_CLOSE
                 else:
-                    self.protocol.print_exception(exc)
+                    await self.response.handle_exception(exc)
 
                 self.protocol.set_handler_timeout(
                     self.protocol.options['app_close_timeout']
