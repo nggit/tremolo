@@ -1,4 +1,4 @@
-![](static/tremolo.svg)
+![](media/tremolo.svg)
 ---
 
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
