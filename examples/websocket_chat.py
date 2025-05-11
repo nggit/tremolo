@@ -10,6 +10,7 @@ from tremolo.utils import html_escape
 
 app = Application()
 
+sockets = []
 
 @app.route('/')
 async def ws_handler(request, websocket=None, stream=False):
@@ -21,14 +22,16 @@ async def ws_handler(request, websocket=None, stream=False):
         # an upgrade request is received.
         # accept it by sending the "101 Switching Protocols"
         await websocket.accept()
+        sockets.append(websocket)
 
         while True:
             message = await websocket.receive()
             # send back the received message
-            await websocket.send(
-                '[%s] Guest%s: %s' % (time.strftime('%H:%M:%S'),
-                                      request.client[1], message)
-            )
+            for socket in sockets:
+                await socket.send(
+                    '[%s] Guest%s: %s' % (time.strftime('%H:%M:%S'),
+                                          request.client[1], message)
+                )
 
     # not an upgrade request. show the html page
     yield b"""\
@@ -48,7 +51,7 @@ async def ws_handler(request, websocket=None, stream=False):
         ws_scheme, html_escape(request.host))
     yield b"""
             var messages = document.getElementById('messages');
-            var sendButton = document.getElementById('send');
+            var form = document.querySelector('form');
 
             socket.onmessage = function(event) {
                 var message = document.createElement('li');
@@ -56,7 +59,8 @@ async def ws_handler(request, websocket=None, stream=False):
                 messages.insertBefore(message, messages.firstChild);
             };
 
-            sendButton.onclick = function() {
+            form.onsubmit = (e) => {
+                e.preventDefault()
                 var message = document.getElementById('message');
 
                 if (message) {
