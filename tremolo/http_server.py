@@ -1,5 +1,7 @@
 # Copyright (c) 2023 nggit
 
+from asyncio import iscoroutine
+
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, UPGRADE_OR_KEEPALIVE
 from .lib.sse import SSE
@@ -130,7 +132,10 @@ class HTTPServer(HTTPProtocol):
         if next_data:
             data = await next_data()
         else:
-            data = await agen
+            if not iscoroutine(agen):
+                data = agen
+            else:
+                data = await agen
 
             if data is None:
                 response.close()
