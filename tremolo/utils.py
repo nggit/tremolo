@@ -168,9 +168,10 @@ def server_date():
     return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
 
+
 def print_logo():
-    w = '[38;5;15m' # white
-    b = '[38;5;4m'  # blue
+    w = '[38;5;15m'  # white
+    b = '[38;5;4m'   # blue
     print('[0m')
     print(f'{w}   ▄                           {b}▄▄██')
     print(f'{w}   █                           {b}▀▀  ')
