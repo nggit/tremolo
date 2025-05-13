@@ -19,7 +19,7 @@ from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
 from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, getoptions, log_date, memory_usage, server_date
+    file_signature, getoptions, log_date, memory_usage, server_date, print_logo
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
@@ -565,13 +565,7 @@ class Tremolo:
         terminal_width = min(get_terminal_size()[0], 72)
 
         if terminal_width > 42:
-            print('''[0m
-   [38;5;15m▄[38;5;7m                           [38;5;4m▄▄██[38;5;7m
-   [38;5;15m█                           [38;5;4m▀▀[38;5;7m
- [38;5;15m▀▀█▀▀[38;5;7m  [38;5;15m█▄▀▀[38;5;7m [38;5;15m▄▀▀▄[38;5;7m [38;5;15m▄▀▀█▀▀▄[38;5;7m [38;5;15m▄▀▀▄[38;5;7m [38;5;4m▄▄██[38;5;7m [38;5;15m▄▀▀▄[38;5;7m
-   [38;5;15m█[38;5;7m    [38;5;15m█[38;5;7m    [38;5;15m█▄▄█[38;5;7m [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m [38;5;4m▀▀[38;5;7m   [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m
-   [38;5;15m█[38;5;7m    [38;5;15m█[38;5;7m    [38;5;15m█[38;5;7m  [38;5;15m▄[38;5;7m [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m [38;5;4m▄▄██[38;5;7m [38;5;15m█[38;5;7m  [38;5;15m█[38;5;7m
-    [38;5;15m▀▀[38;5;7m  [38;5;15m▀[38;5;7m     [38;5;15m▀▀[38;5;7m  [38;5;15m▀[38;5;7m  [38;5;15m▀[38;5;7m  [38;5;15m▀[38;5;7m  [38;5;15m▀▀[38;5;7m  [38;5;4m▀▀[38;5;7m    [38;5;15m▀▀[38;5;7m \n''')
+            print_logo()
 
         print(
             'Starting %s (tremolo %s, %s %d.%d.%d, %s)' %
