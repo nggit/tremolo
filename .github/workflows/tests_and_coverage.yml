@@ -133,4 +133,4 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         if: |
           contains(env.FILES_MODIFIED, '.py') &&
-          github.event.repository.full_name == github.repository
+          github.repository == 'nggit/tremolo'
