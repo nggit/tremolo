@@ -564,7 +564,7 @@ class Tremolo:
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
-        if terminal_width > 42:
+        if server_name == 'Tremolo' and terminal_width > 42:
             print_logo()
 
         print(
