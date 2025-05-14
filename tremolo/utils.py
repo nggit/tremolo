@@ -166,19 +166,18 @@ def parse_int(string, base=10):
 
 def print_logo():
     BLUE = '\033[38;5;4m'
-    WHITE = '\033[38;5;15m'
+    RESET = '\033[0m'
 
     try:
-        print(f'\n {WHITE}  ▄                           {BLUE}▄▄██')
+        print(f'\n   ▄                           {BLUE}▄▄██{RESET}')
     except UnicodeEncodeError:
         return
 
-    print(f' {WHITE}  █                           {BLUE}▀▀  ')
-    print(f' {WHITE}▀▀█▀▀  █▄▀▀ ▄▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▄ {BLUE}▄▄██ {WHITE}▄▀▀▄')
-    print(f' {WHITE}  █    █    █▄▄█ █  █  █ █  █ {BLUE}▀▀   {WHITE}█  █')
-    print(f' {WHITE}  █    █    █  ▄ █  █  █ █  █ {BLUE}▄▄██ {WHITE}█  █')
-    print(f' {WHITE}   ▀▀  ▀     ▀▀  ▀  ▀  ▀  ▀▀  {BLUE}▀▀   {WHITE} ▀▀ ')
-    print('\033[0m')
+    print(f'   █                           {BLUE}▀▀  {RESET}')
+    print(f' ▀▀█▀▀  █▄▀▀ ▄▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▄ {BLUE}▄▄██{RESET} ▄▀▀▄')
+    print(f'   █    █    █▄▄█ █  █  █ █  █ {BLUE}▀▀  {RESET} █  █')
+    print(f'   █    █    █  ▄ █  █  █ █  █ {BLUE}▄▄██{RESET} █  █')
+    print(f'    ▀▀  ▀     ▀▀  ▀  ▀  ▀  ▀▀  {BLUE}▀▀  {RESET}  ▀▀ \n')
 
 
 def server_date():
