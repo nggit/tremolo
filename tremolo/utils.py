@@ -2,7 +2,7 @@
 
 __all__ = ('file_signature', 'getoptions', 'html_escape', 'log_date',
            'memory_usage', 'parse_args', 'parse_fields', 'parse_int',
-           'server_date')
+           'print_logo', 'server_date')
 
 import os  # noqa: E402
 import stat  # noqa: E402
@@ -164,19 +164,23 @@ def parse_int(string, base=10):
     return total
 
 
+def print_logo():
+    BLUE = '\033[38;5;4m'
+    WHITE = '\033[38;5;15m'
+
+    try:
+        print(f'\n {WHITE}  ▄                           {BLUE}▄▄██')
+    except UnicodeEncodeError:
+        return
+
+    print(f' {WHITE}  █                           {BLUE}▀▀  ')
+    print(f' {WHITE}▀▀█▀▀  █▄▀▀ ▄▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▄ {BLUE}▄▄██ {WHITE}▄▀▀▄')
+    print(f' {WHITE}  █    █    █▄▄█ █  █  █ █  █ {BLUE}▀▀   {WHITE}█  █')
+    print(f' {WHITE}  █    █    █  ▄ █  █  █ █  █ {BLUE}▄▄██ {WHITE}█  █')
+    print(f' {WHITE}   ▀▀  ▀     ▀▀  ▀  ▀  ▀  ▀▀  {BLUE}▀▀   {WHITE} ▀▀ ')
+    print('\033[0m')
+
+
 def server_date():
     return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
-
-
-def print_logo():
-    w = '[38;5;15m'  # white
-    b = '[38;5;4m'   # blue
-    print('[0m')
-    print(f'{w}   ▄                           {b}▄▄██')
-    print(f'{w}   █                           {b}▀▀  ')
-    print(f'{w} ▀▀█▀▀  █▄▀▀ ▄▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▄ {b}▄▄██ {w}▄▀▀▄')
-    print(f'{w}   █    █    █▄▄█ █  █  █ █  █ {b}▀▀   {w}█  █')
-    print(f'{w}   █    █    █  ▄ █  █  █ █  █ {b}▄▄██ {w}█  █')
-    print(f'{w}    ▀▀  ▀     ▀▀  ▀  ▀  ▀  ▀▀  {b}▀▀   {w} ▀▀ ')
-    print('')

@@ -19,7 +19,7 @@ from . import __version__  # noqa: E402
 from .managers import ProcessManager  # noqa: E402
 from .routes import Routes  # noqa: E402
 from .utils import (  # noqa: E402
-    file_signature, getoptions, log_date, memory_usage, server_date, print_logo
+    file_signature, getoptions, log_date, memory_usage, print_logo, server_date
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
