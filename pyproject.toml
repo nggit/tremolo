@@ -30,6 +30,3 @@ Funding = 'https://github.com/sponsors/nggit'
 [tool.setuptools.dynamic]
 version = { attr = 'tremolo.__version__' }
 readme = { file = 'README.md', content-type = 'text/markdown' }
-
-[tool.setuptools.packages.find]
-exclude = ["media*"]
