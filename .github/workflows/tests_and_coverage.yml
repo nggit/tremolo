@@ -108,14 +108,24 @@ jobs:
           echo "$HOME/.local/bin" >> $GITHUB_PATH
           python -m pip install --upgrade pip
           python -m pip install --upgrade coverage
-        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          (
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
 
       - uses: actions/download-artifact@v4
         with:
           path: artifact
           pattern: artifact-*
           merge-multiple: true
-        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          (
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
 
       - run: |
           tree -L 2
@@ -125,10 +135,20 @@ jobs:
           python -m coverage combine artifact
           python -m coverage report --show-missing --skip-covered
           python -m coverage xml
-        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          (
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )
 
       - uses: sonarsource/sonarcloud-github-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # needed to get PR information, if any
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        if: ${{ contains(env.FILES_MODIFIED, '.py') }}
+        if: |
+          contains(env.FILES_MODIFIED, '.py') &&
+          (
+            github.event_name != 'pull_request' ||
+            github.event.pull_request.head.repo.full_name == github.repository
+          )

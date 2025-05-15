@@ -2,7 +2,7 @@
 
 __all__ = ('file_signature', 'getoptions', 'html_escape', 'log_date',
            'memory_usage', 'parse_args', 'parse_fields', 'parse_int',
-           'server_date')
+           'print_logo', 'server_date')
 
 import os  # noqa: E402
 import stat  # noqa: E402
@@ -162,6 +162,22 @@ def parse_int(string, base=10):
         total = total * base + int(chr(c), base)
 
     return total
+
+
+def print_logo():
+    BLUE = '\033[38;5;4m'
+    RESET = '\033[0m'
+
+    try:
+        print(f'\n   ▄                           {BLUE}▄▄██{RESET}')
+    except UnicodeEncodeError:
+        return
+
+    print(f'   █                           {BLUE}▀▀  {RESET}')
+    print(f' ▀▀█▀▀  █▄▀▀ ▄▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▄ {BLUE}▄▄██{RESET} ▄▀▀▄')
+    print(f'   █    █    █▄▄█ █  █  █ █  █ {BLUE}▀▀  {RESET} █  █')
+    print(f'   █    █    █  ▄ █  █  █ █  █ {BLUE}▄▄██{RESET} █  █')
+    print(f'    ▀▀  ▀     ▀▀  ▀  ▀  ▀  ▀▀  {BLUE}▀▀  {RESET}  ▀▀ \n')
 
 
 def server_date():

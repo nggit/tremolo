@@ -1,4 +1,6 @@
-# Tremolo
+![Tremolo](media/tremolo.png)
+---
+
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 
