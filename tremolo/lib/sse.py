@@ -37,5 +37,8 @@ class SSE:
         await self.response.write(b'data: %s\n\n' % data)
 
     async def close(self):
-        await self.response.write(b'')
-        self.response.close(keepalive=True)
+        try:
+            await self.response.write(b'')
+            self.response.close(keepalive=True)
+        except RuntimeError:
+            pass

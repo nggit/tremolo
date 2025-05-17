@@ -192,5 +192,8 @@ class WebSocket:
         await self.send(data, opcode=10)
 
     async def close(self, code=1000):
-        await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
-        self.response.close(keepalive=True)
+        try:
+            await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
+            self.response.close(keepalive=True)
+        except RuntimeError:
+            pass
