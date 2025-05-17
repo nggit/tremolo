@@ -35,7 +35,8 @@ class HTTPRequest(Request):
         self.path, _, self.query_string = self.url.partition(b'?')
         self.version = header.getversion()
 
-        if self.version != b'1.0':
+        if self.version not in (b'1.0', b'1.1'):
+            self.is_valid = False
             self.version = b'1.1'
 
         self.content_length = -1
