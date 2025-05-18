@@ -1,4 +1,4 @@
-![Tremolo](media/tremolo.png)
+![Tremolo](https://raw.githubusercontent.com/nggit/tremolo/main/media/tremolo.png)
 ---
 
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
