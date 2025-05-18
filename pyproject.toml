@@ -27,6 +27,9 @@ Homepage = 'https://github.com/nggit/tremolo'
 Source = 'https://github.com/nggit/tremolo'
 Funding = 'https://github.com/sponsors/nggit'
 
+[tool.setuptools]
+packages = [ 'tremolo' ]
+
 [tool.setuptools.dynamic]
 version = { attr = 'tremolo.__version__' }
 readme = { file = 'README.md', content-type = 'text/markdown' }
