@@ -288,7 +288,7 @@ class HTTPProtocol(asyncio.Protocol):
         if self.request is not None:
             del self._waiters['receive']
 
-            if self.request.upgraded:
+            if self.request.upgraded and self in self.globals.connections:
                 self.transport.resume_reading()
             elif self.request.body_size >= self.request.content_length > -1:
                 self.queue[0].put_nowait(None)
