@@ -7,11 +7,13 @@ app = Application()
 
 listeners = {}
 
+
 @app.route('/')
 async def index(request, response, **server):
     try:
         [s] = request.cookies.get('session')
-        if s not in listeners: raise TypeError
+        if s not in listeners: 
+            raise TypeError
     except TypeError:
         s = str(uuid4())
         response.set_cookie('session', s, expires=3600)
@@ -27,7 +29,7 @@ async def index(request, response, **server):
         <button onclick='fetch("/ping")'>Ping Everyone</button>
         <div class="notifications"></div>
         <script>
-        const form = document.querySelector('#form') 
+        const form = document.querySelector('#form')
         form.addEventListener('submit', (e) => {
             e.preventDefault()
             const data = {
@@ -38,9 +40,6 @@ async def index(request, response, **server):
             form.reset()
             const res = fetch('/login', {
                 method: "POST",
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
                 body: new URLSearchParams(form_data)
             })
         })
@@ -112,7 +111,7 @@ async def notify(request, sse=None, **server):
         return None
 
     if sse:
-        msg = { 'text': 'listening', 'class': 'message' }
+        msg = {'text': 'listening', 'class': 'message'}
         await sse.send(json.dumps(msg).encode(), event='notify')
 
         queue = asyncio.Queue(maxsize=1)
@@ -157,10 +156,3 @@ async def ping(request):
 
 if __name__ == "__main__":
     app.run('0.0.0.0', 8001, debug=True)
-
-
-
-
-
-
-
