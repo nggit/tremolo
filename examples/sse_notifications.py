@@ -9,7 +9,7 @@ async def index(**server):
     html = '''
     <body>
         <p>The password is 'tremolo'</p>
-        <form action="login" id="form">
+        <form method="post" action="login" id="form">
             <label for="password">Enter password:</label>
             <input name="password" type="password" />
             <button>Login</button>
@@ -18,14 +18,16 @@ async def index(**server):
         const form = document.querySelector('#form') 
         form.addEventListener('submit', (e) => {
             e.preventDefault()
-            const data = new FormData(form)
+            const data = {
+                password: form.querySelector('input').value
+            }
             form.reset()
             fetch('/login', {
                 method: "POST",
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
                 },
-                body: data
+                body: JSON.stringify(data)
             })
         })
 
@@ -103,8 +105,8 @@ async def notify(sse=None, **server):
 
 @app.route('login$')
 async def login(request):
-
-    data = await request.form()
+    data = await request.body()
+    data = json.loads(data.decode())
 
     # Not retrieving form data correctly.
     password = data.get('password') or "not working"
