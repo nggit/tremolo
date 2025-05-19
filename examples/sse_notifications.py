@@ -1,10 +1,8 @@
 import asyncio
 import json
 from tremolo import Application
-from uuid import uuid4
 
 app = Application()
-
 listeners = {}
 
 
@@ -15,7 +13,7 @@ async def index(request, response, **server):
         if s not in listeners:
             raise TypeError
     except TypeError:
-        s = str(uuid4())
+        s = request.uid().hex()
         response.set_cookie('session', s, expires=3600)
 
     html = '''
@@ -101,7 +99,7 @@ async def index(request, response, **server):
     </body>
     '''
 
-    yield html.encode()
+    return html
 
 
 @app.route('/notifications$')
@@ -121,7 +119,8 @@ async def notify(request, sse=None, **server):
         try:
             while True:
                 ev, data = await queue.get()
-                await sse.send(json.dumps(data).encode(), event=ev)
+                msg = json.dumps(data).encode()
+                await sse.send(msg, event=ev)
         finally:  # the client has gone, clean up
             listeners.pop(s, None)
 
@@ -129,7 +128,7 @@ async def notify(request, sse=None, **server):
 @app.route('login$')
 async def login(request):
     data = await request.form()
-    [password] = data.get('password')
+    [password] = data.get('password') or [None]
 
     if password == "tremolo":
         notification = {'text': 'correct password', 'class': 'message'}
@@ -140,10 +139,10 @@ async def login(request):
         [s] = request.cookies.get('session')
         queue = listeners[s]
         queue.put_nowait(['notify', notification])
-        yield b'login'
+        return 'login'
 
     except TypeError:
-        yield None
+        return None
 
 
 @app.route('ping$')
