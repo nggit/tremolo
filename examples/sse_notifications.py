@@ -12,7 +12,7 @@ listeners = {}
 async def index(request, response, **server):
     try:
         [s] = request.cookies.get('session')
-        if s not in listeners: 
+        if s not in listeners:
             raise TypeError
     except TypeError:
         s = str(uuid4())
@@ -102,6 +102,7 @@ async def index(request, response, **server):
     '''
 
     yield html.encode()
+
 
 @app.route('/notifications$')
 async def notify(request, sse=None, **server):
