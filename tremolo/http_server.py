@@ -286,7 +286,7 @@ class HTTPServer(HTTPProtocol):
             if m:
                 if key in self.app.routes:
                     self.app.routes[key].append((pattern, func, kwargs))
-                else:
+                elif pattern.pattern.count(b'/') > 1:
                     self.app.routes[key] = [(pattern, func, kwargs)]
 
                 matches = m.groupdict()
