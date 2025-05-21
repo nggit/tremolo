@@ -273,7 +273,7 @@ class HTTPServer(HTTPProtocol):
                     matches = m.groupdict()
 
                     if matches:
-                        kwargs.update(matches)
+                        kwargs = {**kwargs, **matches}
                     else:
                         matches = m.groups()
 
@@ -294,7 +294,7 @@ class HTTPServer(HTTPProtocol):
                 matches = m.groupdict()
 
                 if matches:
-                    kwargs.update(matches)
+                    kwargs = {**kwargs, **matches}
                 else:
                     matches = m.groups()
 
