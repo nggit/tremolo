@@ -271,17 +271,20 @@ class HTTPServer(HTTPProtocol):
 
                 if m:
                     matches = m.groupdict()
+                    request.params['path'] = matches or m.groups()
 
-                    if matches:
+                    for k in list(matches):
+                        if k in self.server:
+                            del matches[k]
+                        else:
+                            self.server[k] = matches[k]
+
+                    try:
+                        await self._handle_response(func, kwargs)
+                        return
+                    finally:
                         for k in matches:
-                            self.server.setdefault(k, matches[k])
-                    else:
-                        matches = m.groups()
-
-                    request.params['path'] = matches
-
-                    await self._handle_response(func, kwargs)
-                    return
+                            del self.server[k]
 
         for pattern, func, kwargs in self.app.routes[-1]:
             m = pattern.search(request.url)
@@ -293,17 +296,20 @@ class HTTPServer(HTTPProtocol):
                     self.app.routes[key] = [(pattern, func, kwargs)]
 
                 matches = m.groupdict()
+                request.params['path'] = matches or m.groups()
 
-                if matches:
+                for k in list(matches):
+                    if k in self.server:
+                        del matches[k]
+                    else:
+                        self.server[k] = matches[k]
+
+                try:
+                    await self._handle_response(func, kwargs)
+                    return
+                finally:
                     for k in matches:
-                        self.server.setdefault(k, matches[k])
-                else:
-                    matches = m.groups()
-
-                request.params['path'] = matches
-
-                await self._handle_response(func, kwargs)
-                return
+                        del self.server[k]
 
         # not found
         await self._handle_response(
