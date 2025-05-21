@@ -279,30 +279,25 @@ class HTTPServer(HTTPProtocol):
 
                     await self._handle_response(func, kwargs)
                     return
-        else:
-            i = len(self.app.routes[-1])
 
-            while i > 0:
-                i -= 1
-                pattern, func, kwargs = self.app.routes[-1][i]
-                m = pattern.search(request.url)
+        for pattern, func, kwargs in self.app.routes[-1]:
+            m = pattern.search(request.url)
 
-                if m:
-                    if key in self.app.routes:
-                        self.app.routes[key].append((pattern, func, kwargs))
-                    else:
-                        self.app.routes[key] = [(pattern, func, kwargs)]
+            if m:
+                if key in self.app.routes:
+                    self.app.routes[key].append((pattern, func, kwargs))
+                else:
+                    self.app.routes[key] = [(pattern, func, kwargs)]
 
-                    matches = m.groupdict()
+                matches = m.groupdict()
 
-                    if not matches:
-                        matches = m.groups()
+                if not matches:
+                    matches = m.groups()
 
-                    request.params['path'] = matches
+                request.params['path'] = matches
 
-                    await self._handle_response(func, kwargs)
-                    del self.app.routes[-1][i]
-                    return
+                await self._handle_response(func, kwargs)
+                return
 
         # not found
         await self._handle_response(
