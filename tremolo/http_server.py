@@ -272,7 +272,9 @@ class HTTPServer(HTTPProtocol):
                 if m:
                     matches = m.groupdict()
 
-                    if not matches:
+                    if matches:
+                        kwargs.update(matches)
+                    else:
                         matches = m.groups()
 
                     request.params['path'] = matches
@@ -291,7 +293,9 @@ class HTTPServer(HTTPProtocol):
 
                 matches = m.groupdict()
 
-                if not matches:
+                if matches:
+                    kwargs.update(matches)
+                else:
                     matches = m.groups()
 
                 request.params['path'] = matches
