@@ -171,9 +171,7 @@ class Tremolo:
         return (host, port) in self.ports
 
     def mount(self, prefix, app):
-        prefix = prefix.rstrip('/').encode('latin-1')
-
-        if prefix.rfind(b'/') != 0:
+        if not prefix.startswith('/'):
             raise ValueError('prefix must start with "/"')
 
         if app is self or not isinstance(app, self.__class__):
@@ -181,6 +179,8 @@ class Tremolo:
 
         if app.routes is self.routes:  # already mounted
             return
+
+        prefix = prefix.rstrip('/').encode('latin-1')
 
         while app.routes:
             _, routes = app.routes.popitem()
