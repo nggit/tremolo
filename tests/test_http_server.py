@@ -848,18 +848,62 @@ class TestHTTPServer(unittest.TestCase):
             self.assertEqual(body[:7], data_out[:7])
 
     def test_websocket_continuation(self):
+        payload = (WebSocket.create_frame(b'Hello', fin=0) +
+                   WebSocket.create_frame(b', ', fin=0, opcode=0) +
+                   WebSocket.create_frame(b'World', fin=0, opcode=0) +
+                   WebSocket.create_frame(b'!', fin=1, opcode=0))
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
                 b'Upgrade: websocket\r\n'
                 b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                b'Connection: upgrade\r\n\r\n%s' % (
-                    HTTP_PORT,
-                    WebSocket.create_frame('Hello, ', fin=0))
+                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
         )
 
-        self.assertEqual(body, b'\x88\x02\x03\xeb')
+        self.assertEqual(body, b'\x82\rHello, World!')
+
+    def test_websocket_unexpected_start(self):
+        payload = (WebSocket.create_frame(b'Hello', fin=0) +
+                   WebSocket.create_frame(b'Hello', fin=0))
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
+        )
+
+        self.assertEqual(body, b'\x88\x02\x03\xea')
+
+    def test_websocket_unexpected_continuation(self):
+        payload = WebSocket.create_frame(b'World', fin=0, opcode=0)
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
+        )
+
+        self.assertEqual(body, b'\x88\x02\x03\xea')
+
+    def test_websocket_max_payload(self):
+        payload = (WebSocket.create_frame(b'Hello, World', fin=0) +
+                   WebSocket.create_frame(b'!' * 65536, fin=0, opcode=0) +
+                   WebSocket.create_frame(b'!' * 65536, fin=1, opcode=0))
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
+        )
+
+        self.assertEqual(body, b'\x88\x02\x03\xf1')
 
     def test_sse(self):
         header, body = getcontents(host=HTTP_HOST,
