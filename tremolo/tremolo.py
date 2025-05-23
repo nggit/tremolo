@@ -154,6 +154,47 @@ class Tremolo:
         self.ports[(host, port)] = options
         return (host, port) in self.ports
 
+    def mount(self, prefix, app):
+        prefix = prefix.rstrip('/').encode('latin-1')
+
+        if prefix.rfind(b'/') != 0:
+            raise ValueError('prefix must start with "/"')
+
+        if app is self or not isinstance(app, self.__class__):
+            raise ValueError('invalid app')
+
+        if app.routes is self.routes:  # already mounted
+            return
+
+        while app.routes:
+            _, routes = app.routes.popitem()
+
+            for pattern, func, kwargs in routes:
+                if isinstance(pattern, bytes):
+                    if pattern.startswith(b'^/'):
+                        pattern = b'^' + prefix + pattern[1:]
+                    else:
+                        pattern = b'^' + prefix + b'.*' + pattern
+
+                    self.routes[-1].append((pattern, func, kwargs))
+
+        while app.middlewares:
+            name, middlewares = app.middlewares.popitem()
+
+            if name in self.middlewares:
+                self.middlewares[name].extend(middlewares)
+
+        while app.hooks:
+            name, hooks = app.hooks.popitem()
+
+            if name in self.hooks:
+                self.hooks[name].extend(hooks)
+
+        while app.ports:
+            self.ports.setdefault(*app.ports.popitem())
+
+        app.__dict__.update(self.__dict__)
+
     async def _serve(self, host, port, **kwargs):
         options = self.context.options
         options.update(kwargs)
