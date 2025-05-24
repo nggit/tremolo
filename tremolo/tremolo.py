@@ -178,14 +178,15 @@ class Tremolo:
         while app.middlewares:
             name, middlewares = app.middlewares.popitem()
 
-            if name in self.middlewares:
-                self.middlewares[name].extend(middlewares)
+            for priority, func, kwargs in middlewares:
+                self.add_middleware(func, name=name, priority=priority,
+                                    kwargs=kwargs)
 
         while app.hooks:
             name, hooks = app.hooks.popitem()
 
-            if name in self.hooks:
-                self.hooks[name].extend(hooks)
+            for priority, func in hooks:
+                self.add_hook(func, name=name, priority=priority)
 
         while app.ports:
             self.ports.setdefault(*app.ports.popitem())
