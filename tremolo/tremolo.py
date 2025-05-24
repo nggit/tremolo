@@ -161,9 +161,6 @@ class Tremolo:
         if app is self or not isinstance(app, self.__class__):
             raise ValueError('invalid app')
 
-        if app.routes is self.routes:  # already mounted
-            return
-
         prefix = prefix.rstrip('/').encode('latin-1')
 
         while app.routes:
@@ -192,8 +189,6 @@ class Tremolo:
 
         while app.ports:
             self.ports.setdefault(*app.ports.popitem())
-
-        app.__dict__.update(self.__dict__)
 
     async def _serve(self, host, port, **kwargs):
         options = self.context.options
@@ -577,7 +572,7 @@ class Tremolo:
                 # we need to update/rebind objects like
                 # routes, middlewares, etc.
                 for attr in module.__dict__.values():
-                    if isinstance(attr, self.__class__):
+                    if isinstance(attr, self.__class__) and attr.routes:
                         self.__dict__.update(attr.__dict__)
         elif process.exitcode != 0:
             print(
@@ -644,9 +639,7 @@ class Tremolo:
                 print('Routes:')
 
                 for routes in self.routes.values():
-                    for route in routes:
-                        pattern, func, kw = route
-
+                    for pattern, func, kw in routes:
                         print(
                             '  %s -> %s(%s)' %
                             (pattern,
