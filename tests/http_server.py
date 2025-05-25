@@ -163,10 +163,12 @@ async def get_query(**server):
     return '&'.join(data)
 
 
-@app.route(r'^/page/(?P<page_id>\d+)')
-async def get_page(**server):
+@app.route(r'^/page/(?P<page_id>\d+)(?:/(?P<request>\w+))?$')
+async def get_page(request, page_id=None, **server):
+    assert request is not None
+
     # b'101'
-    return server['request'].params['path'].get('page_id')
+    return page_id
 
 
 @app.route('/getcookies')

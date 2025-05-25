@@ -271,38 +271,45 @@ class HTTPServer(HTTPProtocol):
 
                 if m:
                     matches = m.groupdict()
+                    request.params['path'] = matches or m.groups()
 
-                    if not matches:
-                        matches = m.groups()
+                    for k in list(matches):
+                        if k in self.server:
+                            del matches[k]
+                        else:
+                            self.server[k] = matches[k]
 
-                    request.params['path'] = matches
+                    try:
+                        await self._handle_response(func, kwargs)
+                        return
+                    finally:
+                        for k in matches:
+                            del self.server[k]
 
-                    await self._handle_response(func, kwargs)
-                    return
-        else:
-            i = len(self.app.routes[-1])
+        for pattern, func, kwargs in self.app.routes[-1]:
+            m = pattern.search(request.url)
 
-            while i > 0:
-                i -= 1
-                pattern, func, kwargs = self.app.routes[-1][i]
-                m = pattern.search(request.url)
+            if m:
+                if key in self.app.routes:
+                    self.app.routes[key].append((pattern, func, kwargs))
+                elif pattern.pattern.count(b'/') > 1:
+                    self.app.routes[key] = [(pattern, func, kwargs)]
 
-                if m:
-                    if key in self.app.routes:
-                        self.app.routes[key].append((pattern, func, kwargs))
+                matches = m.groupdict()
+                request.params['path'] = matches or m.groups()
+
+                for k in list(matches):
+                    if k in self.server:
+                        del matches[k]
                     else:
-                        self.app.routes[key] = [(pattern, func, kwargs)]
+                        self.server[k] = matches[k]
 
-                    matches = m.groupdict()
-
-                    if not matches:
-                        matches = m.groups()
-
-                    request.params['path'] = matches
-
+                try:
                     await self._handle_response(func, kwargs)
-                    del self.app.routes[-1][i]
                     return
+                finally:
+                    for k in matches:
+                        del self.server[k]
 
         # not found
         await self._handle_response(
