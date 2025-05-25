@@ -131,13 +131,14 @@ class Tremolo:
         self.hooks[name].sort(key=lambda item: item[0],
                               reverse=name == 'worker_stop')
 
-    def add_middleware(self, func, name='request', priority=999, kwargs=None):
+    def add_middleware(self, func, name='request', priority=999, *,
+                       kwargs=None, prefix=b'/'):
         if name not in self.middlewares:
             raise ValueError('%s is not one of the: %s' %
                              (name, ', '.join(self.middlewares)))
 
         self.middlewares[name].append(
-            (priority, func, kwargs or getoptions(func))
+            (priority, func, kwargs or getoptions(func), prefix or b'/')
         )
         self.middlewares[name].sort(key=lambda item: item[0],
                                     reverse=name in ('close', 'response'))
@@ -168,25 +169,27 @@ class Tremolo:
 
             for pattern, func, kwargs in routes:
                 if isinstance(pattern, bytes):
-                    if pattern.startswith(b'^/'):
-                        pattern = b'^' + prefix + pattern[1:]
+                    pattern = pattern.lstrip(b'^')
+
+                    if pattern.startswith(b'/'):
+                        pattern = b'^' + prefix + pattern
                     else:
-                        pattern = b'^' + prefix + b'.*' + pattern
+                        pattern = b'^' + prefix + b'/.*' + pattern
 
                     self.routes[-1].append((pattern, func, kwargs))
 
         while app.middlewares:
             name, middlewares = app.middlewares.popitem()
 
-            for priority, func, kwargs in middlewares:
-                self.add_middleware(func, name=name, priority=priority,
-                                    kwargs=kwargs)
+            for priority, func, kwargs, _ in middlewares:
+                self.add_middleware(func, name, priority, kwargs=kwargs,
+                                    prefix=prefix + b'/')
 
         while app.hooks:
             name, hooks = app.hooks.popitem()
 
             for priority, func in hooks:
-                self.add_hook(func, name=name, priority=priority)
+                self.add_hook(func, name, priority)
 
         while app.ports:
             self.ports.setdefault(*app.ports.popitem())
