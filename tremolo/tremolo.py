@@ -628,6 +628,9 @@ class Tremolo:
 
                 kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
         else:
+            if not self.routes:
+                raise RuntimeError('cannot run this app. mounted somewhere?')
+
             kwargs['app'] = None
 
             if hasattr(__main__, '__file__'):
