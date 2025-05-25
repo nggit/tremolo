@@ -181,9 +181,9 @@ class Tremolo:
         while app.middlewares:
             name, middlewares = app.middlewares.popitem()
 
-            for priority, func, kwargs, _ in middlewares:
+            for priority, func, kwargs, p in middlewares:
                 self.add_middleware(func, name, priority, kwargs=kwargs,
-                                    prefix=prefix + b'/')
+                                    prefix=prefix + p)
 
         while app.hooks:
             name, hooks = app.hooks.popitem()
