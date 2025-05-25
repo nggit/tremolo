@@ -8,7 +8,7 @@ from .lib.websocket import WebSocket
 
 class HTTPServer(HTTPProtocol):
     async def _connection_made(self):
-        for _, func, _ in self.app.middlewares['connect']:
+        for _, func, _, _ in self.app.middlewares['connect']:
             if await func(**self.server):
                 break
 
@@ -54,13 +54,14 @@ class HTTPServer(HTTPProtocol):
         while -1 < self.server['next'] < len(self.app.middlewares[name]):
             middleware = self.app.middlewares[name][self.server['next']]
 
-            if await self._handle_middleware(middleware[1], middleware[2]):
-                if reverse:
-                    self.server['next'] = -1
-                else:
-                    self.server['next'] = len(self.app.middlewares[name])
+            if self.request.path.startswith(middleware[3]):
+                if await self._handle_middleware(middleware[1], middleware[2]):
+                    if reverse:
+                        self.server['next'] = -1
+                    else:
+                        self.server['next'] = len(self.app.middlewares[name])
 
-                return True
+                    return True
 
             self.server['next'] += step
 
