@@ -1,5 +1,11 @@
+#!/usr/bin/env python
+# SPDX-License-Identifier: MIT
+# Author: Zenen Treadwell (https://github.com/ZenenTreadwell)
+# Description: https://github.com/nggit/tremolo/pull/275
+
 import asyncio
 import json
+
 from tremolo import Application
 
 app = Application()
@@ -121,11 +127,12 @@ async def notify(request, sse=None, **server):
                 ev, data = await queue.get()
                 msg = json.dumps(data).encode()
                 await sse.send(msg, event=ev)
-        finally:  # the client has gone, clean up
+        finally:  # the client has gone or queue.get() has timed out, clean up
             listeners.pop(s, None)
+            await sse.close()  # no-op on a client who has gone
 
 
-@app.route('login$')
+@app.route('/login$')
 async def login(request):
     data = await request.form()
     [password] = data.get('password') or [None]
@@ -145,7 +152,7 @@ async def login(request):
         return None
 
 
-@app.route('ping$')
+@app.route('/ping$')
 async def ping(request):
     notification = {'text': 'ping!', 'class': 'message'}
     for queue in listeners.values():
@@ -155,4 +162,4 @@ async def ping(request):
 
 
 if __name__ == "__main__":
-    app.run('0.0.0.0', 8001, debug=True)
+    app.run('0.0.0.0', 8002, debug=True, app_handler_timeout=600)
