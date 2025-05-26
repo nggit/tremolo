@@ -13,6 +13,11 @@ class WebSocket:
     def __init__(self, request, response):
         self.request = request
         self.response = response
+        self.fin = 1
+        self.opcode = 0
+
+        self._max_payload_size = request.server.options['ws_max_payload_size']
+        self._receive_timeout = request.server.options['keepalive_timeout'] / 2
 
     def __aiter__(self):
         return self
@@ -51,10 +56,21 @@ class WebSocket:
         is_masked = (second_byte & 0x80) >> 7
         payload_length = second_byte & 0x7f
 
-        if fin == 0 or opcode == 0:
-            raise WebSocketServerClosed(
-                'continuation frames are not supported', code=1003
-            )
+        if opcode != 0:
+            if self.fin != 1:
+                raise WebSocketServerClosed('unexpected start', code=1002)
+
+            if fin == 0:  # start of fragmented message
+                self.fin = 0
+
+            self.opcode = opcode
+        else:  # continuation frame
+            if self.fin == 1:
+                raise WebSocketServerClosed('unexpected continuation',
+                                            code=1002)
+
+            if fin == 1:  # end of fragmented message, reset
+                self.fin = 1
 
         if payload_length == 126:
             payload_length = int.from_bytes(await self.request.recv(2),
@@ -63,12 +79,10 @@ class WebSocket:
             payload_length = int.from_bytes(await self.request.recv(8),
                                             byteorder='big')
 
-            if (payload_length >
-                    self.request.server.options['ws_max_payload_size']):
+            if payload_length > self._max_payload_size:
                 raise WebSocketServerClosed(
                     '%d exceeds maximum payload size (%d)' %
-                    (payload_length,
-                     self.request.server.options['ws_max_payload_size']),
+                    (payload_length, self._max_payload_size),
                     code=1009
                 )
 
@@ -82,10 +96,7 @@ class WebSocket:
         else:
             unmasked_data = await self.request.recv(payload_length)
 
-        if opcode == 1:
-            return unmasked_data.decode('utf-8')
-
-        if opcode == 2:
+        if opcode == 1 or opcode == 2 or opcode == 0:
             return unmasked_data
 
         # ping
@@ -115,26 +126,39 @@ class WebSocket:
         )
 
     async def receive(self):
-        payload = b''
+        payload = bytearray()
 
-        while payload == b'':
-            # got empty bytes (pong)
-            # ping until non-empty bytes are received
+        while True:
             coro = self.ping()
             timer = self.request.server.loop.call_at(
-                self.request.server.loop.time() +
-                self.request.server.options['keepalive_timeout'] / 2,
+                self.request.server.loop.time() + self._receive_timeout,
                 self.request.server.create_task, coro
             )
 
             try:
-                payload = await self.recv()
+                frame = await self.recv()
             except TimeoutError as exc:
                 raise WebSocketServerClosed('receive timeout',
                                             code=1000) from exc
             finally:
                 timer.cancel()
                 coro.close()
+
+            if frame == b'':
+                # got empty bytes (pong). continue and keep pinging
+                continue
+
+            payload.extend(frame)
+
+            if len(payload) > self._max_payload_size:
+                raise WebSocketServerClosed('maximum payload size exceeded',
+                                            code=1009)
+
+            if self.fin == 1:
+                break
+
+        if self.opcode == 1:
+            return payload.decode('utf-8')
 
         return payload
 
