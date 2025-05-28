@@ -47,21 +47,22 @@ class HTTPServer(HTTPProtocol):
         if self.is_closing():
             return
 
+        middlewares = self.app.middlewares[self.server['prefix']][name]
+
         if reverse and self.server['next'] != -1:
-            self.server['next'] = len(self.app.middlewares[name]) - 1
+            self.server['next'] = len(middlewares) - 1
             step = -1
 
-        while -1 < self.server['next'] < len(self.app.middlewares[name]):
-            middleware = self.app.middlewares[name][self.server['next']]
+        while -1 < self.server['next'] < len(middlewares):
+            middleware = middlewares[self.server['next']]
 
-            if self.request.path.startswith(middleware[3]):
-                if await self._handle_middleware(middleware[1], middleware[2]):
-                    if reverse:
-                        self.server['next'] = -1
-                    else:
-                        self.server['next'] = len(self.app.middlewares[name])
+            if await self._handle_middleware(middleware[1], middleware[2]):
+                if reverse:
+                    self.server['next'] = -1
+                else:
+                    self.server['next'] = len(middlewares)
 
-                    return True
+                return True
 
             self.server['next'] += step
 
@@ -102,6 +103,7 @@ class HTTPServer(HTTPProtocol):
         request = response.request
         options = request.context.options
         options.update(kwargs)
+
         options.setdefault('rate', self.options['download_rate'])
         options.setdefault('buffer_size', self.options['buffer_size'])
 
@@ -247,6 +249,24 @@ class HTTPServer(HTTPProtocol):
         if self.app.hooks['connect']:
             await self.context.ON_CONNECT
 
+        path = request.path.strip(b'/')
+
+        if path == b'':
+            key = 1
+            self.server['prefix'] = ()
+        else:
+            parts = path.split(b'/', 254)
+            length = len(parts)
+            key = bytes([length]) + parts[0]
+
+            while length >= 0:
+                self.server['prefix'] = tuple(parts[:length])
+
+                if self.server['prefix'] in self.app.middlewares:
+                    break
+
+                length -= 1
+
         if await self.run_middlewares('request'):
             await self.run_middlewares('response', reverse=True)
             return
@@ -257,14 +277,6 @@ class HTTPServer(HTTPProtocol):
                 self.app.routes[0][0][1], self.app.routes[0][0][2]
             )
             return
-
-        path = request.path.strip(b'/')
-
-        if path == b'':
-            key = 1
-        else:
-            parts = path.split(b'/', 254)
-            key = bytes([len(parts)]) + parts[0]
 
         if key in self.app.routes:
             for pattern, func, kwargs in self.app.routes[key]:
