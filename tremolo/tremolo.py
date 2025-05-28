@@ -38,8 +38,10 @@ class Tremolo:
         self.manager = ProcessManager()
         self.routes = Routes()
         self.middlewares = {
-            'request': [],
-            'response': []
+            (): {
+                'request': [],
+                'response': []
+            }
         }
         self.hooks = {
             'worker_start': [],
@@ -132,16 +134,22 @@ class Tremolo:
                               reverse=name in ('worker_stop', 'close'))
 
     def add_middleware(self, func, name='request', priority=999, *,
-                       kwargs=None, prefix=b'/'):
-        if name not in self.middlewares:
+                       kwargs=None, prefix=()):
+        if name not in self.middlewares[()]:
             raise ValueError('%s is not one of the: %s' %
-                             (name, ', '.join(self.middlewares)))
+                             (name, ', '.join(self.middlewares[()])))
 
-        self.middlewares[name].append(
-            (priority, func, kwargs or getoptions(func), prefix or b'/')
+        if prefix not in self.middlewares:
+            self.middlewares[prefix] = {
+                'request': [],
+                'response': []
+            }
+
+        self.middlewares[prefix][name].append(
+            (priority, func, kwargs or getoptions(func))
         )
-        self.middlewares[name].sort(key=lambda item: item[0],
-                                    reverse=name == 'response')
+        self.middlewares[prefix][name].sort(key=lambda item: item[0],
+                                            reverse=name == 'response')
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -156,8 +164,8 @@ class Tremolo:
         return (host, port) in self.ports
 
     def mount(self, prefix, app):
-        if not prefix.startswith('/'):
-            raise ValueError('prefix must start with "/"')
+        if not prefix.startswith('/') or len(prefix) > 255:
+            raise ValueError('prefix must start with "/" and <=255 in length')
 
         if app is self or not isinstance(app, self.__class__):
             raise ValueError('invalid app')
@@ -178,12 +186,15 @@ class Tremolo:
 
                     self.routes[-1].append((pattern, func, kwargs))
 
-        while app.middlewares:
-            name, middlewares = app.middlewares.popitem()
+        parts = tuple(part for part in prefix.split(b'/') if part)
 
-            for priority, func, kwargs, p in middlewares:
-                self.add_middleware(func, name, priority, kwargs=kwargs,
-                                    prefix=prefix + p)
+        while app.middlewares:
+            p, middlewares = app.middlewares.popitem()
+
+            for name in middlewares:
+                for middleware in middlewares[name]:
+                    self.add_middleware(middleware[1], name, middleware[0],
+                                        kwargs=middleware[2], prefix=parts + p)
 
         while app.hooks:
             name, hooks = app.hooks.popitem()
