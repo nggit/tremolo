@@ -38,14 +38,14 @@ class Tremolo:
         self.manager = ProcessManager()
         self.routes = Routes()
         self.middlewares = {
-            'connect': [],
-            'close': [],
             'request': [],
             'response': []
         }
         self.hooks = {
             'worker_start': [],
-            'worker_stop': []
+            'worker_stop': [],
+            'connect': [],
+            'close': []
         }
         self.ports = {}
 
@@ -100,6 +100,12 @@ class Tremolo:
     def on_worker_stop(self, *args, **kwargs):
         return self.hook('worker_stop', *args, **kwargs)
 
+    def on_connect(self, *args, **kwargs):
+        return self.hook('connect', *args, **kwargs)
+
+    def on_close(self, *args, **kwargs):
+        return self.hook('close', *args, **kwargs)
+
     def middleware(self, name, *args, priority=999):
         def decorator(func):
             self.add_middleware(func, name, priority, getoptions(func))
@@ -109,12 +115,6 @@ class Tremolo:
             return decorator(args[0])
 
         return decorator
-
-    def on_connect(self, *args, **kwargs):
-        return self.middleware('connect', *args, **kwargs)
-
-    def on_close(self, *args, **kwargs):
-        return self.middleware('close', *args, **kwargs)
 
     def on_request(self, *args, **kwargs):
         return self.middleware('request', *args, **kwargs)
@@ -129,7 +129,7 @@ class Tremolo:
 
         self.hooks[name].append((priority, func))
         self.hooks[name].sort(key=lambda item: item[0],
-                              reverse=name == 'worker_stop')
+                              reverse=name in ('worker_stop', 'close'))
 
     def add_middleware(self, func, name='request', priority=999, *,
                        kwargs=None, prefix=b'/'):
@@ -141,7 +141,7 @@ class Tremolo:
             (priority, func, kwargs or getoptions(func), prefix or b'/')
         )
         self.middlewares[name].sort(key=lambda item: item[0],
-                                    reverse=name in ('close', 'response'))
+                                    reverse=name == 'response')
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
