@@ -963,7 +963,7 @@ class TestHTTPServer(unittest.TestCase):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
                                    method='GET',
-                                   url='/sub/subsub/mount',
+                                   url='/sub/subsub/mount/',
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -973,7 +973,7 @@ class TestHTTPServer(unittest.TestCase):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
                                    method='GET',
-                                   url='/sub/mount/',
+                                   url='/sub/whatevermount',
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')

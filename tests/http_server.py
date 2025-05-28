@@ -410,21 +410,23 @@ async def mount(prefix, **server):
 
 
 subsub.routes.add(mount, '/mount')
-sub.routes.add(mount, '/mount')
-
-sub.mount('/subsub', subsub)
-app.mount('/sub', sub)
-
-assert (b'sub', b'subsub') in app.middlewares
+sub.routes.add(mount, 'mount$')
 
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=1, keepalive_timeout=2,
            app_handler_timeout=2, app_close_timeout=0)
-app.listen(HTTP_PORT + 2)
+sub.listen(HTTP_PORT + 2)
+
+sub.mount('/subsub', subsub)
+app.mount('/sub', sub)
+app.mount('/sub', sub)  # no-op
+
+assert (b'sub', b'subsub') in app.middlewares
 
 # test unix socket
 # 'tremolo-test.sock'
 app.listen('tremolo-test', debug=False, client_max_body_size=1048576)
+
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, limit_memory=LIMIT_MEMORY,
