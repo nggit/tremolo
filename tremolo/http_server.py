@@ -8,18 +8,18 @@ from .lib.websocket import WebSocket
 
 class HTTPServer(HTTPProtocol):
     async def _connection_made(self):
-        for _, func, _, _ in self.app.middlewares['connect']:
+        for _, func in self.app.hooks['connect']:
             if await func(**self.server):
                 break
 
     async def _connection_lost(self, exc):
         try:
-            i = len(self.app.middlewares['close'])
+            i = len(self.app.hooks['close'])
 
             while i > 0:
                 i -= 1
 
-                if await self.app.middlewares['close'][i][1](**self.server):
+                if await self.app.hooks['close'][i][1](**self.server):
                     break
         finally:
             super().connection_lost(exc)
@@ -27,14 +27,14 @@ class HTTPServer(HTTPProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
 
-        if self.app.middlewares['connect']:
+        if self.app.hooks['connect']:
             self.context.ON_CONNECT = self.app.create_task(
                 self._connection_made()
             )
             self.add_task(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
-        if self.app.middlewares['close']:
+        if self.app.hooks['close']:
             task = self.app.create_task(self._connection_lost(exc))
             self.loop.call_at(
                 self.loop.time() + self.options['app_close_timeout'],
@@ -244,7 +244,7 @@ class HTTPServer(HTTPProtocol):
         self.server['response'] = response
         self.server['next'] = 0
 
-        if self.app.middlewares['connect']:
+        if self.app.hooks['connect']:
             await self.context.ON_CONNECT
 
         if await self.run_middlewares('request'):
