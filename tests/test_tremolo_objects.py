@@ -96,13 +96,13 @@ class TestTremoloObjects(unittest.TestCase):
                 continue
 
             getattr(app, attr_name)(getattr(middlewares, attr_name))
-            _, func, options, _ = app.middlewares[attr_name[3:]][-1]
+            _, func, options = app.middlewares[()][attr_name[3:]][-1]
 
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})
 
             getattr(app, attr_name)()(getattr(middlewares, attr_name))
-            _, func, options, _ = app.middlewares[attr_name[3:]][-1]
+            _, func, options = app.middlewares[()][attr_name[3:]][-1]
 
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})

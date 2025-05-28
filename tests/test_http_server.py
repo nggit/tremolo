@@ -959,6 +959,26 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertFalse(body2 == body1)
 
+    def test_mount_subsub_with_middleware(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/sub/subsub/mount',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'/sub/subsub')
+
+    def test_mount_sub_no_middleware(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/sub/mount/',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'/')
+
 
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
