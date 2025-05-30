@@ -286,14 +286,19 @@ class HTTPServer(HTTPProtocol):
                         for k in matches:
                             del self.server[k]
 
-        for pattern, func, kwargs in self.app.routes[-1]:
+        i = len(self.app.routes[-1])
+
+        while i > 0:
+            i -= 1
+            pattern, func, kwargs = self.app.routes[-1][i]
             m = pattern.search(request.url)
 
             if m:
-                if key in self.app.routes:
-                    self.app.routes[key].append((pattern, func, kwargs))
-                elif pattern.pattern.count(b'/') > 1:
-                    self.app.routes[key] = [(pattern, func, kwargs)]
+                if key != 1 and pattern.pattern.startswith(b'^/' + parts[0]):
+                    if key in self.app.routes:
+                        self.app.routes[key].append(self.app.routes[-1].pop(i))
+                    else:
+                        self.app.routes[key] = [self.app.routes[-1].pop(i)]
 
                 matches = m.groupdict()
                 request.params['path'] = matches or m.groups()
