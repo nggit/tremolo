@@ -14,12 +14,8 @@ class HTTPServer(HTTPProtocol):
 
     async def _connection_lost(self, exc):
         try:
-            i = len(self.app.hooks['close'])
-
-            while i > 0:
-                i -= 1
-
-                if await self.app.hooks['close'][i][1](**self.server):
+            for _, func in reversed(self.app.hooks['close']):
+                if await func(**self.server):
                     break
         finally:
             super().connection_lost(exc)
