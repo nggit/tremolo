@@ -29,6 +29,12 @@ class TestTremoloObjects(unittest.TestCase):
             # app.run(host=None)
             app.run()
 
+    def test_run_mounted_app(self):
+        app.mount('/', sub)
+
+        with self.assertRaises(RuntimeError):
+            sub.run()
+
     def test_mount_invalid_prefix(self):
         with self.assertRaises(ValueError):
             app.mount('', sub)
