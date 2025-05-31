@@ -165,7 +165,7 @@ def parse_int(string, base=10):
 
 
 def print_logo():
-    BLUE = '\033[38;5;4m'
+    BLUE = '\033[0;34m'
     RESET = '\033[0m'
 
     try:
