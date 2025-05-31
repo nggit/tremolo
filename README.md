@@ -41,15 +41,19 @@ Tremolo is only suitable for those who value [minimalism](https://en.wikipedia.o
 
 With only **3k** lines of code, with **no dependencies** other than the [Python Standard Library](https://docs.python.org/3/library/index.html), it gives you:
 
-* HTTP/1.x with [WebSocket support](https://nggit.github.io/tremolo-docs/websocket.html)
+* A production-ready HTTP/1.x server rather than just a development server,
+* of course with [WebSocket support](https://nggit.github.io/tremolo-docs/reference/websocket/)
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
 * Stream chunked uploads
 * [Stream multipart uploads](https://nggit.github.io/tremolo-docs/body.html#multipart)
 * Download/upload speed throttling
 * [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
 * Framework features; routing, middleware, etc.
-* ASGI server
+* ASGI server implementation
 * PyPy compatible
+
+All built-in in a single, portable folder module [tremolo](https://github.com/nggit/tremolo/tree/main/tremolo),
+in a very compact way like a Swiss Army knife.
 
 ## Installation
 ```
