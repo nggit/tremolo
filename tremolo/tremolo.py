@@ -207,11 +207,16 @@ class Tremolo:
         options['state'] = {}
 
         for _, func in self.hooks['worker_start']:
-            if await func(globals=self.context,
-                          context=self.context,
-                          app=self,
-                          loop=self.loop,
-                          logger=self.logger):
+            try:
+                coro = func(app=self,
+                            globals=self.context,
+                            context=self.context,
+                            loop=self.loop,
+                            logger=self.logger)
+            except TypeError:
+                coro = func(app=self)
+
+            if await coro:
                 break
 
         if options['app'] is None:
@@ -391,17 +396,17 @@ class Tremolo:
                 if exc:
                     self.logger.error(exc)
         finally:
-            i = len(self.hooks['worker_stop'])
+            for _, func in reversed(self.hooks['worker_stop']):
+                try:
+                    coro = func(app=self,
+                                globals=self.context,
+                                context=self.context,
+                                loop=self.loop,
+                                logger=self.logger)
+                except TypeError:
+                    coro = func(app=self)
 
-            while i > 0:
-                i -= 1
-
-                if await self.hooks['worker_stop'][i][1](
-                        globals=self.context,
-                        context=self.context,
-                        app=self,
-                        loop=self.loop,
-                        logger=self.logger):
+                if await coro:
                     break
 
     def _worker(self, host, port, **kwargs):
