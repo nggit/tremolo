@@ -82,6 +82,7 @@ def parse_args(**callbacks):
             options[name] = sys.argv[i]
         elif sys.argv[i - 1] in ('--port',
                                  '--worker-num',
+                                 '--thread-pool-size',
                                  '--limit-memory',
                                  '--backlog',
                                  '--download-rate',

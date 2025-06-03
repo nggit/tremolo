@@ -26,6 +26,8 @@ def usage(**context):
     print('                            Multiple binds can be separated by commas')  # noqa: E501
     print('                            E.g. "127.0.0.1:8000,:8001"')
     print('  --worker-num              Number of worker processes. Defaults to 1')  # noqa: E501
+    print('  --thread-pool-size        Number of executor threads per process')  # noqa: E501
+    print('                            Defaults to 5')
     print('  --limit-memory            Restart the worker if this limit (in KiB) is reached')  # noqa: E501
     print('                            (Linux-only). Defaults to 0 or unlimited')  # noqa: E501
     print('  --backlog                 Maximum number of pending connections')

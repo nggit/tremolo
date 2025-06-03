@@ -22,6 +22,7 @@ from .utils import (  # noqa: E402
 )
 from .lib.connections import KeepAliveConnections  # noqa: E402
 from .lib.contexts import WorkerContext  # noqa: E402
+from .lib.executors import MultiThreadExecutor  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 
 _REUSEPORT_OR_REUSEADDR = {
@@ -186,7 +187,10 @@ class Tremolo:
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
-        self.context.update(connections=connections)
+        executor = MultiThreadExecutor(size=options.get('thread_pool_size', 5))
+        executor.start()
+
+        self.context.update(connections=connections, executor=executor)
         options['state'] = {}
 
         for _, func in self.hooks['worker_start']:
@@ -308,13 +312,16 @@ class Tremolo:
                 for task in pending:
                     task.cancel()
         finally:
-            server.close()
+            try:
+                server.close()
 
-            while self.context.tasks:
-                await self.context.tasks.pop()
+                while self.context.tasks:
+                    await self.context.tasks.pop()
 
-            await server.wait_closed()
-            await self._worker_stop()
+                await server.wait_closed()
+                await self._worker_stop()
+            finally:
+                await executor.shutdown()
 
     async def _serve_forever(self):
         limit_memory = self.context.options.get('limit_memory', 0)
