@@ -2,37 +2,24 @@
 
 import asyncio
 
-from concurrent.futures import ThreadPoolExecutor
-
 
 class ServerLock:
-    def __init__(self, locks, name=0, timeout=30, loop=None, executors=None):
-        if locks:
-            self.name = name % len(locks)
-        else:
-            self.name = name
-
+    def __init__(self, locks, executor, name=0, timeout=30, loop=None):
         self.locks = locks
+        self.name = name % len(locks)
+        self._executor = executor
         self._timeout = timeout
         self._loop = loop or asyncio.get_event_loop()
-
-        if executors is None:
-            executors = {}
-
-        self._executors = executors
-
-        if self.name not in executors:
-            self._executors[self.name] = ThreadPoolExecutor(max_workers=1)
 
     def __call__(self, name=0, *, timeout=None):
         if timeout is None:
             timeout = self._timeout
 
         return self.__class__(self.locks,
+                              self._executor,
                               name=name,
                               timeout=timeout,
-                              loop=self._loop,
-                              executors=self._executors)
+                              loop=self._loop)
 
     async def __aenter__(self):
         await self.acquire()
@@ -44,10 +31,9 @@ class ServerLock:
         if timeout is None:
             timeout = self._timeout
 
-        fut = self._loop.run_in_executor(
-            self._executors[self.name],
-            self.locks[self.name].acquire, True, timeout)
-
+        fut = self._executor.submit(self.locks[self.name].acquire,
+                                    args=(True, timeout),
+                                    name=self.name)
         timer = self._loop.call_at(self._loop.time() + timeout, fut.cancel)
 
         try:
