@@ -209,7 +209,7 @@ class Tremolo:
         if options['app'] is None:
             from .http_server import HTTPServer as Server
 
-            self.routes.compile()
+            self.routes.compile(executor=executor)
         else:
             from .asgi_lifespan import ASGILifespan
             from .asgi_server import ASGIServer as Server

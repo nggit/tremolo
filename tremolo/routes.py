@@ -2,8 +2,10 @@
 
 import re
 
+from functools import wraps
+
 from . import handlers
-from .utils import getoptions
+from .utils import getoptions, is_async
 
 
 class Routes(dict):
@@ -49,10 +51,18 @@ class Routes(dict):
                 else:
                     self[key] = [(pattern, func, kwargs)]
 
-    def compile(self):
+    def compile(self, executor=None):
         for key in self:
-            for i, h in enumerate(self[key]):
-                pattern, *handler = h
-
+            for i, (pattern, func, kwargs) in enumerate(self[key]):
                 if isinstance(pattern, bytes):
-                    self[key][i] = (re.compile(pattern), *handler)
+                    pattern = re.compile(pattern)
+
+                if executor is None or is_async(func):
+                    wrapper = func
+                else:
+                    @wraps(func)
+                    def wrapper(func, kwargs, **server):
+                        kw = {k: server.get(k, kwargs[k]) for k in kwargs}
+                        return executor.submit(func.__wrapped__, kwargs=kw)
+
+                self[key][i] = (pattern, wrapper, kwargs)
