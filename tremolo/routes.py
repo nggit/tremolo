@@ -62,7 +62,6 @@ class Routes(dict):
                 else:
                     @wraps(func)
                     def wrapper(func, kwargs, **server):
-                        kw = {k: server.get(k, kwargs[k]) for k in kwargs}
-                        return executor.submit(func.__wrapped__, kwargs=kw)
+                        return executor.submit(func.__wrapped__, kwargs=server)
 
                 self[key][i] = (pattern, wrapper, kwargs)
