@@ -1,8 +1,8 @@
 # Copyright (c) 2023 nggit
 
-__all__ = ('file_signature', 'getoptions', 'html_escape', 'log_date',
-           'memory_usage', 'parse_args', 'parse_fields', 'parse_int',
-           'print_logo', 'server_date')
+__all__ = ('file_signature', 'getoptions', 'html_escape', 'is_async',
+           'log_date', 'memory_usage', 'parse_args', 'parse_fields',
+           'parse_int', 'print_logo', 'server_date')
 
 import os  # noqa: E402
 import stat  # noqa: E402
@@ -10,6 +10,7 @@ import sys  # noqa: E402
 
 from datetime import datetime, timezone  # noqa: E402
 from html import escape  # noqa: E402
+from inspect import iscoroutinefunction, isasyncgenfunction  # noqa: E402
 from urllib.parse import unquote_to_bytes as unquote  # noqa: E402
 
 
@@ -44,6 +45,10 @@ def html_escape(data):
             .replace(b'<', b'&lt;')
             .replace(b'>', b'&gt;')
             .replace(b'"', b'&quot;'))
+
+
+def is_async(func):
+    return iscoroutinefunction(func) or isasyncgenfunction(func)
 
 
 def log_date():

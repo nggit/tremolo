@@ -121,7 +121,7 @@ class HTTPServer(HTTPProtocol):
             response.set_content_type(options['content_type'])
 
         try:
-            agen = func(**self.server)
+            agen = func(func=func, kwargs=kwargs, **self.server)
         except TypeError:  # doesn't accept extra **kwargs
             agen = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
 
