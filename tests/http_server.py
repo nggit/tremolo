@@ -142,25 +142,19 @@ async def get_ip(**server):
 
 
 @app.route('/gethost')
-async def get_host(**server):
+def get_host(**server):
     # b'localhost:28000'
     return server['request'].host
 
 
 @app.route('/getquery')
-async def get_query(**server):
-    request = server['request']
-
+def get_query(request, **server):
     assert request.query['a'] == ['111', 'xyz']
     assert request.query['b'] == ['222']
 
-    data = []
-
+    # b'a=111&b=222&'
     for name, value in request.query.items():
-        data.append('%s=%s' % (name, value[0]))
-
-    # b'a=111&b=222'
-    return '&'.join(data)
+        yield f'{name}={value[0]}&'.encode()
 
 
 @app.route(r'^/page/(?P<page_id>\d+)(?:/(?P<request>\w+))?$')
