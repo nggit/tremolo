@@ -47,6 +47,10 @@ class WorkerContext(Context):
     def connections(self):
         return self.__dict__.get('connections', None)
 
+    @property
+    def executor(self):
+        return self.__dict__.get('executor', None)
+
 
 class ConnectionContext(Context):
     __slots__ = ('_tasks',)  # won't appear in self.__dict__. safe from clear()

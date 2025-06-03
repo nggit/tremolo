@@ -183,13 +183,13 @@ class Tremolo:
         if isinstance(server_name, str):
             server_name = server_name.encode('latin-1')
 
-        lock = ServerLock(options['_locks'], loop=self.loop)
+        executor = MultiThreadExecutor(size=options['thread_pool_size'])
+        executor.start()
+
+        lock = ServerLock(options['_locks'], executor, loop=self.loop)
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
-        executor = MultiThreadExecutor(size=options.get('thread_pool_size', 5))
-        executor.start()
-
         self.context.update(connections=connections, executor=executor)
         options['state'] = {}
 
@@ -555,6 +555,7 @@ class Tremolo:
     def run(self, host=None, port=0, *, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
         kwargs.setdefault('reuse_port', True)
+        kwargs.setdefault('thread_pool_size', 5)
         kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
@@ -630,7 +631,7 @@ class Tremolo:
             except AttributeError:
                 worker_num = os.cpu_count() or 1
 
-        locks = [mp.Lock() for _ in range(kwargs.get('locks', 16))]
+        locks = [mp.Lock() for _ in range(kwargs['thread_pool_size'])]
         socks = {}
         print('Options:')
 
