@@ -11,7 +11,6 @@ import socket  # noqa: E402
 import ssl  # noqa: E402
 import sys  # noqa: E402
 
-from functools import wraps  # noqa: E402
 from importlib import import_module, reload as reload_module  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
@@ -66,40 +65,28 @@ class Tremolo:
             return self.error(path)
 
         def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            self.routes.add(wrapper, path, getoptions(func))
-            return wrapper
+            self.routes.add(func, path, getoptions(func))
+            return func
 
         return decorator
 
     def error(self, code):
         def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
             for i, h in enumerate(self.routes[0]):
                 if code == h[0]:
                     self.routes[0][i] = (
-                        h[0], wrapper, dict(h[2], **getoptions(func))
+                        h[0], func, dict(h[2], **getoptions(func))
                     )
                     break
 
-            return wrapper
+            return func
 
         return decorator
 
     def hook(self, name, *args, priority=999):
         def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            self.add_hook(wrapper, name, priority)
-            return wrapper
+            self.add_hook(func, name, priority)
+            return func
 
         if len(args) == 1 and callable(args[0]):
             return decorator(args[0])
@@ -114,12 +101,8 @@ class Tremolo:
 
     def middleware(self, name, *args, priority=999):
         def decorator(func):
-            @wraps(func)
-            def wrapper(**kwargs):
-                return func(**kwargs)
-
-            self.add_middleware(wrapper, name, priority, getoptions(func))
-            return wrapper
+            self.add_middleware(func, name, priority, getoptions(func))
+            return func
 
         if len(args) == 1 and callable(args[0]):
             return decorator(args[0])
