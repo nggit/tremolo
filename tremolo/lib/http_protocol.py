@@ -250,7 +250,9 @@ class HTTPProtocol(asyncio.Protocol):
                 await self.request_received(self.request, response)
             finally:
                 timer.cancel()
-        except (asyncio.CancelledError, Exception) as exc:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except BaseException as exc:
             if self.request is not None:
                 data = None
 
