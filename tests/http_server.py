@@ -244,10 +244,10 @@ async def trigger_memory_leak(**server):
 
 
 @app.route('/submitform')
-async def post_form(**server):
+def post_form(**server):
     request = server['request']
 
-    await request.form(max_size=8192)
+    request.form(max_size=8192)
 
     data = []
 
@@ -259,18 +259,18 @@ async def post_form(**server):
 
 
 @app.route('/upload')
-async def upload(request, content_type=b'application/octet-stream'):
+def upload(request, content_type=b'application/octet-stream', **server):
     if request.query_string == b'maxqueue':
         request.protocol.options['max_queue_size'] = 0
 
     try:
         size = int(request.query['size'][0])
-        yield (await request.read(0)) + (await request.read(size))
+        yield request.read(0) + request.read(size)
     except KeyError:
-        async for data in request.stream():
+        for data in request.stream():
             yield data
 
-        async for data in request.stream():
+        for data in request.stream():
             # should not raised
             raise Exception('EOF!!!')
 
