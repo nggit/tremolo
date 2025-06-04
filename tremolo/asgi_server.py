@@ -108,12 +108,11 @@ class ASGIWrapper:
             # it will become True later
             # after the response status is set to 101:
             # Response.set_status(101) in WebSocket.accept()
-            if not self.request.upgraded:
-                if self._websocket is None:
-                    await self._stream.aclose()
-                    self._websocket = WebSocket(self.request, self.response)
+            if not self.request.upgraded and self._websocket is None:
+                await self._stream.aclose()
+                self._websocket = WebSocket(self.request, self.response)
 
-                    return {'type': 'websocket.connect'}
+                return {'type': 'websocket.connect'}
 
             try:
                 payload = await self._websocket.receive()
