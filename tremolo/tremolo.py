@@ -38,14 +38,16 @@ class Tremolo:
         self.manager = ProcessManager()
         self.routes = Routes()
         self.middlewares = {
-            'connect': [],
-            'close': [],
-            'request': [],
-            'response': []
+            (): {
+                'request': [],
+                'response': []
+            }
         }
         self.hooks = {
             'worker_start': [],
-            'worker_stop': []
+            'worker_stop': [],
+            'connect': [],
+            'close': []
         }
         self.ports = {}
 
@@ -100,21 +102,21 @@ class Tremolo:
     def on_worker_stop(self, *args, **kwargs):
         return self.hook('worker_stop', *args, **kwargs)
 
+    def on_connect(self, *args, **kwargs):
+        return self.hook('connect', *args, **kwargs)
+
+    def on_close(self, *args, **kwargs):
+        return self.hook('close', *args, **kwargs)
+
     def middleware(self, name, *args, priority=999):
         def decorator(func):
-            self.add_middleware(func, name, priority, getoptions(func))
+            self.add_middleware(func, name, priority, kwargs=getoptions(func))
             return func
 
         if len(args) == 1 and callable(args[0]):
             return decorator(args[0])
 
         return decorator
-
-    def on_connect(self, *args, **kwargs):
-        return self.middleware('connect', *args, **kwargs)
-
-    def on_close(self, *args, **kwargs):
-        return self.middleware('close', *args, **kwargs)
 
     def on_request(self, *args, **kwargs):
         return self.middleware('request', *args, **kwargs)
@@ -129,18 +131,25 @@ class Tremolo:
 
         self.hooks[name].append((priority, func))
         self.hooks[name].sort(key=lambda item: item[0],
-                              reverse=name == 'worker_stop')
+                              reverse=name in ('worker_stop', 'close'))
 
-    def add_middleware(self, func, name='request', priority=999, kwargs=None):
-        if name not in self.middlewares:
+    def add_middleware(self, func, name='request', priority=999, *,
+                       kwargs=None, prefix=()):
+        if name not in self.middlewares[()]:
             raise ValueError('%s is not one of the: %s' %
-                             (name, ', '.join(self.middlewares)))
+                             (name, ', '.join(self.middlewares[()])))
 
-        self.middlewares[name].append(
+        if prefix not in self.middlewares:
+            self.middlewares[prefix] = {
+                'request': [],
+                'response': []
+            }
+
+        self.middlewares[prefix][name].append(
             (priority, func, kwargs or getoptions(func))
         )
-        self.middlewares[name].sort(key=lambda item: item[0],
-                                    reverse=name in ('close', 'response'))
+        self.middlewares[prefix][name].sort(key=lambda item: item[0],
+                                            reverse=name == 'response')
 
     def listen(self, port, host=None, **options):
         if not isinstance(port, int):
@@ -153,6 +162,48 @@ class Tremolo:
 
         self.ports[(host, port)] = options
         return (host, port) in self.ports
+
+    def mount(self, prefix, app):
+        if not prefix.startswith('/') or len(prefix) > 255:
+            raise ValueError('prefix must start with "/" and <=255 in length')
+
+        if app is self or not isinstance(app, self.__class__):
+            raise ValueError('invalid app')
+
+        prefix = prefix.rstrip('/').encode('latin-1')
+
+        while app.routes:
+            _, routes = app.routes.popitem()
+
+            for pattern, func, kwargs in routes:
+                if isinstance(pattern, bytes):
+                    pattern = pattern.lstrip(b'^')
+
+                    if pattern.startswith(b'/'):
+                        pattern = b'^' + prefix + pattern
+                    else:
+                        pattern = b'^' + prefix + b'/.*' + pattern
+
+                    self.routes[-1].append((pattern, func, kwargs))
+
+        parts = tuple(part for part in prefix.split(b'/') if part)
+
+        while app.middlewares:
+            p, middlewares = app.middlewares.popitem()
+
+            for name in middlewares:
+                for middleware in middlewares[name]:
+                    self.add_middleware(middleware[1], name, middleware[0],
+                                        kwargs=middleware[2], prefix=parts + p)
+
+        while app.hooks:
+            name, hooks = app.hooks.popitem()
+
+            for priority, func in hooks:
+                self.add_hook(func, name, priority)
+
+        while app.ports:
+            self.ports.setdefault(*app.ports.popitem())
 
     async def _serve(self, host, port, **kwargs):
         options = self.context.options
@@ -536,7 +587,7 @@ class Tremolo:
                 # we need to update/rebind objects like
                 # routes, middlewares, etc.
                 for attr in module.__dict__.values():
-                    if isinstance(attr, self.__class__):
+                    if isinstance(attr, self.__class__) and attr.routes:
                         self.__dict__.update(attr.__dict__)
         elif process.exitcode != 0:
             print(
@@ -588,6 +639,9 @@ class Tremolo:
 
                 kwargs['app'] = '%s:%s' % (__main__.__file__, attr_name)
         else:
+            if not self.routes:
+                raise RuntimeError('cannot run this app. mounted somewhere?')
+
             kwargs['app'] = None
 
             if hasattr(__main__, '__file__'):
@@ -603,9 +657,7 @@ class Tremolo:
                 print('Routes:')
 
                 for routes in self.routes.values():
-                    for route in routes:
-                        pattern, func, kw = route
-
+                    for pattern, func, kw in routes:
                         print(
                             '  %s -> %s(%s)' %
                             (pattern,

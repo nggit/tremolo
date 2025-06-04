@@ -17,6 +17,7 @@ from tests.http_server import HTTP_PORT  # noqa: E402
 from tests.utils import syncify  # noqa: E402
 
 app = Application()
+sub = Application()
 
 
 class TestTremoloObjects(unittest.TestCase):
@@ -27,6 +28,28 @@ class TestTremoloObjects(unittest.TestCase):
         with self.assertRaises(ValueError):
             # app.run(host=None)
             app.run()
+
+    def test_run_mounted_app(self):
+        app.mount('/', sub)
+
+        with self.assertRaises(RuntimeError):
+            sub.run()
+
+    def test_mount_invalid_prefix(self):
+        with self.assertRaises(ValueError):
+            app.mount('', sub)
+
+    def test_mount_invalid_prefix_long(self):
+        with self.assertRaises(ValueError):
+            app.mount('/a' * 128, sub)
+
+    def test_mount_invalid_app(self):
+        with self.assertRaises(ValueError):
+            app.mount('/', None)
+
+    def test_mount_invalid_app_self(self):
+        with self.assertRaises(ValueError):
+            app.mount('/', app)
 
     def test_listen(self):
         self.assertTrue(app.listen(8000))
@@ -96,13 +119,13 @@ class TestTremoloObjects(unittest.TestCase):
                 continue
 
             getattr(app, attr_name)(getattr(middlewares, attr_name))
-            _, func, options = app.middlewares[attr_name[3:]][-1]
+            _, func, options = app.middlewares[()][attr_name[3:]][-1]
 
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})
 
             getattr(app, attr_name)()(getattr(middlewares, attr_name))
-            _, func, options = app.middlewares[attr_name[3:]][-1]
+            _, func, options = app.middlewares[()][attr_name[3:]][-1]
 
             self.assertEqual(func(), b'Halt!')
             self.assertEqual(options, {})

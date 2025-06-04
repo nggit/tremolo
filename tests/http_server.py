@@ -24,6 +24,8 @@ HTTP_PORT = 28000
 TEST_FILE = __file__
 
 app = Application()
+sub = Application()
+subsub = Application()
 
 
 @app.on_worker_start  # priority=999 (low)
@@ -74,14 +76,14 @@ async def worker_stop(**worker):
         assert g.shared > 0
 
 
-@app.on_connect
+@sub.on_connect
 async def on_connect(**server):
     server['context'].foo = 'bar'
 
     return True
 
 
-@app.on_close
+@subsub.on_close
 async def on_close(**server):
     assert server['context'].foo == 'bar'
     server['globals'].options['max_queue_size'] = 128
@@ -396,14 +398,35 @@ async def reload(request, **server):
         # simulate a code change
         os.utime(TEST_FILE, (mtime, mtime))
 
+
+@subsub.on_request
+async def subsub_middleware(**server):
+    pass
+
+
+async def mount(prefix, **server):
+    # b'/sub/subsub'
+    return b'/' + b'/'.join(prefix)
+
+
+subsub.routes.add(mount, '/mount')
+sub.routes.add(mount, 'mount$')
+
 # test multiple ports
 app.listen(HTTP_PORT + 1, request_timeout=1, keepalive_timeout=2,
            app_handler_timeout=2, app_close_timeout=0)
-app.listen(HTTP_PORT + 2)
+sub.listen(HTTP_PORT + 2)
+
+sub.mount('/subsub', subsub)
+app.mount('/sub', sub)
+app.mount('/sub', sub)  # no-op
+
+assert (b'sub', b'subsub') in app.middlewares
 
 # test unix socket
 # 'tremolo-test.sock'
 app.listen('tremolo-test', debug=False, client_max_body_size=1048576)
+
 
 if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, limit_memory=LIMIT_MEMORY,

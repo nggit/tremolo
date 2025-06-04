@@ -8,18 +8,14 @@ from .lib.websocket import WebSocket
 
 class HTTPServer(HTTPProtocol):
     async def _connection_made(self):
-        for _, func, _ in self.app.middlewares['connect']:
+        for _, func in self.app.hooks['connect']:
             if await func(**self.server):
                 break
 
     async def _connection_lost(self, exc):
         try:
-            i = len(self.app.middlewares['close'])
-
-            while i > 0:
-                i -= 1
-
-                if await self.app.middlewares['close'][i][1](**self.server):
+            for _, func in reversed(self.app.hooks['close']):
+                if await func(**self.server):
                     break
         finally:
             super().connection_lost(exc)
@@ -27,14 +23,14 @@ class HTTPServer(HTTPProtocol):
     def connection_made(self, transport):
         super().connection_made(transport)
 
-        if self.app.middlewares['connect']:
+        if self.app.hooks['connect']:
             self.context.ON_CONNECT = self.app.create_task(
                 self._connection_made()
             )
             self.add_task(self.context.ON_CONNECT)
 
     def connection_lost(self, exc):
-        if self.app.middlewares['close']:
+        if self.app.hooks['close']:
             task = self.app.create_task(self._connection_lost(exc))
             self.loop.call_at(
                 self.loop.time() + self.options['app_close_timeout'],
@@ -47,18 +43,20 @@ class HTTPServer(HTTPProtocol):
         if self.is_closing():
             return
 
+        middlewares = self.app.middlewares[self.server['prefix']][name]
+
         if reverse and self.server['next'] != -1:
-            self.server['next'] = len(self.app.middlewares[name]) - 1
+            self.server['next'] = len(middlewares) - 1
             step = -1
 
-        while -1 < self.server['next'] < len(self.app.middlewares[name]):
-            middleware = self.app.middlewares[name][self.server['next']]
+        while -1 < self.server['next'] < len(middlewares):
+            middleware = middlewares[self.server['next']]
 
             if await self._handle_middleware(middleware[1], middleware[2]):
                 if reverse:
                     self.server['next'] = -1
                 else:
-                    self.server['next'] = len(self.app.middlewares[name])
+                    self.server['next'] = len(middlewares)
 
                 return True
 
@@ -101,6 +99,7 @@ class HTTPServer(HTTPProtocol):
         request = response.request
         options = request.context.options
         options.update(kwargs)
+
         options.setdefault('rate', self.options['download_rate'])
         options.setdefault('buffer_size', self.options['buffer_size'])
 
@@ -243,8 +242,26 @@ class HTTPServer(HTTPProtocol):
         self.server['response'] = response
         self.server['next'] = 0
 
-        if self.app.middlewares['connect']:
+        if self.app.hooks['connect']:
             await self.context.ON_CONNECT
+
+        path = request.path.strip(b'/')
+
+        if path == b'':
+            key = 1
+            self.server['prefix'] = ()
+        else:
+            parts = path.split(b'/', 254)
+            length = len(parts)
+            key = bytes([length]) + parts[0]
+
+            while length >= 0:
+                self.server['prefix'] = tuple(parts[:length])
+
+                if self.server['prefix'] in self.app.middlewares:
+                    break
+
+                length -= 1
 
         if await self.run_middlewares('request'):
             await self.run_middlewares('response', reverse=True)
@@ -256,14 +273,6 @@ class HTTPServer(HTTPProtocol):
                 self.app.routes[0][0][1], self.app.routes[0][0][2]
             )
             return
-
-        path = request.path.strip(b'/')
-
-        if path == b'':
-            key = 1
-        else:
-            parts = path.split(b'/', 254)
-            key = bytes([len(parts)]) + parts[0]
 
         if key in self.app.routes:
             for pattern, func, kwargs in self.app.routes[key]:
