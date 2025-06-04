@@ -132,8 +132,8 @@ class HTTPRequest(Request):
 
         return self._body
 
-    def read(self, size=-1, *, timeout=None):
-        return self.recv(size, timeout=timeout, raw=False)
+    async def read(self, size=-1, *, timeout=None):
+        return await self.recv(size, timeout=timeout, raw=False)
 
     def eof(self):
         return self.content_length == 0 and self._read_buf == b''
