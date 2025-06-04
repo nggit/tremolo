@@ -28,7 +28,7 @@ class ThreadExecutor(Thread):
         self._shutdown = None
 
     def run(self):
-        while True:
+        while self.loop.is_running():
             try:
                 self.context.thread = self  # update the last active thread
                 fut, func, args, kwargs = self.queue.get(timeout=1)
@@ -99,23 +99,33 @@ class MultiThreadExecutor:
         self.size = size
         self.threads = []
         self.thread = None  # points to the last active thread
+        self.counter = 1
 
     def start(self, prefix='MultiThreadExecutor', **kwargs):
         while len(self.threads) < self.size:
             self.thread = ThreadExecutor(
-                self, name=f'{prefix}-{len(self.threads)}', **kwargs
+                self, name=f'{prefix}-{self.counter}', **kwargs
             )
             self.thread.start()
             self.threads.append(self.thread)
 
+            self.counter += 1
+
     def submit(self, func, args=(), kwargs={}, name=None):
-        if self.size == 0 or len(self.threads) != self.size:
-            raise RuntimeError('no running threads')
+        if self.size == 0 or len(self.threads) < self.size:
+            raise RuntimeError('no threads are running or not ready')
 
         if name is None:
-            return self.thread.submit(func, *args, **kwargs)
+            thread = self.thread
+        else:
+            thread = self.threads[name % self.size]
 
-        return self.threads[name % self.size].submit(func, *args, **kwargs)
+        try:
+            return thread.submit(func, *args, **kwargs)
+        except RuntimeError:  # dead thread found. attempt self-healing
+            self.threads.remove(thread)
+            self.start()
+            raise
 
     async def shutdown(self):
         self.size = 0
