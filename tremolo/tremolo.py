@@ -110,7 +110,7 @@ class Tremolo:
 
     def middleware(self, name, *args, priority=999):
         def decorator(func):
-            self.add_middleware(func, name, priority, getoptions(func))
+            self.add_middleware(func, name, priority, kwargs=getoptions(func))
             return func
 
         if len(args) == 1 and callable(args[0]):
