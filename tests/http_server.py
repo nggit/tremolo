@@ -37,6 +37,22 @@ async def worker_start(**worker):
     g.shared = 0
     g.socket_family = 'AF_UNIX'
 
+    # MultiThreadExecutor: test invalid callable and thread self-healing
+    while True:
+        try:
+            await g.executor.submit(None, name=0)
+        except TypeError:  # None is not a callable
+            await g.executor.threads[0].shutdown()
+        except RuntimeError:  # dead thread
+            for thread in g.executor.threads:
+                if not thread.is_alive():
+                    raise  # should not raised due to self-healing
+
+            break
+
+    assert len(g.executor.threads) == g.executor.size
+    assert g.executor.counter > g.executor.size
+
 
 @app.on_worker_start(priority=1)  # high
 async def worker_start2(**worker):
