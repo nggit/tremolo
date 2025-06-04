@@ -113,7 +113,7 @@ class ASGIWrapper:
                     await self._stream.aclose()
                     self._websocket = WebSocket(self.request, self.response)
 
-                return {'type': 'websocket.connect'}
+                    return {'type': 'websocket.connect'}
 
             try:
                 payload = await self._websocket.receive()
