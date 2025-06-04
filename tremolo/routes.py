@@ -5,7 +5,7 @@ import re
 from functools import wraps
 
 from . import handlers
-from .utils import getoptions, is_async
+from .utils import getoptions, is_async, to_sync
 
 
 class Routes(dict):
@@ -61,7 +61,10 @@ class Routes(dict):
                     wrapper = func
                 else:
                     @wraps(func)
-                    def wrapper(func, kwargs, **server):
+                    def wrapper(func, kwargs, request, response, **server):
+                        server['request'] = to_sync(request, server['loop'])
+                        server['response'] = to_sync(response, server['loop'])
+
                         return executor.submit(func.__wrapped__, kwargs=server)
 
                 self[key][i] = (pattern, wrapper, kwargs)

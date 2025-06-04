@@ -2,12 +2,13 @@
 
 __all__ = ('file_signature', 'getoptions', 'html_escape', 'is_async',
            'log_date', 'memory_usage', 'parse_args', 'parse_fields',
-           'parse_int', 'print_logo', 'server_date')
+           'parse_int', 'print_logo', 'server_date', 'to_sync')
 
 import os  # noqa: E402
 import stat  # noqa: E402
 import sys  # noqa: E402
 
+from asyncio import run_coroutine_threadsafe as run_coroutine  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
 from html import escape  # noqa: E402
 from inspect import iscoroutinefunction, isasyncgenfunction  # noqa: E402
@@ -189,3 +190,36 @@ def print_logo():
 def server_date():
     return datetime.now(timezone.utc).strftime(
         '%a, %d %b %Y %H:%M:%S GMT').encode('latin-1')
+
+
+class AsyncToSyncWrapper:
+    def __init__(self, obj, loop):
+        self.__wrapped__ = obj
+        self.loop = loop
+
+    def __getattr__(self, name):
+        attr = getattr(self.__wrapped__, name)
+
+        if iscoroutinefunction(attr):
+            def func(*args, **kwargs):
+                return run_coroutine(attr(*args, **kwargs), self.loop).result()
+
+            return func
+
+        if isasyncgenfunction(attr):
+            def generator(*args, **kwargs):
+                agen = attr(*args, **kwargs)
+
+                while True:
+                    try:
+                        fut = run_coroutine(agen.__anext__(), self.loop)
+                        yield fut.result()
+                    except StopAsyncIteration:
+                        return
+
+            return generator
+
+        return attr
+
+
+to_sync = AsyncToSyncWrapper
