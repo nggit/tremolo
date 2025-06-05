@@ -275,12 +275,11 @@ class HTTPResponse(Response):
 
         kwargs.setdefault('rate', self.request.server.options['download_rate'])
         kwargs['buffer_size'] = buffer_size
-        g = self.request.server.globals
         loop = self.request.server.loop
 
         def run_sync(func, *args):
             if executor is None:
-                return g.executor.submit(func, args=args)
+                return loop.run_in_executor(None, func, *args)
 
             fut = executor.submit(func, *args)
 
