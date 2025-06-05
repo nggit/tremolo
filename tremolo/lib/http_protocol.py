@@ -16,23 +16,23 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('_receive_buf', '_waiters', '_watermarks')
+    __slots__ = ('queue', 'events', 'handlers', '_receive_buf', '_watermarks')
 
     def __init__(self, app, **kwargs):
-        self.globals = app.context  # a worker-level context
-        self.context = ConnectionContext()
-        self.extras = kwargs
         self.app = app
+        self.extras = kwargs
         self.loop = app.loop
         self.logger = app.logger
+        self.globals = app.context  # a worker-level context
+        self.context = ConnectionContext()
         self.lock = kwargs['lock']
         self.fileno = -1
-        self.queue = [Queue(), Queue()]  # IN, OUT
-        self.handlers = set()
         self.request = None
 
+        self.queue = [Queue(), Queue()]  # IN, OUT
+        self.events = {}
+        self.handlers = set()
         self._receive_buf = bytearray()
-        self._waiters = {}
         self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
@@ -73,11 +73,11 @@ class HTTPProtocol(asyncio.Protocol):
         self.context.update(transport=transport)
         self.fileno = transport.get_extra_info('socket').fileno()
 
-        self._waiters['request'] = self.loop.create_future()
+        self.events['request'] = self.loop.create_future()
 
         self.add_close_callback(self.app.create_task(self._send_data()).cancel)
         self.add_task(self.app.create_task(
-            self.set_timeout(self._waiters['request'],
+            self.set_timeout(self.events['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
         ))
@@ -239,8 +239,8 @@ class HTTPProtocol(asyncio.Protocol):
 
             # successfully got header,
             # clear either the request or keepalive timeout
-            if not self._waiters['request'].done():
-                self._waiters['request'].set_result(None)
+            if not self.events['request'].done():
+                self.events['request'].set_result(None)
 
             timer = self.set_handler_timeout(
                 self.options['app_handler_timeout']
@@ -262,8 +262,8 @@ class HTTPProtocol(asyncio.Protocol):
                     await response.handle_exception(exc, data)
 
     async def _receive_data(self):
-        if 'request' in self._waiters:
-            await self._waiters['request']
+        if 'request' in self.events:
+            await self.events['request']
 
         if self.request is None:
             return
@@ -288,7 +288,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         # maybe resume reading, or close
         if self.request is not None:
-            del self._waiters['receive']
+            del self.events['receive']
 
             if self.request.upgraded:
                 if self in self.globals.connections:
@@ -336,12 +336,12 @@ class HTTPProtocol(asyncio.Protocol):
         # resumed in _receive_data or _send_data
         self.transport.pause_reading()
 
-        if 'receive' not in self._waiters:
-            self._waiters['receive'] = self.create_task(self._receive_data())
+        if 'receive' not in self.events:
+            self.events['receive'] = self.create_task(self._receive_data())
 
     def resume_writing(self):
-        if 'send' in self._waiters and not self._waiters['send'].done():
-            self._waiters['send'].set_result(None)
+        if 'send' in self.events and not self.events['send'].done():
+            self.events['send'].set_result(None)
 
     def set_watermarks(self, high=65536, low=8192):
         if self.transport is not None:
@@ -394,10 +394,10 @@ class HTTPProtocol(asyncio.Protocol):
                         self._watermarks['high'],
                         self._watermarks['low']
                     )
-                    self._waiters['send'] = self.loop.create_future()
+                    self.events['send'] = self.loop.create_future()
 
                     await self.set_timeout(
-                        self._waiters['send'],
+                        self.events['send'],
                         timeout=self.options['keepalive_timeout'],
                         timeout_cb=self.send_timeout
                     )
@@ -412,9 +412,9 @@ class HTTPProtocol(asyncio.Protocol):
             self.close(exc)
 
     async def _handle_keepalive(self):
-        if 'receive' in self._waiters:
+        if 'receive' in self.events:
             # waits for all incoming data to enter the queue
-            await self._waiters['receive']
+            await self.events['receive']
 
         if self.request.has_body:
             if not self.request.eof():
@@ -426,10 +426,10 @@ class HTTPProtocol(asyncio.Protocol):
                 self.close()
                 return
 
-        self._waiters['request'] = self.loop.create_future()
+        self.events['request'] = self.loop.create_future()
 
         self.add_task(self.app.create_task(
-            self.set_timeout(self._waiters['request'],
+            self.set_timeout(self.events['request'],
                              timeout=self.options['keepalive_timeout'],
                              timeout_cb=self.keepalive_timeout)
         ))
@@ -467,7 +467,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.request = None
 
         self.context.clear()
-        self._waiters.clear()
+        self.events.clear()
         self._watermarks.clear()
 
         self.set_handler_timeout(self.options['app_close_timeout'])
