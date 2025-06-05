@@ -22,16 +22,16 @@ _WSS_OR_WS = {
 
 
 class ASGIServer(HTTPProtocol):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def connection_made(self, transport):
+        super().connection_made(transport)
 
-        self.ON_CLOSE = self.loop.create_future()
+        self.events['close'] = self.loop.create_future()
 
     def connection_lost(self, exc):
-        super().connection_lost(exc)
+        if not self.events['close'].done():
+            self.events['close'].set_result(None)
 
-        if not self.ON_CLOSE.done():
-            self.ON_CLOSE.set_result(None)
+        super().connection_lost(exc)
 
     async def request_received(self, request, response):
         if not request.is_valid:
@@ -71,9 +71,9 @@ class ASGIServer(HTTPProtocol):
         try:
             await ASGIWrapper(self.options['app'], scope, request, response)
 
-            if not self.ON_CLOSE.done():
+            if not self.events['close'].done():
                 self.logger.info('handler exited early (no close?)')
-                await self.ON_CLOSE
+                await self.events['close']
         except (asyncio.CancelledError, Exception) as exc:
             if scope['type'] == 'websocket' and request.upgraded:
                 exc = WebSocketServerClosed(cause=exc)
@@ -173,8 +173,9 @@ class ASGIWrapper:
                 if self._stream is None or isinstance(exc, StopAsyncIteration):
                     # delay http.disconnect (a workaround for Quart)
                     # https://github.com/nggit/tremolo/issues/202
-                    if self.protocol.ON_CLOSE.done():
-                        self.protocol.ON_CLOSE = self.loop.create_future()
+                    if self.protocol.events['close'].done():
+                        self.protocol.events[
+                            'close'] = self.loop.create_future()
 
                     if self._stream is not None:
                         self._stream = None
@@ -183,7 +184,7 @@ class ASGIWrapper:
                     self.logger.info(
                         'calling receive() when there is no more body'
                     )
-                    await self.protocol.ON_CLOSE
+                    await self.protocol.events['close']
                 else:
                     await self.response.handle_exception(exc)
 
@@ -261,7 +262,7 @@ class ASGIWrapper:
                     await self.response.write(b'')
                     self.response.close(keepalive=True)
                     self._stream = None  # disallows further receive()
-                    self.protocol.ON_CLOSE.cancel()
+                    self.protocol.events['close'].cancel()
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
                     await self._websocket.send(data['bytes'])
@@ -272,7 +273,7 @@ class ASGIWrapper:
             elif data['type'] == 'websocket.close':
                 await self._websocket.close(data.get('code', 1000))
                 self._websocket = None
-                self.protocol.ON_CLOSE.cancel()
+                self.protocol.events['close'].cancel()
         except asyncio.CancelledError:
             pass
         except Exception as exc:

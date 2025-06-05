@@ -24,10 +24,10 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self.app.hooks['connect']:
-            self.context.ON_CONNECT = self.app.create_task(
+            self.events['connect'] = self.app.create_task(
                 self._connection_made()
             )
-            self.add_task(self.context.ON_CONNECT)
+            self.add_task(self.events['connect'])
 
     def connection_lost(self, exc):
         if self.app.hooks['close']:
@@ -243,7 +243,7 @@ class HTTPServer(HTTPProtocol):
         self.server['next'] = 0
 
         if self.app.hooks['connect']:
-            await self.context.ON_CONNECT
+            await self.events['connect']
 
         path = request.path.strip(b'/')
 
