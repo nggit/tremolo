@@ -215,7 +215,7 @@ class AsyncToSyncWrapper:
                         fut = run_coroutine(agen.__anext__(), self.loop)
                         yield fut.result()
                     except StopAsyncIteration:
-                        return
+                        break
 
             return generator
 
