@@ -363,16 +363,14 @@ class Tremolo:
                 for task in pending:
                     task.cancel()
         finally:
-            try:
-                server.close()
+            server.close()
 
-                while self.context.tasks:
-                    await self.context.tasks.pop()
+            while self.context.tasks:
+                await self.context.tasks.pop()
 
-                await server.wait_closed()
-                await self._worker_stop()
-            finally:
-                await executor.shutdown()
+            await server.wait_closed()
+            await self._worker_stop()
+            await executor.shutdown()
 
     async def _serve_forever(self):
         limit_memory = self.context.options.get('limit_memory', 0)
