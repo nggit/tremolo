@@ -30,7 +30,9 @@ class ThreadExecutor(Thread):
     def run(self):
         while self.loop.is_running():
             try:
-                self.context.thread = self  # update the last active thread
+                self.loop.call_soon_threadsafe(  # set the last active thread
+                    self.context.__setattr__, 'thread', self
+                )
                 fut, func, args, kwargs = self.queue.get(timeout=1)
             except queue.Empty:
                 continue
