@@ -16,10 +16,11 @@ class MultipartFile(dict):
         self.files = files
 
     async def stream(self):
-        yield self['data']
+        if 'data' in self:
+            yield self.pop('data')
 
-        while not self['eof']:
-            yield (await self.files.__anext__())['data']
+            while not self['eof']:
+                yield (await self.files.__anext__()).pop('data')
 
 
 class HTTPRequest(Request):
