@@ -75,7 +75,7 @@ async def upload(request, response):
 
 @app.route('/download')
 async def download(request, response):
-    # prepend / append hardcoded string.
+    # prepend / append a hardcoded string.
     # do not let the user freely determine the path
     path = 'Uploaded_' + quote(request.query['filename'][0])
     content_type = request.query['type'][0]
