@@ -146,7 +146,7 @@ class HTTPProtocol(asyncio.Protocol):
 
             if queue_size <= self.options['max_queue_size']:
                 if data and rate > 0 and queue_size > 0:
-                    await asyncio.sleep(1 / (rate / queue_size / len(data)))
+                    await asyncio.sleep(queue_size * len(data) / rate)
 
                 return True
 
