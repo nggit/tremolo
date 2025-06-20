@@ -31,25 +31,27 @@ class Routes(dict):
         if not kwargs:
             kwargs = getoptions(func)
 
-        if path.startswith('^') or path.endswith('$'):
+        key = -1
+
+        if path.endswith('$'):
+            pattern = path.rstrip('$').encode('latin-1') + b'(?:\\?.*)?$'
+        elif path.startswith('^'):
             pattern = path.encode('latin-1')
-            self[-1].append((pattern, func, kwargs))
         else:
             path = path.split('?', 1)[0].strip('/').encode('latin-1')
 
             if path == b'':
                 key = 1
                 pattern = self[1][0][0]
-                self[key] = [(pattern, func, kwargs)]
             else:
                 parts = path.split(b'/', 254)
                 key = bytes([len(parts)]) + parts[0]
                 pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
 
-                if key in self:
-                    self[key].append((pattern, func, kwargs))
-                else:
-                    self[key] = [(pattern, func, kwargs)]
+        if key != 1 and key in self:
+            self[key].append((pattern, func, kwargs))
+        else:
+            self[key] = [(pattern, func, kwargs)]
 
     def compile(self, executor=None):
         for key in self:
