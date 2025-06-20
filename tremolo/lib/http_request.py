@@ -12,11 +12,14 @@ from .request import Request
 
 
 class MultipartFile(dict):
+    def __init__(self, files):
+        self.files = files
+
     async def stream(self):
         yield self['data']
 
         while not self['eof']:
-            yield (await self['files'].__anext__())['data']
+            yield (await self.files.__anext__())['data']
 
 
 class HTTPRequest(Request):
@@ -377,7 +380,7 @@ class HTTPRequest(Request):
                     paused = False
                 else:
                     body.extend(self._read_buf[header_size + 2:])
-                    part = MultipartFile(files=self._files)
+                    part = MultipartFile(self._files)
 
                     # use find() instead of startswith() to ignore the preamble
                     if self._read_buf.find(b'--%s\r\n' % boundary,
