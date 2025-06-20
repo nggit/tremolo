@@ -274,6 +274,9 @@ class HTTPServer(HTTPProtocol):
             )
             return
 
+        if key not in self.app.routes:
+            key = parts[0]
+
         if key in self.app.routes:
             for pattern, func, kwargs in self.app.routes[key]:
                 m = pattern.search(request.url)
