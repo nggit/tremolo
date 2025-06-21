@@ -11,11 +11,23 @@ from .http_response import HTTPResponse
 from .request import Request
 
 
+class MultipartFile(dict):
+    def __init__(self, files):
+        self.files = files
+
+    async def stream(self):
+        if 'data' in self:
+            yield self.pop('data')
+
+            while not self['eof']:
+                yield (await self.files.__anext__()).pop('data')
+
+
 class HTTPRequest(Request):
     __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
                  'host', 'method', 'url', 'path', 'query_string', 'version',
                  'content_length', 'http_continue', 'http_keepalive',
-                 '_body', '_stream', '_read_buf')
+                 '_body', '_read_buf', '_stream', '_files')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -42,9 +54,11 @@ class HTTPRequest(Request):
         self.content_length = -1
         self.http_continue = False
         self.http_keepalive = False
+
         self._body = bytearray()
-        self._stream = None
         self._read_buf = bytearray()
+        self._stream = None
+        self._files = None
 
     @property
     def ip(self):
@@ -284,7 +298,7 @@ class HTTPRequest(Request):
 
             return self.params['cookies']
 
-    async def form(self, max_size=8 * 1048576, max_fields=100):
+    async def form(self, max_fields=100, *, max_size=8 * 1048576):
         try:
             return self.params['post']
         except KeyError as exc:
@@ -308,8 +322,16 @@ class HTTPRequest(Request):
 
             return self.params['post']
 
-    async def files(self, max_files=1024, max_file_size=100 * 1048576):
+    async def files(self, max_files=1024, *, max_file_size=100 * 1048576):
         if self.eof():
+            return
+
+        if self._files is None:
+            self._files = self.files(max_files, max_file_size=max_file_size)
+
+            async for part in self._files:
+                yield part
+
             return
 
         for key, boundary in parse_fields(self.content_type):
@@ -325,7 +347,7 @@ class HTTPRequest(Request):
         body_size = 0
         content_length = 0
         paused = False
-        part = None  # represents a file received in a multipart request
+        part = None  # represents a field/file received in a multipart request
 
         if self._stream is None:
             self._stream = self.stream()
@@ -359,7 +381,7 @@ class HTTPRequest(Request):
                     paused = False
                 else:
                     body.extend(self._read_buf[header_size + 2:])
-                    part = {}
+                    part = MultipartFile(self._files)
 
                     # use find() instead of startswith() to ignore the preamble
                     if self._read_buf.find(b'--%s\r\n' % boundary,
@@ -393,10 +415,9 @@ class HTTPRequest(Request):
 
             if body_size == -1:
                 if len(body) >= max_file_size > boundary_size + 4:
-                    sub_part = part.copy()
-                    sub_part['data'] = body[:-boundary_size - 4]
-                    sub_part['eof'] = False
-                    yield sub_part
+                    part['data'] = bytes(body[:-boundary_size - 4])
+                    part['eof'] = False
+                    yield part
 
                     content_length = max(
                         content_length - (len(body) - boundary_size - 4), 0
@@ -406,7 +427,7 @@ class HTTPRequest(Request):
                 paused = False
                 continue
 
-            part['data'] = body[:body_size]
+            part['data'] = bytes(body[:body_size])
             part['eof'] = True
             yield part
 

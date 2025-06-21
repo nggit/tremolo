@@ -45,10 +45,10 @@ With only **3k** lines of code, with **no dependencies** other than the [Python 
 * of course with [WebSocket support](https://nggit.github.io/tremolo-docs/reference/websocket/)
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
 * Stream chunked uploads
-* [Stream multipart uploads](https://nggit.github.io/tremolo-docs/body.html#multipart)
+* [Stream multipart uploads](https://nggit.github.io/tremolo-docs/body.html#multipart) with [per-part streaming](https://github.com/nggit/tremolo/pull/293)
 * Download/upload speed throttling
 * [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
-* Framework features; routing, middleware, etc.
+* Framework features; routing, async/[sync handlers](https://nggit.github.io/tremolo-docs/handlers.html#synchronous-handlers), middleware, etc.
 * ASGI server implementation
 * PyPy compatible
 

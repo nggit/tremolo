@@ -28,46 +28,55 @@ async def upload(request, response):
     # it can still be read continuously bit by bit according to this size
     files = request.files(max_file_size=16384)  # 16KiB
 
-    fp = None
-    filename = None
+    # keep track of incomplete writings
+    incomplete = set()
 
     try:
         # read while writing the file(s).
+        # `part` represents a field/file received in a multipart request
         async for part in files:
             filename = quote(part.get('filename', ''))
 
             if not filename:
                 continue
 
-            if fp is None:
-                fp = open('Uploaded_' + filename, 'wb')
+            with open('Uploaded_' + filename, 'wb') as fp:
+                incomplete.add(fp)
 
-            print('Writing %s (len=%d, eof=%s)' % (filename,
-                                                   len(part['data']),
-                                                   part['eof']))
-            fp.write(part['data'])
+                if part['eof']:
+                    # this part is not larger than `max_file_size`.
+                    # but you can skip this check and always use `part.stream`
+                    fp.write(part['data'])
+                else:
+                    # stream a (possibly) large part in chunks
+                    async for data in part.stream():
+                        print('Writing %s (len=%d, eof=%s)' % (filename,
+                                                               len(data),
+                                                               part['eof']))
+                        fp.write(data)
 
-            if part['eof']:
-                fp.close()
-                fp = None  # the next iteration will be another file
-                filename = filename.encode()
-                content_type = quote(part['type']).encode()
+                incomplete.discard(fp)  # completed :)
 
-                yield (
-                    b'File <a href="/download?type=%s&filename=%s">%s</a> '
-                    b'was uploaded.<br />' % (content_type, filename, filename)
-                )
+            filename = filename.encode()
+            content_type = quote(part['type']).encode()
+
+            yield (
+                b'File <a href="/download?type=%s&filename=%s">%s</a> '
+                b'was uploaded.<br />' % (content_type, filename, filename)
+            )
     finally:
-        if fp is not None:
-            fp.close()
-            print('Upload canceled, removing incomplete file: %s' % filename)
-            os.unlink('Uploaded_' + filename)
+        while incomplete:
+            path = incomplete.pop().name
+            print('Upload canceled, removing incomplete file: %s' % path)
+            os.unlink(path)
 
     yield b''
 
 
 @app.route('/download')
 async def download(request, response):
+    # prepend / append a hardcoded string.
+    # do not let the user freely determine the path
     path = 'Uploaded_' + quote(request.query['filename'][0])
     content_type = request.query['type'][0]
 
