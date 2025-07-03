@@ -107,7 +107,7 @@ class TestHTTPServer(unittest.TestCase):
             host=HTTP_HOST,
             port=HTTP_PORT,
             raw=b'GET /getheaderline?foo HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Host: host.local\r\n\r\n' % HTTP_PORT
+                b'\r\n\r\n' % HTTP_PORT
         )
 
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
@@ -122,8 +122,9 @@ class TestHTTPServer(unittest.TestCase):
                 b'Host: host.local\r\n\r\n' % HTTP_PORT
         )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'localhost:%d' % HTTP_PORT)
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'Bad Request')
 
     def test_get_query_11(self):
         header, body = getcontents(host=HTTP_HOST,
