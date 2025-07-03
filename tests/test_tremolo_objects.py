@@ -169,9 +169,10 @@ class TestTremoloObjects(unittest.TestCase):
     def test_create_sock(self):
         # simulate unsupported IPv6
         del socket.AF_INET6
+        port = HTTP_PORT + 3
 
-        with app.create_sock('localhost', HTTP_PORT + 3) as sock:
-            self.assertEqual(sock.getsockname()[:2][-1], HTTP_PORT + 3)
+        with app.create_sock('localhost', port, reuse_port=False) as sock:
+            self.assertEqual(sock.getsockname()[:2][-1], port)
 
         # trigger sock file already exists
         if not os.path.exists('tremolo.sock'):
@@ -179,11 +180,11 @@ class TestTremoloObjects(unittest.TestCase):
 
         for sock_name, sock_file in (('tremolo_sock', 'tremolo_sock.sock'),
                                      ('tremolo.sock', 'tremolo.sock')):
-            with app.create_sock(sock_name, HTTP_PORT + 3) as sock:
+            with app.create_sock(sock_name, port, reuse_port=False) as sock:
                 if sock.family.name == 'AF_UNIX':
                     self.assertEqual(sock.getsockname(), sock_file)
                 else:
-                    self.assertEqual(sock.getsockname()[1], HTTP_PORT + 3)
+                    self.assertEqual(sock.getsockname()[1], port)
 
     def test_serverconnections(self):
         with self.assertRaises(ValueError):
