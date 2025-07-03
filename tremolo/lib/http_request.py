@@ -40,6 +40,7 @@ class HTTPRequest(Request):
         self.host = header.gethost()
 
         if isinstance(self.host, list):
+            self.is_valid = False
             self.host = self.host[0]
 
         self.method = header.getmethod()
