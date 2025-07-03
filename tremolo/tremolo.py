@@ -25,11 +25,6 @@ from .lib.contexts import WorkerContext  # noqa: E402
 from .lib.executors import MultiThreadExecutor  # noqa: E402
 from .lib.locks import ServerLock  # noqa: E402
 
-_REUSEPORT_OR_REUSEADDR = {
-    False: socket.SO_REUSEADDR,
-    True: getattr(socket, 'SO_REUSEPORT', socket.SO_REUSEADDR)
-}
-
 
 class Tremolo:
     def __init__(self, name=None):
@@ -210,13 +205,7 @@ class Tremolo:
         options.update(kwargs)
         backlog = options.get('backlog', 100)
 
-        if hasattr(options['_sock'], 'share'):
-            # Windows
-            sock = socket.fromshare(options['_sock'].share(os.getpid()))
-        else:
-            # Linux
-            sock = self.create_sock(host, port, options['reuse_port'])
-
+        sock = options['_sock'] or self.create_sock(host, port)
         sock.listen(backlog)
 
         if 'ssl' in options and isinstance(options['ssl'] or None, dict):
@@ -541,8 +530,15 @@ class Tremolo:
                         os.unlink(host)
         else:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            sock.setsockopt(socket.SOL_SOCKET,
-                            _REUSEPORT_OR_REUSEADDR[reuse_port], 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            if reuse_port:
+                sock.setsockopt(
+                    socket.SOL_SOCKET,
+                    getattr(socket, 'SO_REUSEPORT_LB', socket.SO_REUSEPORT),
+                    1
+                )
+
             sock.bind((host, port))
 
         return sock
@@ -603,7 +599,6 @@ class Tremolo:
 
     def run(self, host=None, port=0, *, worker_num=1, **kwargs):
         kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
-        kwargs.setdefault('reuse_port', True)
         kwargs.setdefault('thread_pool_size', 5)
         kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
@@ -702,13 +697,18 @@ class Tremolo:
             )
 
             args = (_host, _port)
-            socks[args] = self.create_sock(_host, _port, options['reuse_port'])
+
+            if options.get('reuse_port', hasattr(socket, 'SO_REUSEPORT')):
+                sock = None
+            else:
+                sock = self.create_sock(_host, _port, reuse_port=False)
+                socks[args] = sock
 
             for _ in range(options.get('worker_num', worker_num)):
                 self.manager.spawn(
                     self._worker,
                     args=args,
-                    kwargs=dict(options, _locks=locks, _sock=socks[args]),
+                    kwargs=dict(options, _locks=locks, _sock=sock),
                     exit_cb=self._handle_reload
                 )
 
