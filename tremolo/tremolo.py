@@ -281,7 +281,7 @@ class Tremolo:
                         options['app'].__class__.__name__)
             )
 
-            if server_name != b'':
+            if server_name == b'Tremolo':
                 server_name += b' (ASGI)'
 
             self.context.lifespan = ASGILifespan(self, options=options)
