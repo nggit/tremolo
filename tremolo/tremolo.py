@@ -203,8 +203,8 @@ class Tremolo:
     async def _serve(self, host, port, **kwargs):
         options = self.context.options
         options.update(kwargs)
-        backlog = options.get('backlog', 100)
 
+        backlog = options.get('backlog', 100)
         sock = options['_sock'] or self.create_sock(host, port)
         sock.listen(backlog)
 
