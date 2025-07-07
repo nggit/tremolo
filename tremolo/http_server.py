@@ -285,6 +285,12 @@ class HTTPServer(HTTPProtocol):
                     matches = m.groupdict()
                     request.params['path'] = matches or m.groups()
 
+                    if 'self' in kwargs:
+                        if request.method != func.__name__.upper().encode():
+                            continue
+
+                        matches['self'] = kwargs['self']()
+
                     for k in list(matches):
                         if k in self.server:
                             del matches[k]
@@ -314,6 +320,12 @@ class HTTPServer(HTTPProtocol):
 
                 matches = m.groupdict()
                 request.params['path'] = matches or m.groups()
+
+                if 'self' in kwargs:
+                    if request.method != func.__name__.upper().encode():
+                        continue
+
+                    matches['self'] = kwargs['self']()
 
                 for k in list(matches):
                     if k in self.server:

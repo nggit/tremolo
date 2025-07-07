@@ -66,6 +66,10 @@ class Routes(dict):
                     def wrapper(func, kwargs, request, response, **server):
                         server['request'] = to_sync(request, server['loop'])
                         server['response'] = to_sync(response, server['loop'])
+                        obj = server.pop('self', None)
+
+                        if obj:
+                            func.__wrapped__ = getattr(obj, func.__name__)
 
                         return executor.submit(func.__wrapped__, kwargs=server)
 

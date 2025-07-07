@@ -63,7 +63,7 @@ class Tremolo:
             return self.error(path)
 
         def decorator(func):
-            self.routes.add(func, path, getoptions(func))
+            self.add_route(func, path)
             return func
 
         return decorator
@@ -118,6 +118,18 @@ class Tremolo:
 
     def on_response(self, *args, **kwargs):
         return self.middleware('response', *args, **kwargs)
+
+    def add_route(self, func, path='/'):
+        if isinstance(func, type):  # a class-based view
+            for name in dir(func):
+                method = getattr(func, name)
+
+                if not name.startswith('_') and callable(method):
+                    self.routes.add(
+                        method, path, dict(getoptions(method), self=func)
+                    )
+        else:
+            self.routes.add(func, path, getoptions(func))
 
     def add_hook(self, func, name='worker_start', priority=999):
         if name not in self.hooks:
