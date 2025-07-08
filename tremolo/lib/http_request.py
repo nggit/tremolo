@@ -303,25 +303,53 @@ class HTTPRequest(Request):
         try:
             return self.params['post']
         except KeyError as exc:
-            if (b'application/x-www-form-urlencoded' not in
-                    self.headers.getlist(b'content-type', b';')):
-                raise BadRequest('invalid Content-Type') from exc
-
-            async for data in self.stream():
-                self._body.extend(data)
-
-                if self.body_size > max_size:
-                    raise ValueError('form size limit reached') from exc
-
+            content_type = self.headers.getlist(b'content-type', b';')
             self.params['post'] = {}
 
-            if 2 < self.body_size <= max_size:
-                self.params['post'] = parse_qs(
-                    self._body.decode('latin-1'),
-                    max_num_fields=max_fields
-                )
+            if b'application/x-www-form-urlencoded' in content_type:
+                async for data in self.stream():
+                    self._body.extend(data)
 
-            return self.params['post']
+                    if self.body_size > max_size:
+                        raise ValueError('form size limit reached') from exc
+
+                if 2 < self.body_size <= max_size:
+                    self.params['post'] = parse_qs(
+                        self._body.decode('latin-1'),
+                        max_num_fields=max_fields
+                    )
+
+                return self.params['post']
+
+            if b'multipart/form-data' in content_type:
+                self._files = self.files(max_fields, max_file_size=max_size)
+                self.params['files'] = {}
+
+                async for part in self._files:
+                    if 'filename' in part:
+                        if part['filename'] == '':
+                            continue
+
+                        if not part['eof']:
+                            raise ValueError(
+                                'fragmented file. consider increasing the '
+                                'max_size limit or stream using files()'
+                            )
+
+                        self.params['files'][part['filename']] = part['data']
+                    elif 'name' in part:
+                        if part['name'] in self.params['post']:
+                            self.params['post'][part['name']].append(
+                                part['data'].decode()
+                            )
+                        else:
+                            self.params['post'][part['name']] = [
+                                part['data'].decode()
+                            ]
+
+                return self.params['post']
+
+            raise BadRequest('invalid Content-Type') from exc
 
     async def files(self, max_files=1024, *, max_file_size=100 * 1048576):
         if self.eof():
