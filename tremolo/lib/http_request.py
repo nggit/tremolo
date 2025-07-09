@@ -326,26 +326,29 @@ class HTTPRequest(Request):
                 self.params['files'] = {}
 
                 async for part in self._files:
+                    if not part.pop('eof'):
+                        raise ValueError(
+                            'fragmented file. consider increasing the '
+                            'max_size limit or stream using request.files()'
+                        )
+
+                    name = part.pop('name', '')
+
                     if 'filename' in part:
                         if part['filename'] == '':
                             continue
 
-                        if not part['eof']:
-                            raise ValueError(
-                                'fragmented file. consider increasing the '
-                                'max_size limit or stream using files()'
-                            )
-
-                        self.params['files'][part['filename']] = part['data']
-                    elif 'name' in part:
-                        if part['name'] in self.params['post']:
-                            self.params['post'][part['name']].append(
+                        if name in self.params['files']:
+                            self.params['files'][name].append(part)
+                        else:
+                            self.params['files'][name] = [part]
+                    else:
+                        if name in self.params['post']:
+                            self.params['post'][name].append(
                                 part['data'].decode()
                             )
                         else:
-                            self.params['post'][part['name']] = [
-                                part['data'].decode()
-                            ]
+                            self.params['post'][name] = [part['data'].decode()]
 
                 return self.params['post']
 
