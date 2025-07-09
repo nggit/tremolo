@@ -342,6 +342,46 @@ class TestHTTPServer(unittest.TestCase):
             b'file2,524288,application/octet-stream,-----END\r\n'
         )
 
+    def test_post_upload_multipart_form(self):
+        boundary = b'----MultipartBoundary'
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload/multipart/form HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n'
+                b'Content-Type: multipart/form-data; boundary=%s\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
+                    HTTP_PORT,
+                    boundary,
+                    create_chunked_body(create_multipart_body(
+                        boundary,
+                        text=b'Hello, World!',
+                        file=create_dummy_data(262144))))
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'BEGINHello, World!END')
+
+    def test_post_upload_multipart_form_fragmented(self):
+        boundary = b'----MultipartBoundary'
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload/multipart/form HTTP/1.1\r\n'
+                b'Host: localhost:%d\r\n'
+                b'Content-Type: multipart/form-data; boundary=%s\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
+                    HTTP_PORT,
+                    boundary,
+                    create_chunked_body(create_multipart_body(
+                        boundary,
+                        text=b'Hello, World!',
+                        file=create_dummy_data(524288))))
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 500 Internal Server Error')
+
     def test_post_upload_payloadtoolarge_11(self):
         header, body = getcontents(
             host=HTTP_HOST,

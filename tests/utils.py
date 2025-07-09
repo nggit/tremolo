@@ -220,12 +220,21 @@ def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
     body = bytearray(b'PREAMBLE')
 
     for name, data in parts.items():
+        name = name.encode('latin-1')
         body.extend(b'--%s\r\nContent-Length: %d\r\n' % (boundary, len(data)))
-        body.extend(b'Content-Disposition: form-data; name="%s"\r\n' %
-                    name.encode('latin-1'))
-        body.extend(
-            b'Content-Type: application/octet-stream\r\n\r\n%s\r\n' % data
-        )
+
+        if name.startswith(b'file'):
+            body.extend(
+                b'Content-Disposition: form-data; '
+                b'name="%s"; filename="%s.ext"\r\n' % (name, name)
+            )
+            body.extend(b'Content-Type: application/octet-stream\r\n')
+        else:
+            body.extend(
+                b'Content-Disposition: form-data; name="%s"\r\n' % name
+            )
+
+        body.extend(b'\r\n%s\r\n' % data)
 
     return bytes(body) + b'--%s--\r\nEPILOGUE' % boundary
 
