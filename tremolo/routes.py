@@ -11,25 +11,25 @@ from .utils import getoptions, is_async, to_sync
 class Routes(dict):
     def __init__(self):
         self[0] = [
-            (400, handlers.error_400, {}),
+            (400, handlers.error_400, {}, {}),
             (404, handlers.error_404, dict(request=None,
                                            globals=None,
                                            status=(404, b'Not Found'),
-                                           stream=False)),
-            (405, handlers.error_405, {}),
+                                           stream=False), {}),
+            (405, handlers.error_405, {}, {}),
 
             # must be at the very end
-            (500, handlers.error_500, {})
+            (500, handlers.error_500, {}, {})
         ]
         self[1] = [
             (
                 b'^/+(?:\\?.*)?$',
-                handlers.index, dict(status=(503, b'Service Unavailable'))
+                handlers.index, dict(status=(503, b'Service Unavailable')), {}
             )
         ]
         self[-1] = []
 
-    def add(self, func, path='/', kwargs=None):
+    def add(self, func, path='/', kwargs=None, **options):
         if not kwargs:
             kwargs = getoptions(func)
 
@@ -51,13 +51,13 @@ class Routes(dict):
                 pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
 
         if key != 1 and key in self:
-            self[key].append((pattern, func, kwargs))
+            self[key].append((pattern, func, kwargs, options))
         else:
-            self[key] = [(pattern, func, kwargs)]
+            self[key] = [(pattern, func, kwargs, options)]
 
     def compile(self, executor=None):
         for key in self:
-            for i, (pattern, func, kwargs) in enumerate(self[key]):
+            for i, (pattern, func, kwargs, options) in enumerate(self[key]):
                 if isinstance(pattern, bytes):
                     pattern = re.compile(pattern)
 
@@ -75,4 +75,4 @@ class Routes(dict):
 
                         return executor.submit(func.__wrapped__, kwargs=server)
 
-                self[key][i] = (pattern, wrapper, kwargs)
+                self[key][i] = (pattern, wrapper, kwargs, options)

@@ -280,7 +280,7 @@ class HTTPServer(HTTPProtocol):
         error = 1
 
         if key in self.app.routes:
-            for p, func, kwargs in self.app.routes[key]:
+            for p, func, kwargs, options in self.app.routes[key]:
                 m = p.search(request.url)
 
                 if m:
@@ -292,7 +292,7 @@ class HTTPServer(HTTPProtocol):
                             error = 2
                             continue
 
-                        matches['self'] = kwargs['self']()
+                        matches['self'] = kwargs['self'](**options)
 
                     for k in list(matches):
                         if k in self.server:
@@ -312,7 +312,7 @@ class HTTPServer(HTTPProtocol):
 
             while i > 0:
                 i -= 1
-                p, func, kwargs = self.app.routes[-1][i]
+                p, func, kwargs, options = self.app.routes[-1][i]
                 m = p.search(request.url)
 
                 if m:
@@ -332,7 +332,7 @@ class HTTPServer(HTTPProtocol):
                             error = 2
                             continue
 
-                        matches['self'] = kwargs['self']()
+                        matches['self'] = kwargs['self'](**options)
 
                     for k in list(matches):
                         if k in self.server:

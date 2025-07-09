@@ -58,12 +58,12 @@ class Tremolo:
 
         return task
 
-    def route(self, path):
+    def route(self, path, **options):
         if isinstance(path, int):
             return self.error(path)
 
         def decorator(func):
-            self.add_route(func, path)
+            self.add_route(func, path, **options)
             return func
 
         return decorator
@@ -73,7 +73,7 @@ class Tremolo:
             for i, h in enumerate(self.routes[0]):
                 if code == h[0]:
                     self.routes[0][i] = (
-                        h[0], func, dict(h[2], **getoptions(func))
+                        h[0], func, dict(h[2], **getoptions(func)), h[3]
                     )
                     break
 
@@ -119,14 +119,15 @@ class Tremolo:
     def on_response(self, *args, **kwargs):
         return self.middleware('response', *args, **kwargs)
 
-    def add_route(self, func, path='/'):
+    def add_route(self, func, path='/', **options):
         if isinstance(func, type):  # a class-based view
             for name in dir(func):
                 method = getattr(func, name)
 
                 if not name.startswith('_') and callable(method):
                     self.routes.add(
-                        method, path, dict(getoptions(method), self=func)
+                        method, path, dict(getoptions(method), self=func),
+                        **options
                     )
         else:
             self.routes.add(func, path, getoptions(func))
@@ -182,7 +183,7 @@ class Tremolo:
         while app.routes:
             _, routes = app.routes.popitem()
 
-            for pattern, func, kwargs in routes:
+            for pattern, func, kwargs, options in routes:
                 if isinstance(pattern, bytes):
                     pattern = pattern.lstrip(b'^')
 
@@ -191,7 +192,7 @@ class Tremolo:
                     else:
                         pattern = b'^' + prefix + b'/.*' + pattern
 
-                    self.routes[-1].append((pattern, func, kwargs))
+                    self.routes[-1].append((pattern, func, kwargs, options))
 
         parts = tuple(part for part in prefix.split(b'/') if part)
 
@@ -662,7 +663,7 @@ class Tremolo:
                 print('Routes:')
 
                 for routes in self.routes.values():
-                    for pattern, func, kw in routes:
+                    for pattern, func, kw, _ in routes:
                         print(
                             '  %s -> %s(%s)' %
                             (pattern,
