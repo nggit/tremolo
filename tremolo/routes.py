@@ -16,6 +16,8 @@ class Routes(dict):
                                            globals=None,
                                            status=(404, b'Not Found'),
                                            stream=False)),
+            (405, handlers.error_405, {}),
+
             # must be at the very end
             (500, handlers.error_500, {})
         ]

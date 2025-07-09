@@ -277,6 +277,8 @@ class HTTPServer(HTTPProtocol):
         if key not in self.app.routes:
             key = parts[0]
 
+        error = 1
+
         if key in self.app.routes:
             for pattern, func, kwargs in self.app.routes[key]:
                 m = pattern.search(request.url)
@@ -287,6 +289,7 @@ class HTTPServer(HTTPProtocol):
 
                     if 'self' in kwargs:
                         if request.method != func.__name__.upper().encode():
+                            error = 2
                             continue
 
                         matches['self'] = kwargs['self']()
@@ -323,6 +326,7 @@ class HTTPServer(HTTPProtocol):
 
                 if 'self' in kwargs:
                     if request.method != func.__name__.upper().encode():
+                        error = 2
                         continue
 
                     matches['self'] = kwargs['self']()
@@ -340,7 +344,7 @@ class HTTPServer(HTTPProtocol):
                     for k in matches:
                         del self.server[k]
 
-        # not found
+        # error = 1 (not found), error = 2 (method not allowed)
         await self._handle_response(
-            self.app.routes[0][1][1], self.app.routes[0][1][2]
+            self.app.routes[0][error][1], self.app.routes[0][error][2]
         )

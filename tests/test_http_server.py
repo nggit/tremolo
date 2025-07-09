@@ -990,7 +990,7 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'Hello, World!')
 
-    def test_class_post_notfound(self):
+    def test_class_post_methodnotallowed(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
                                    method='POST',
@@ -998,7 +998,7 @@ class TestHTTPServer(unittest.TestCase):
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 404 Not Found')
+                         b'HTTP/1.1 405 Method Not Allowed')
 
 
 if __name__ == '__main__':
