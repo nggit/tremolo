@@ -305,6 +305,7 @@ class HTTPRequest(Request):
         except KeyError as exc:
             content_type = self.headers.getlist(b'content-type', b';')
             self.params['post'] = {}
+            self.params['files'] = {}
 
             if b'application/x-www-form-urlencoded' in content_type:
                 async for data in self.stream():
@@ -323,7 +324,6 @@ class HTTPRequest(Request):
 
             if b'multipart/form-data' in content_type:
                 self._files = self.files(max_fields, max_file_size=max_size)
-                self.params['files'] = {}
 
                 async for part in self._files:
                     if not part.pop('eof'):
