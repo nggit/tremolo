@@ -314,6 +314,16 @@ async def upload_multipart(request, response, stream=False, **server):
         raise Exception('EOF!!!')
 
 
+@app.route('/upload/multipart/form')
+async def upload_multipart_form(request):
+    form_data = await request.form(max_size=262144)
+    files = request.params.files
+
+    yield files['file'][0]['data'][:5]  # b'BEGIN'
+    yield form_data['text'][0].encode()  # b'Hello, World!'
+    yield files['file'][0]['data'][-3:]  # b'END'
+
+
 @app.route('/download')
 async def download(request, response):
     if request.query_string == b'executor':
