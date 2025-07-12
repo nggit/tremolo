@@ -4,7 +4,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 
-Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
+Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/basics/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
 
 Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
 
@@ -45,10 +45,10 @@ With only **3k** lines of code, with **no dependencies** other than the [Python 
 * of course with [WebSocket support](https://nggit.github.io/tremolo-docs/reference/websocket/)
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
 * Stream chunked uploads
-* [Stream multipart uploads](https://nggit.github.io/tremolo-docs/body.html#multipart) with [per-part streaming](https://github.com/nggit/tremolo/pull/293)
+* [Stream multipart uploads](https://nggit.github.io/tremolo-docs/basics/body.html#multipart) with [per-part streaming](https://github.com/nggit/tremolo/pull/293)
 * Download/upload speed throttling
-* [Resumable downloads](https://nggit.github.io/tremolo-docs/resumable-downloads.html)
-* Framework features; routing, async/[sync handlers](https://nggit.github.io/tremolo-docs/handlers.html#synchronous-handlers), middleware, etc.
+* [Resumable downloads](https://nggit.github.io/tremolo-docs/how-to/resumable-downloads.html)
+* Framework features; routing, [CBV](https://nggit.github.io/tremolo-docs/basics/routing.html#class-based-views), async/[sync handlers](https://nggit.github.io/tremolo-docs/basics/handlers.html#synchronous-handlers), middleware, etc.
 * ASGI server implementation
 * PyPy compatible
 
@@ -131,7 +131,7 @@ Since they require user awareness, they are not enabled by default.
 
 For example, even in ASGI server mode, Tremolo gives apps direct access to the server objects.
 Which means that even if you use an app/framework like Starlette/FastAPI,
-you can still use Tremolo's `request` and `response` objects for more optimized [streaming features](https://nggit.github.io/tremolo-docs/body.html#multipart).
+you can still use Tremolo's `request` and `response` objects for more optimized [streaming features](https://nggit.github.io/tremolo-docs/basics/body.html#multipart).
 ```python
 from starlette.applications import Starlette
 from starlette.routing import Route
