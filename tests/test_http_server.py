@@ -1020,6 +1020,26 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertEqual(read_chunked(body), b'/')
 
+    def test_class_get(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/resource',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
+        self.assertEqual(read_chunked(body), b'Hello, World!')
+
+    def test_class_post_methodnotallowed(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='POST',
+                                   url='/resource',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 405 Method Not Allowed')
+
 
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)

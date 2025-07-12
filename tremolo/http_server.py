@@ -277,13 +277,22 @@ class HTTPServer(HTTPProtocol):
         if key not in self.app.routes:
             key = parts[0]
 
+        error = 1
+
         if key in self.app.routes:
-            for pattern, func, kwargs in self.app.routes[key]:
-                m = pattern.search(request.url)
+            for p, func, kwargs, options in self.app.routes[key]:
+                m = p.search(request.url)
 
                 if m:
                     matches = m.groupdict()
                     request.params['path'] = matches or m.groups()
+
+                    if 'self' in kwargs:
+                        if request.method != func.__name__.upper().encode():
+                            error = 2
+                            continue
+
+                        matches['self'] = kwargs['self'](**options)
 
                     for k in list(matches):
                         if k in self.server:
@@ -298,37 +307,47 @@ class HTTPServer(HTTPProtocol):
                         for k in matches:
                             del self.server[k]
 
-        i = len(self.app.routes[-1])
+        if error == 1:
+            i = len(self.app.routes[-1])
 
-        while i > 0:
-            i -= 1
-            pattern, func, kwargs = self.app.routes[-1][i]
-            m = pattern.search(request.url)
+            while i > 0:
+                i -= 1
+                p, func, kwargs, options = self.app.routes[-1][i]
+                m = p.search(request.url)
 
-            if m:
-                if key != 1 and pattern.pattern.startswith(b'^/' + parts[0]):
-                    if key in self.app.routes:
-                        self.app.routes[key].append(self.app.routes[-1].pop(i))
-                    else:
-                        self.app.routes[key] = [self.app.routes[-1].pop(i)]
+                if m:
+                    if key != 1 and p.pattern.startswith(b'^/' + parts[0]):
+                        if key in self.app.routes:
+                            self.app.routes[key].append(
+                                self.app.routes[-1].pop(i)
+                            )
+                        else:
+                            self.app.routes[key] = [self.app.routes[-1].pop(i)]
 
-                matches = m.groupdict()
-                request.params['path'] = matches or m.groups()
+                    matches = m.groupdict()
+                    request.params['path'] = matches or m.groups()
 
-                for k in list(matches):
-                    if k in self.server:
-                        del matches[k]
-                    else:
-                        self.server[k] = matches[k]
+                    if 'self' in kwargs:
+                        if request.method != func.__name__.upper().encode():
+                            error = 2
+                            continue
 
-                try:
-                    await self._handle_response(func, kwargs)
-                    return
-                finally:
-                    for k in matches:
-                        del self.server[k]
+                        matches['self'] = kwargs['self'](**options)
 
-        # not found
+                    for k in list(matches):
+                        if k in self.server:
+                            del matches[k]
+                        else:
+                            self.server[k] = matches[k]
+
+                    try:
+                        await self._handle_response(func, kwargs)
+                        return
+                    finally:
+                        for k in matches:
+                            del self.server[k]
+
+        # error = 1 (not found), error = 2 (method not allowed)
         await self._handle_response(
-            self.app.routes[0][1][1], self.app.routes[0][1][2]
+            self.app.routes[0][error][1], self.app.routes[0][error][2]
         )

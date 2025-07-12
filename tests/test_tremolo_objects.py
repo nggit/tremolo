@@ -59,21 +59,21 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_route(self):
         app.route('/hello')(handlers.hello)
-        pattern, func, options = app.routes[b'\x01hello'][-1]
+        pattern, func, options, _ = app.routes[b'\x01hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello!')
         self.assertEqual(options, {})
 
         app.route('/hello/world')(handlers.hello_world)
-        pattern, func, options = app.routes[b'\x02hello'][-1]
+        pattern, func, options, _ = app.routes[b'\x02hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello/world(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello, World!')
         self.assertEqual(options, {'a': 1, 'b': 2})
 
         app.route('/hello/python')(handlers.hello_python)
-        pattern, func, options = app.routes[b'\x02hello'][-1]
+        pattern, func, options, _ = app.routes[b'\x02hello'][-1]
 
         self.assertEqual(pattern, b'^/+hello/python(?:/+)?(?:\\?.*)?$')
         self.assertEqual(func(), b'Hello, Python!')
@@ -81,7 +81,7 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_route_index(self):
         app.route('/')(handlers.index)
-        pattern, func, options = app.routes[1][-1]
+        pattern, func, options, _ = app.routes[1][-1]
 
         self.assertEqual(pattern, b'^/+(?:\\?.*)?$')
         self.assertEqual(func(), b'Index!')
@@ -89,14 +89,14 @@ class TestTremoloObjects(unittest.TestCase):
 
     def test_route_regex(self):
         app.route(r'^/page/(?P<page_id>\d+)')(handlers.my_page)
-        pattern, func, options = app.routes[-1][-1]
+        pattern, func, options, _ = app.routes[-1][-1]
 
         self.assertEqual(pattern, b'^/page/(?P<page_id>\\d+)')
         self.assertEqual(func(), b'My Page!')
         self.assertEqual(options, {})
 
         app.routes.compile()
-        pattern, func, options = app.routes[-1][-1]
+        pattern, func, options, _ = app.routes[-1][-1]
 
         self.assertEqual(pattern.pattern, b'^/page/(?P<page_id>\\d+)')
         self.assertEqual(func(), b'My Page!')
@@ -105,7 +105,7 @@ class TestTremoloObjects(unittest.TestCase):
     def test_route_error(self):
         app.route(404)(handlers.error_404)
 
-        for code, func, options in app.routes[0]:
+        for code, func, options, _ in app.routes[0]:
             if code == 404:
                 self.assertEqual(func(), b'Not Found!!!')
                 self.assertEqual(options['status'], (404, b'Not Found'))

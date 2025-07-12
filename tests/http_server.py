@@ -409,6 +409,15 @@ async def reload(request, **server):
         os.utime(TEST_FILE, (mtime, mtime))
 
 
+@app.route('/resource')
+class HelloWorld:
+    async def get(self, **server):
+        return 'Hello, World!'
+
+    # async def post(self, request, **server):
+    #    return await request.body()
+
+
 @subsub.on_request
 async def subsub_middleware(**server):
     pass

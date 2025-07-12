@@ -2,7 +2,7 @@
 
 from traceback import TracebackException
 
-from .exceptions import BadRequest
+from .exceptions import BadRequest, MethodNotAllowed
 from .utils import html_escape
 
 
@@ -29,6 +29,10 @@ async def error_404(request, globals, **_):
         b'<address title="Powered by Tremolo">%s</address>'
         b'</body></html>' % globals.info['server_name']
     )
+
+
+async def error_405(**_):
+    raise MethodNotAllowed
 
 
 async def error_500(request, exc=None, **_):
