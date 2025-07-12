@@ -122,9 +122,12 @@ class Tremolo:
     def add_route(self, func, path='/', **options):
         if isinstance(func, type):  # a class-based view
             for name in dir(func):
+                if name.startswith('_'):
+                    continue
+
                 method = getattr(func, name)
 
-                if not name.startswith('_') and callable(method):
+                if callable(method):
                     self.routes.add(
                         method, path, dict(getoptions(method), self=func),
                         **options
