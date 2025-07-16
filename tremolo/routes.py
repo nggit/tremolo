@@ -65,14 +65,16 @@ class Routes(dict):
                     wrapper = func
                 else:
                     @wraps(func)
-                    def wrapper(func, kwargs, request, response, **server):
+                    def wrapper(func, kwargs, request, response,
+                                self=None, **server):
                         server['request'] = to_sync(request, server['loop'])
                         server['response'] = to_sync(response, server['loop'])
-                        obj = server.pop('self', None)
 
-                        if obj:
-                            func.__wrapped__ = getattr(obj, func.__name__)
+                        if self is None:
+                            func = func.__wrapped__
+                        else:  # use bound method
+                            func = getattr(self, func.__name__)
 
-                        return executor.submit(func.__wrapped__, kwargs=server)
+                        return executor.submit(func, kwargs=server)
 
                 self[key][i] = (pattern, wrapper, kwargs, options)
