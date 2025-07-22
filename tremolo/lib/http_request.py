@@ -139,6 +139,13 @@ class HTTPRequest(Request):
             del self._body[:]
 
         del self._read_buf[:]
+
+        if self._stream is not None:
+            self.server.app.create_task(self._stream.aclose())
+
+        if self._files is not None:
+            self.server.app.create_task(self._files.aclose())
+
         super().clear()
 
     async def body(self, **kwargs):
