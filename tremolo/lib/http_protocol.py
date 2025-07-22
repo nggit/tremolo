@@ -419,10 +419,12 @@ class HTTPProtocol(asyncio.Protocol):
         if self.request.has_body:
             if not self.request.eof():
                 self.logger.info('request body was not fully consumed')
+                self.request.clear()
                 self.close()
                 return
 
             if b'transfer-encoding' in self.request.headers:
+                self.request.clear()
                 self.close()
                 return
 
