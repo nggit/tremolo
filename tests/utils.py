@@ -25,14 +25,17 @@ def syncify(coro):
 
 
 def read_header(header, key):
-    name = b'\r\n%s: ' % key
+    names = (b'\r\n%s: ' % key, b'\r\n%s: ' % key.lower())
     values = []
     start = 0
 
     while True:
-        start = header.find(name, start)
+        for name in names:
+            start = header.find(name, start)
 
-        if start == -1:
+            if start != -1:
+                break
+        else:
             break
 
         start += len(name)
@@ -150,36 +153,36 @@ def chunked_detected(header):
     return b'\r\ntransfer-encoding: chunked' in header.lower()
 
 
-def read_chunked(data):
-    if not data.endswith(b'\r\n0\r\n\r\n'):
-        return False
-
-    data = bytearray(data)
+def parse_chunked(data):
     body = bytearray()
+    start = 0
 
-    while data != b'0\r\n\r\n':
-        i = data.find(b'\r\n')
+    while True:
+        i = data.find(b'\r\n', start)
 
         if i == -1:
-            print('read_chunked: terminating chunk not found')
+            print('parse_chunked: no chunk size')
             return False
 
         try:
-            chunk_size = int(data[:i].split(b';')[0], 16)
+            chunk_size = int(data[start:i].split(b';')[0], 16)
         except ValueError:
-            print('read_chunked: invalid chunk size')
+            print('parse_chunked: invalid chunk size')
             return False
 
-        del data[:i + 2]
+        start = i + 2 + chunk_size
 
-        if data[chunk_size:chunk_size + 2] != b'\r\n':
-            print('read_chunked: bad chunked encoding')
+        if data[start:start + 2] != b'\r\n':
+            print('parse_chunked: invalid chunk terminator')
             return False
 
-        body.extend(data[:chunk_size])
-        del data[:chunk_size + 2]
+        if chunk_size <= 0:
+            break
 
-    return bytes(body)
+        body.extend(data[i + 2:i + 2 + chunk_size])
+        start += 2
+
+    return body
 
 
 def valid_chunked(data):
@@ -239,6 +242,7 @@ def create_multipart_body(boundary=b'----MultipartBoundary', **parts):
     return bytes(body) + b'--%s--\r\nEPILOGUE' % boundary
 
 
+read_chunked = parse_chunked
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
