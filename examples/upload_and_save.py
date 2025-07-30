@@ -43,17 +43,12 @@ async def upload(request, response):
             with open('Uploaded_' + filename, 'wb') as fp:
                 incomplete.add(fp)
 
-                if part['eof']:
-                    # this part is not larger than `max_file_size`.
-                    # but you can skip this check and always use `part.stream`
-                    fp.write(part['data'])
-                else:
-                    # stream a (possibly) large part in chunks
-                    async for data in part.stream():
-                        print('Writing %s (len=%d, eof=%s)' % (filename,
-                                                               len(data),
-                                                               part['eof']))
-                        fp.write(data)
+                # stream a (possibly) large part in chunks
+                async for data in part.stream():
+                    print('Writing %s (len=%d, eof=%s)' % (filename,
+                                                           len(data),
+                                                           part['eof']))
+                    fp.write(data)
 
                 incomplete.discard(fp)  # completed :)
 
