@@ -165,7 +165,7 @@ def parse_chunked(data):
             return False
 
         try:
-            chunk_size = int(data[start:i].split(b';')[0], 16)
+            chunk_size = int(data[start:i].split(b';', 1)[0], 16)
         except ValueError:
             print('parse_chunked: invalid chunk size')
             return False
