@@ -53,7 +53,7 @@ class ASGIServer(HTTPProtocol):
 
         if self.options['experimental']:
             # provide direct access to server objects
-            scope['state']['server'] = {**self.server, 'response': response}
+            scope['state']['server'] = dict(self.server, response=response)
 
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
                 b'upgrade' in request.headers and
