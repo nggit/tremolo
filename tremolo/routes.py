@@ -11,12 +11,13 @@ from .utils import getoptions, is_async, to_sync
 class Routes(dict):
     def __init__(self):
         self[0] = [
-            (400, handlers.error_400, {}, {}),
+            (400, handlers.error_400, dict(status=(400, b'Bad Request')), {}),
             (404, handlers.error_404, dict(request=None,
                                            globals=None,
                                            status=(404, b'Not Found'),
                                            stream=False), {}),
-            (405, handlers.error_405, {}, {}),
+            (405, handlers.error_405,
+             dict(status=(405, b'Method Not Allowed')), {}),
 
             # must be at the very end
             (500, handlers.error_500, {}, {})
