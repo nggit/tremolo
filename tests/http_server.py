@@ -155,7 +155,7 @@ async def get_ip(**server):
     request = server['request']
 
     # b'127.0.0.1'
-    return request.ip
+    return request.ip, b'latin-1'
 
 
 @app.route('/gethost')
