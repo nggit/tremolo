@@ -2,7 +2,7 @@
 
 from traceback import TracebackException
 
-from .exceptions import BadRequest, MethodNotAllowed
+from .exceptions import BadRequest
 from .utils import html_escape
 
 
@@ -32,7 +32,7 @@ async def error_404(request, globals, **_):
 
 
 async def error_405(**_):
-    raise MethodNotAllowed
+    return b'Method Not Allowed'
 
 
 async def error_500(request, exc=None, **_):

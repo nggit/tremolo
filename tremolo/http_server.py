@@ -277,7 +277,7 @@ class HTTPServer(HTTPProtocol):
         if key not in self.app.routes:
             key = parts[0]
 
-        error = 1
+        methods = set()
 
         if key in self.app.routes:
             for p, func, kwargs, options in self.app.routes[key]:
@@ -288,8 +288,9 @@ class HTTPServer(HTTPProtocol):
                     request.params['path'] = matches or m.groups()
 
                     if 'self' in kwargs:
-                        if request.method != func.__name__.upper().encode():
-                            error = 2
+                        methods.add(func.__name__.upper().encode())
+
+                        if request.method not in methods:
                             continue
 
                         matches['self'] = kwargs['self'](**options)
@@ -307,7 +308,7 @@ class HTTPServer(HTTPProtocol):
                         for k in matches:
                             del self.server[k]
 
-        if error == 1:
+        if not methods:
             i = len(self.app.routes[-1])
 
             while i > 0:
@@ -328,8 +329,9 @@ class HTTPServer(HTTPProtocol):
                     request.params['path'] = matches or m.groups()
 
                     if 'self' in kwargs:
-                        if request.method != func.__name__.upper().encode():
-                            error = 2
+                        methods.add(func.__name__.upper().encode())
+
+                        if request.method not in methods:
                             continue
 
                         matches['self'] = kwargs['self'](**options)
@@ -347,7 +349,13 @@ class HTTPServer(HTTPProtocol):
                         for k in matches:
                             del self.server[k]
 
-        # error = 1 (not found), error = 2 (method not allowed)
-        await self._handle_response(
-            self.app.routes[0][error][1], self.app.routes[0][error][2]
-        )
+        if methods:  # method not allowed
+            response.set_header(b'Allow', b', '.join(methods))
+
+            await self._handle_response(
+                self.app.routes[0][2][1], self.app.routes[0][2][2]
+            )
+        else:  # not found
+            await self._handle_response(
+                self.app.routes[0][1][1], self.app.routes[0][1][2]
+            )
