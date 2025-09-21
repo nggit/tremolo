@@ -110,7 +110,7 @@ async def on_request(**server):
     if not request.is_valid:
         raise BadRequest
 
-    if request.method not in (b'GET', b'POST', b'HEAD'):
+    if request.method not in (b'GET', b'HEAD', b'POST', b'PUT'):
         response.set_status(405, 'Method Not Allowed')
         response.set_content_type('text/plain')
 
