@@ -216,12 +216,32 @@ class Tremolo:
         while app.ports:
             self.ports.setdefault(*app.ports.popitem())
 
-    async def _serve(self, host, port, **kwargs):
+    async def serve(self, host, port, *, sock=None, backlog=100, **kwargs):
         options = self.context.options
         options.update(kwargs)
 
-        backlog = options.get('backlog', 100)
-        sock = options['_sock'] or self.create_sock(host, port)
+        options.setdefault('app', None)
+        options.setdefault('app_dir', os.getcwd())
+        options.setdefault('shutdown_timeout', 30)
+
+        if self.logger is None:
+            self.logger = logging.getLogger(mp.current_process().name)
+
+        self.logger.setLevel(
+            getattr(logging,
+                    options.get('log_level', 'DEBUG').upper(), logging.DEBUG)
+        )
+        formatter = logging.Formatter(
+            options.get('log_fmt',
+                        '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
+        )
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        self.logger.addHandler(handler)
+
+        if sock is None:
+            sock = self.create_sock(host, port)
+
         sock.listen(backlog)
 
         if 'ssl' in options and isinstance(options['ssl'] or None, dict):
@@ -239,10 +259,14 @@ class Tremolo:
         if isinstance(server_name, str):
             server_name = server_name.encode('latin-1')
 
-        executor = MultiThreadExecutor(size=options['thread_pool_size'])
+        executor = MultiThreadExecutor(size=options.get('thread_pool_size', 5))
         executor.start()
 
-        lock = ServerLock(options['_locks'], executor, loop=self.loop)
+        if '_locks' in options:
+            lock = ServerLock(options['_locks'], executor, loop=self.loop)
+        else:
+            lock = None
+
         connections = KeepAliveConnections(
             maxlen=options.get('keepalive_connections', 512)
         )
@@ -274,18 +298,21 @@ class Tremolo:
             # '/path/to/module.py'       -> 'module:app'   (dir: '/path/to')
             # '/path/to/module.py:myapp' -> 'module:myapp' (dir: '/path/to')
 
-            if options['app'].find(':', options['app'].find(':\\') + 1) == -1:
-                options['app'] += ':app'
+            if isinstance(options['app'], str):
+                if options['app'].find(':',
+                                       options['app'].find(':\\') + 1) == -1:
+                    options['app'] += ':app'
 
-            path, attr_name = options['app'].rsplit(':', 1)
-            options['app_dir'], basename = os.path.split(os.path.abspath(path))
-            module_name = os.path.splitext(basename)[0]
+                path, attr_name = options['app'].rsplit(':', 1)
+                options['app_dir'], basename = os.path.split(
+                    os.path.abspath(path))
+                module_name = os.path.splitext(basename)[0]
 
-            if options['app_dir'] == '':
-                options['app_dir'] = os.getcwd()
+                if options['app_dir'] == '':
+                    options['app_dir'] = os.getcwd()
 
-            sys.path.insert(0, options['app_dir'])
-            options['app'] = getattr(import_module(module_name), attr_name)
+                sys.path.insert(0, options['app_dir'])
+                options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
             sys.stdout.flush()
@@ -454,20 +481,6 @@ class Tremolo:
                     break
 
     def _worker(self, host, port, **kwargs):
-        if self.logger is None:
-            self.logger = logging.getLogger(mp.current_process().name)
-
-        self.logger.setLevel(
-            getattr(logging, kwargs['log_level'], logging.DEBUG)
-        )
-        formatter = logging.Formatter(
-            kwargs.get('log_fmt',
-                       '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
-        )
-        handler = logging.StreamHandler()
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
-
         loop_name = kwargs.get('loop', 'asyncio.')
 
         if '.' not in loop_name:
@@ -478,7 +491,7 @@ class Tremolo:
         module_name, _, class_name = loop_name.rpartition('.')
         module = import_module(module_name or 'asyncio')
         loop = getattr(module, class_name or 'new_event_loop')()
-        task = loop.create_task(self._serve(host, port, **kwargs))
+        task = loop.create_task(self.serve(host, port, **kwargs))
 
         task.add_done_callback(lambda fut: loop.stop())
         signal.signal(signal.SIGINT, lambda signum, frame: task.cancel())
@@ -548,7 +561,7 @@ class Tremolo:
             sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-            if reuse_port:
+            if reuse_port and hasattr(socket, 'SO_REUSEPORT'):
                 sock.setsockopt(
                     socket.SOL_SOCKET,
                     getattr(socket, 'SO_REUSEPORT_LB', socket.SO_REUSEPORT),
@@ -614,9 +627,6 @@ class Tremolo:
             )
 
     def run(self, host=None, port=0, *, worker_num=1, **kwargs):
-        kwargs['log_level'] = kwargs.get('log_level', 'DEBUG').upper()
-        kwargs.setdefault('thread_pool_size', 5)
-        kwargs.setdefault('shutdown_timeout', 30)
         server_name = kwargs.get('server_name', 'Tremolo')
         terminal_width = min(get_terminal_size()[0], 72)
 
@@ -662,7 +672,7 @@ class Tremolo:
                 kwargs['app_dir'] = os.getcwd()
                 kwargs['module_name'] = '__main__'
 
-            if kwargs['log_level'] in ('DEBUG', 'INFO'):
+            if kwargs.get('log_level', 'DEBUG').upper() in ('DEBUG', 'INFO'):
                 print('Routes:')
 
                 for routes in self.routes.values():
@@ -692,7 +702,7 @@ class Tremolo:
             except AttributeError:
                 worker_num = os.cpu_count() or 1
 
-        locks = [mp.Lock() for _ in range(kwargs['thread_pool_size'])]
+        locks = [mp.Lock() for _ in range(kwargs.get('thread_pool_size', 5))]
         socks = {}
         print('Options:')
 
@@ -724,7 +734,7 @@ class Tremolo:
                 self.manager.spawn(
                     self._worker,
                     args=args,
-                    kwargs=dict(options, _locks=locks, _sock=sock),
+                    kwargs=dict(options, sock=sock, _locks=locks),
                     exit_cb=self._handle_reload
                 )
 
@@ -732,7 +742,7 @@ class Tremolo:
         print('%s main (pid %d) is running ' % (server_name, os.getpid()))
 
         try:
-            self.manager.wait(timeout=kwargs['shutdown_timeout'])
+            self.manager.wait(timeout=kwargs.get('shutdown_timeout', 30))
         finally:
             for sock in socks.values():
                 self.close_sock(sock)
