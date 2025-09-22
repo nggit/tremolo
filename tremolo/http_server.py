@@ -277,6 +277,11 @@ class HTTPServer(HTTPProtocol):
         if key not in self.app.routes:
             key = parts[0]
 
+        if request.method == b'HEAD':
+            method = b'GET'
+        else:
+            method = request.method
+
         methods = set()
 
         if key in self.app.routes:
@@ -290,7 +295,7 @@ class HTTPServer(HTTPProtocol):
                     if 'self' in kwargs:
                         methods.add(func.__name__.upper().encode())
 
-                        if request.method not in methods:
+                        if method not in methods:
                             continue
 
                         matches['self'] = kwargs['self'](**options)
@@ -331,7 +336,7 @@ class HTTPServer(HTTPProtocol):
                     if 'self' in kwargs:
                         methods.add(func.__name__.upper().encode())
 
-                        if request.method not in methods:
+                        if method not in methods:
                             continue
 
                         matches['self'] = kwargs['self'](**options)
