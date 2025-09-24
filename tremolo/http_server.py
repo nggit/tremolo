@@ -284,75 +284,55 @@ class HTTPServer(HTTPProtocol):
 
         methods = set()
 
-        if key in self.app.routes:
-            for p, func, kwargs, options in self.app.routes[key]:
-                m = p.search(request.url)
+        while True:
+            if key in self.app.routes:
+                i = len(self.app.routes[key])
 
-                if m:
-                    matches = m.groupdict()
-                    request.params['path'] = matches or m.groups()
+                while i > 0:
+                    i -= 1
+                    p, func, kwargs, options = self.app.routes[key][i]
+                    m = p.search(request.url)
 
-                    if 'self' in kwargs:
-                        methods.add(func.__name__.upper().encode())
+                    if m:
+                        if (key == -1 and path != '' and
+                                p.pattern.startswith(b'^/' + parts[0])):
+                            if parts[0] in self.app.routes:
+                                self.app.routes[parts[0]].append(
+                                    self.app.routes[-1].pop(i)
+                                )
+                            else:
+                                self.app.routes[parts[0]] = [
+                                    self.app.routes[-1].pop(i)
+                                ]
 
-                        if method not in methods:
-                            continue
+                        matches = m.groupdict()
+                        request.params['path'] = matches or m.groups()
 
-                        matches['self'] = kwargs['self'](**options)
+                        if 'self' in kwargs:
+                            methods.add(func.__name__.upper().encode())
 
-                    for k in list(matches):
-                        if k in self.server:
-                            del matches[k]
-                        else:
-                            self.server[k] = matches[k]
+                            if method not in methods:
+                                continue
 
-                    try:
-                        await self._handle_response(func, kwargs)
-                        return
-                    finally:
-                        for k in matches:
-                            del self.server[k]
+                            matches['self'] = kwargs['self'](**options)
 
-        if not methods:
-            i = len(self.app.routes[-1])
+                        for k in list(matches):
+                            if k in self.server:
+                                del matches[k]
+                            else:
+                                self.server[k] = matches[k]
 
-            while i > 0:
-                i -= 1
-                p, func, kwargs, options = self.app.routes[-1][i]
-                m = p.search(request.url)
+                        try:
+                            await self._handle_response(func, kwargs)
+                            return
+                        finally:
+                            for k in matches:
+                                del self.server[k]
 
-                if m:
-                    if key != 1 and p.pattern.startswith(b'^/' + parts[0]):
-                        if key in self.app.routes:
-                            self.app.routes[key].append(
-                                self.app.routes[-1].pop(i)
-                            )
-                        else:
-                            self.app.routes[key] = [self.app.routes[-1].pop(i)]
+            if methods or key == -1:
+                break
 
-                    matches = m.groupdict()
-                    request.params['path'] = matches or m.groups()
-
-                    if 'self' in kwargs:
-                        methods.add(func.__name__.upper().encode())
-
-                        if method not in methods:
-                            continue
-
-                        matches['self'] = kwargs['self'](**options)
-
-                    for k in list(matches):
-                        if k in self.server:
-                            del matches[k]
-                        else:
-                            self.server[k] = matches[k]
-
-                    try:
-                        await self._handle_response(func, kwargs)
-                        return
-                    finally:
-                        for k in matches:
-                            del self.server[k]
+            key = -1
 
         if methods:  # method not allowed
             response.set_header(b'Allow', b', '.join(methods))
