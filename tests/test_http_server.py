@@ -1033,12 +1033,13 @@ class TestHTTPServer(unittest.TestCase):
     def test_class_post_methodnotallowed(self):
         header, body = getcontents(host=HTTP_HOST,
                                    port=HTTP_PORT,
-                                   method='POST',
+                                   method='PUT',
                                    url='/resource',
                                    version='1.1')
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 405 Method Not Allowed')
+        self.assertTrue(b'\r\nAllow: GET' in header)
 
 
 if __name__ == '__main__':

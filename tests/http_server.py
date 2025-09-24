@@ -110,11 +110,11 @@ async def on_request(**server):
     if not request.is_valid:
         raise BadRequest
 
-    if request.method not in (b'GET', b'POST', b'HEAD'):
+    if request.method not in (b'GET', b'HEAD', b'POST', b'PUT'):
         response.set_status(405, 'Method Not Allowed')
         response.set_content_type('text/plain')
 
-        return b'Request method %s is not supported!' % request.method
+        return (b'Request method %s is not supported!' % request.method,)
 
     # these should appear in the next middlewares or handlers
     response.set_header('X-Foo', 'bar')
@@ -122,7 +122,7 @@ async def on_request(**server):
 
 
 @app.on_response
-async def on_response(**server):
+async def on_response(content_type=b'text/plain', **server):
     response = server['response']
 
     assert response.headers[b'x-foo'] == [b'X-Foo: bar']
@@ -132,9 +132,8 @@ async def on_response(**server):
 
     if response.headers[b'_line'][1] == b'503':
         response.set_status(503, b'Under Maintenance')
-        response.set_content_type(b'text/plain')
 
-        return b'Under Maintenance'
+        return 'Under Maintenance'
 
 
 @app.route('/getheaderline')
@@ -156,7 +155,7 @@ async def get_ip(**server):
     request = server['request']
 
     # b'127.0.0.1'
-    return request.ip
+    return request.ip, b'latin-1'
 
 
 @app.route('/gethost')
