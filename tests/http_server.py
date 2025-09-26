@@ -285,17 +285,16 @@ async def upload_multipart(request, response, stream=False, **server):
     # should be ignored
     yield b''
 
-    yield b'name,length,type,data\r\n'
+    yield b'name,type,data\r\n'
 
     # should be ignored
     yield b''
 
     # stream multipart file upload then send it back as csv
     async for part in request.files(max_files=1):
-        yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
-                                    part['length'],
-                                    part['type'].encode(),
-                                    (part['data'][:5] + part['data'][-3:]))
+        yield b'%s,%s,%s\r\n' % (part['name'].encode(),
+                                 part['type'].encode(),
+                                 (part['data'][:5] + part['data'][-3:]))
 
     async for part in request.files(max_file_size=262144):
         if part['eof']:
@@ -303,10 +302,9 @@ async def upload_multipart(request, response, stream=False, **server):
         else:
             part['data'] = part['data'][:5] + b'---'
 
-        yield b'%s,%d,%s,%s\r\n' % (part['name'].encode(),
-                                    part['length'],
-                                    part['type'].encode(),
-                                    (part['data'][:5] + part['data'][-3:]))
+        yield b'%s,%s,%s\r\n' % (part['name'].encode(),
+                                 part['type'].encode(),
+                                 (part['data'][:5] + part['data'][-3:]))
 
     async for part in request.files():
         # should not raised

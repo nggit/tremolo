@@ -384,7 +384,6 @@ class HTTPRequest(Request):
 
         header_size = 0
         body_size = 0
-        content_length = 0
         paused = False
         part = None  # represents a field/file received in a multipart request
 
@@ -434,23 +433,13 @@ class HTTPRequest(Request):
                                     header[b'content-disposition']):
                                 part[k.decode('latin-1')] = v.decode('latin-1')
 
-                        if b'content-length' in header:
-                            try:
-                                content_length = parse_int(
-                                    header[b'content-length']
-                                )
-                            except ValueError as exc:
-                                raise BadRequest('bad Content-Length') from exc
-
-                            part['length'] = content_length
-
                         if b'content-type' in header:
                             part['type'] = header[
                                            b'content-type'].decode('latin-1')
                 continue
 
             body.extend(data)
-            body_size = body.find(b'\r\n--%s' % boundary, content_length)
+            body_size = body.find(b'\r\n--%s' % boundary)
 
             if body_size == -1:
                 if len(body) >= max_file_size > boundary_size + 4:
@@ -458,9 +447,6 @@ class HTTPRequest(Request):
                     part['eof'] = False
                     yield part
 
-                    content_length = max(
-                        content_length - (len(body) - boundary_size - 4), 0
-                    )
                     del body[:-boundary_size - 4]
 
                 paused = False
@@ -471,7 +457,6 @@ class HTTPRequest(Request):
             yield part
 
             self._read_buf[:] = body[body_size + 2:]
-            content_length = 0
             paused = True
             part = None
             max_files -= 1

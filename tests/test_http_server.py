@@ -336,10 +336,10 @@ class TestHTTPServer(unittest.TestCase):
         self.assertTrue(b'\r\nContent-Type: text/csv' in header)
         self.assertEqual(
             read_chunked(body) if chunked_detected(header) else body,
-            b'name,length,type,data\r\n'
-            b'file1,4096,application/octet-stream,BEGINEND\r\n'
-            b'file2,524288,application/octet-stream,BEGIN---\r\n'
-            b'file2,524288,application/octet-stream,-----END\r\n'
+            b'name,type,data\r\n'
+            b'file1,application/octet-stream,BEGINEND\r\n'
+            b'file2,application/octet-stream,BEGIN---\r\n'
+            b'file2,application/octet-stream,-----END\r\n'
         )
 
     def test_post_upload_multipart_form(self):
