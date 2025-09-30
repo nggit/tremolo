@@ -4,9 +4,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=coverage)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=nggit_tremolo&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=nggit_tremolo)
 
-Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/basics/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server).
-
-Tremolo provides a common routing functionality to some unique features such as download/upload speed limiters, etc. While maintaining its simplicity and performance.
+Tremolo is a [stream-oriented](https://nggit.github.io/tremolo-docs/basics/yield.html), asynchronous, programmable HTTP server written in pure Python. It can also serve as an [ASGI server](#asgi-server) for other ASGI web frameworks.
 
 Being built with a stream in mind, Tremolo tends to use `yield` instead of `return` in route handlers.
 
@@ -17,24 +15,7 @@ async def hello_world(**server):
     yield b'world!'
 ```
 
-You can take advantage of this to serve/generate big files efficiently:
-
-```python
-@app.route('/my/url/speedtest.bin')
-async def my_big_data(request, response):
-    buffer_size = 16384
-
-    response.set_content_type('application/octet-stream')
-
-    with open('/dev/random', 'rb') as f:
-        chunk = True
-
-        while chunk:
-            chunk = f.read(buffer_size)
-            yield chunk
-```
-
-And other use cases…
+But that's not the only pattern. You can go straight to the [Basics](https://nggit.github.io/tremolo-docs/basics/) to start building your web application with Tremolo.
 
 ## Features
 Tremolo is only suitable for those who value [minimalism](https://en.wikipedia.org/wiki/Minimalism_%28computing%29) and stability over features.
@@ -46,7 +27,7 @@ With only **3k** lines of code, with **no dependencies** other than the [Python 
 * Keep-Alive connections with [configurable limit](https://nggit.github.io/tremolo-docs/configuration.html#keepalive_connections)
 * Stream chunked uploads
 * [Stream multipart uploads](https://nggit.github.io/tremolo-docs/basics/body.html#multipart) with [per-part streaming](https://github.com/nggit/tremolo/pull/293)
-* Download/upload speed throttling
+* Download/upload speed throttling, prevent network bandwidth saturation by a single client
 * [Resumable downloads](https://nggit.github.io/tremolo-docs/how-to/resumable-downloads.html)
 * Framework features; routing, [CBV](https://nggit.github.io/tremolo-docs/basics/routing.html#class-based-views), async/[sync handlers](https://nggit.github.io/tremolo-docs/basics/handlers.html#synchronous-handlers), middleware, etc.
 * ASGI server implementation
@@ -123,36 +104,6 @@ It's also possible to run the ASGI server programmatically ([example with uvloop
 
 ```
 python3 example_uvloop.py
-```
-
-## Experimental Features
-Experimental features can be enabled with `experimental=True` or `--experimental`.
-Since they require user awareness, they are not enabled by default.
-
-For example, even in ASGI server mode, Tremolo gives apps direct access to the server objects.
-Which means that even if you use an app/framework like Starlette/FastAPI,
-you can still use Tremolo's `request` and `response` objects for more optimized [streaming features](https://nggit.github.io/tremolo-docs/basics/body.html#multipart).
-```python
-from starlette.applications import Starlette
-from starlette.routing import Route
-
-
-async def homepage(request):
-    # Tremolo's `request` and `response` objects
-    req = request.state.server['request']
-    res = request.state.server['response']
-
-    async for data in req.stream():
-        await res.write(data)
-
-    await res.end()
-
-
-routes = [
-    Route('/', homepage, methods=['GET', 'POST']),
-]
-
-app = Starlette(routes=routes)
 ```
 
 ## Testing
