@@ -11,7 +11,7 @@ app = Application()
 
 # apply middleware
 # `document_root` is local folder in your computer
-StaticMiddleware(app, document_root='static')
+StaticMiddleware(app, document_root='public')
 
 
 if __name__ == '__main__':
