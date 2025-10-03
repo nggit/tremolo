@@ -423,11 +423,6 @@ class HTTPProtocol(asyncio.Protocol):
                 self.close()
                 return
 
-            if b'transfer-encoding' in self.request.headers:
-                self.request.clear()
-                self.close()
-                return
-
         self.events['request'] = self.loop.create_future()
 
         self.add_task(self.app.create_task(
@@ -464,7 +459,7 @@ class HTTPProtocol(asyncio.Protocol):
                 self.print_exception(exc, 'connection_lost')
 
         while self.queue:
-            self.queue.pop().clear()
+            self.queue.pop().queue.clear()
 
         self.request = None
 

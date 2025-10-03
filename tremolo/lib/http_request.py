@@ -193,68 +193,64 @@ class HTTPRequest(Request):
             agen = super().recv(timeout)
             paused = False
             bytes_unread = 0
+            chunk_size = -1
 
             while True:
                 if not paused:
-                    try:
-                        buf.extend(await agen.__anext__())
-                    except StopAsyncIteration as exc:
-                        if b'\r\n\r\n' not in buf:
-                            raise BadRequest(
-                                'bad chunked encoding: incomplete read'
-                            ) from exc
+                    buf.extend(await agen.__anext__())
 
                 if bytes_unread > 2:
                     data = bytes(buf[:bytes_unread - 2])
-
                     yield data
-                    del buf[:bytes_unread - 2]
 
+                    del buf[:bytes_unread - 2]
                     bytes_unread -= len(data)
 
-                    if bytes_unread > 2:
-                        continue
+                    paused = False
+                    continue
 
-                    paused = True
-                else:
-                    # bytes_unread should only be either 0 or 2 at this point
-                    i = buf.find(b'\r\n', bytes_unread)
-
-                    if i == -1:
-                        if len(buf) > 64:
-                            raise BadRequest(
-                                'bad chunked encoding: no chunk size'
-                            )
-
+                if bytes_unread == 2:
+                    if len(buf) < 2:
                         paused = False
                         continue
 
-                    try:
-                        chunk_size = parse_int(
-                            buf[bytes_unread:i].split(b';', 1)[0], 16
-                        )
-                    except ValueError as exc:
-                        raise BadRequest('bad chunked encoding') from exc
+                    if not buf.startswith(b'\r\n'):
+                        raise BadRequest('bad chunked encoding: '
+                                         'invalid chunk terminator')
 
-                    data = bytes(buf[i + 2:i + 2 + chunk_size])
-                    bytes_unread = chunk_size - len(data) + 2
+                    if chunk_size == 0:
+                        if self.server.options['experimental']:
+                            self.server.queue[0].queue.appendleft(buf[2:])
+                        else:
+                            self.http_keepalive = False
 
-                    if bytes_unread > 2:
-                        paused = False
                         del buf[:]
-                    else:
-                        paused = True
-                        del buf[:i + 2 + chunk_size]
-
-                    if bytes_unread == 2 and not b'\r\n'.startswith(buf[:2]):
-                        raise BadRequest(
-                            'bad chunked encoding: invalid chunk terminator'
-                        )
-
-                    if chunk_size <= 0:
                         break
 
-                    yield data
+                # bytes_unread should only be either 0 or 2 at this point
+                i = buf.find(b'\r\n', bytes_unread)
+
+                if i == -1:
+                    if len(buf) > 64:
+                        raise BadRequest('bad chunked encoding: no chunk size')
+
+                    paused = False
+                    continue
+
+                try:
+                    chunk_size = parse_int(
+                        buf[bytes_unread:i].split(b';', 1)[0], 16
+                    )
+                except ValueError as exc:
+                    raise BadRequest('bad chunked encoding') from exc
+
+                data = bytes(buf[i + 2:i + 2 + chunk_size])
+                bytes_unread = chunk_size - len(data) + 2
+
+                del buf[:i + 2 + chunk_size]
+
+                yield data
+                paused = True
         else:
             if (self.content_length >
                     self.server.options['client_max_body_size']):
