@@ -304,6 +304,57 @@ class TestHTTPServer(unittest.TestCase):
         )
         self.assertEqual(read_chunked(body), create_dummy_body(65536))
 
+    def test_post_bad_chunked_encoding(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n-1\r\n' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad chunked encoding')
+
+    def test_post_no_chunk_size(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n%s' %
+                (HTTP_PORT, b'X' * 65)
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body, b'bad chunked encoding: no chunk size')
+
+    def test_post_invalid_chunk_terminator(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n1\r\nA\rX' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body,
+                         b'bad chunked encoding: invalid chunk terminator')
+
+    def test_post_invalid_chunk_end(self):
+        header, body = getcontents(
+            host=HTTP_HOST,
+            port=HTTP_PORT + 2,
+            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Transfer-Encoding: chunked\r\n\r\n0;\r\n\rX' % HTTP_PORT
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 400 Bad Request')
+        self.assertEqual(body,
+                         b'bad chunked encoding: invalid chunk terminator')
+
     def test_post_upload_maxqueue(self):
         header, body = getcontents(
             host=HTTP_HOST,
@@ -395,10 +446,6 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
         self.assertTrue(
             b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertEqual(
-            read_chunked(body) if chunked_detected(header) else body,
-            False
         )
 
     def test_payloadtoolarge(self):
