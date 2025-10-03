@@ -266,8 +266,12 @@ def upload(request, content_type=b'application/octet-stream', **server):
         size = int(request.query['size'][0])
         yield request.read(0) + request.read(size)
     except KeyError:
+        body = bytearray()
+
         for data in request.stream():
-            yield data
+            body.extend(data)
+
+        yield body
 
         for data in request.stream():
             # should not raised
