@@ -16,7 +16,7 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('queue', 'events', 'handlers', '_receive_buf', '_watermarks')
+    __slots__ = ('queue', 'events', 'handlers', '_recv_buf', '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.app = app
@@ -32,7 +32,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue = [Queue(), Queue()]  # IN, OUT
         self.events = {}
         self.handlers = set()
-        self._receive_buf = bytearray()
+        self._recv_buf = bytearray()
         self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
@@ -269,19 +269,19 @@ class HTTPProtocol(asyncio.Protocol):
         excess = 0
 
         if not self.request.upgraded:
-            self.request.body_size += len(self._receive_buf)
+            self.request.body_size += len(self._recv_buf)
 
             if self.request.body_size > self.request.content_length > -1:
                 excess = self.request.body_size - self.request.content_length
 
-        while len(self._receive_buf) > excess:
-            data = self._receive_buf[:min(self.options['buffer_size'],
-                                          len(self._receive_buf) - excess)]
+        while len(self._recv_buf) > excess:
+            data = self._recv_buf[:min(self.options['buffer_size'],
+                                       len(self._recv_buf) - excess)]
 
             if await self.put_to_queue(data, rate=self.options['upload_rate']):
-                del self._receive_buf[:len(data)]
+                del self._recv_buf[:len(data)]
             else:
-                del self._receive_buf[:]
+                del self._recv_buf[:]
                 return
 
         # maybe resume reading, or close
@@ -291,28 +291,29 @@ class HTTPProtocol(asyncio.Protocol):
             if self.request.upgraded:
                 if self in self.globals.connections:
                     self.transport.resume_reading()
+            elif self.request.body_size > self.options['client_max_body_size']:
+                self.close(BadRequest('payload too large'))
             elif self.request.body_size >= self.request.content_length > -1:
                 self.queue[0].put_nowait(None)
-            elif self.request.body_size < self.options['client_max_body_size']:
-                if self.request.has_body and not self.request.eof():
-                    self.transport.resume_reading()
-            else:
-                self.close(BadRequest('payload too large'))
+            elif self.request.has_body and not self.request.eof():
+                self.transport.resume_reading()
 
     def data_received(self, data):
         if not data:
             return
 
-        self._receive_buf.extend(data)
+        self._recv_buf.extend(data)
 
         if self.request is None:
-            header_size = self._receive_buf.find(b'\r\n\r\n') + 2
+            header_size = self._recv_buf.find(b'\r\n\r\n') + 2
 
-            if 1 < header_size <= self.options['client_max_header_size']:
-                header = HTTPHeader(self._receive_buf[:header_size],
+            if header_size > self.options['client_max_header_size']:
+                self.close(BadRequest('request header too large'))
+            elif header_size != 1:
+                header = HTTPHeader(self._recv_buf[:header_size],
                                     header_size=header_size,
                                     excludes=[b'proxy'])
-                del self._receive_buf[:header_size + 2]
+                del self._recv_buf[:header_size + 2]
 
                 if header.is_request:
                     self.request = HTTPRequest(self, header)
@@ -322,13 +323,10 @@ class HTTPProtocol(asyncio.Protocol):
                     task.add_done_callback(self.handlers.discard)
                 else:
                     self.close(BadRequest('bad request: not a request'))
-            elif header_size > self.options['client_max_header_size']:
-                self.close(BadRequest('request header too large'))
-            elif not (header_size == 1 and len(self._receive_buf) <=
-                      self.options['client_max_header_size']):
+            elif len(self._recv_buf) > self.options['client_max_header_size']:
                 self.close(BadRequest('bad request'))
 
-            if self.request is None or not self._receive_buf:
+            if self.request is None or not self._recv_buf:
                 return
 
         # resumed in _receive_data or _send_data
@@ -375,7 +373,7 @@ class HTTPProtocol(asyncio.Protocol):
                                 'keepalive connection dropped: %d', self.fileno
                             )
 
-                        del self._receive_buf[:]
+                        del self._recv_buf[:]
                         self.request.clear()
 
                     self.close()
@@ -433,9 +431,9 @@ class HTTPProtocol(asyncio.Protocol):
         self.request.clear()
         self.request = None
 
-        if self._receive_buf:
-            self.queue[0].put_nowait(self._receive_buf[:])
-            del self._receive_buf[:]
+        if self._recv_buf:
+            self.queue[0].put_nowait(self._recv_buf[:])
+            del self._recv_buf[:]
 
         while self.queue[0].qsize():
             # this data is supposed to be the next header
@@ -446,12 +444,7 @@ class HTTPProtocol(asyncio.Protocol):
             task = self.context.tasks.pop()
 
             try:
-                if callable(task):
-                    # a close callback
-                    task()
-                    continue
-
-                task.cancel()
+                getattr(task, 'cancel', task)()
             except Exception as exc:
                 self.print_exception(exc, 'connection_lost')
 
