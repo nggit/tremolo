@@ -332,7 +332,7 @@ class HTTPRequest(Request):
                         raise ValueError(
                             'fragmented file. consider increasing the '
                             'max_size limit or stream using request.files()'
-                        )
+                        ) from exc
 
                     name = part.pop('name', '')
 
