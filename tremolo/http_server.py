@@ -24,10 +24,8 @@ class HTTPServer(HTTPProtocol):
         super().connection_made(transport)
 
         if self.app.hooks['connect']:
-            self.events['connect'] = self.app.create_task(
-                self._connection_made()
-            )
-            self.add_task(self.events['connect'])
+            self.events['connect'] = self.create_task(self._connection_made())
+            self.app.add_task(self.events['connect'])
 
     def connection_lost(self, exc):
         if self.app.hooks['close']:

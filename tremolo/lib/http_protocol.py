@@ -50,13 +50,11 @@ class HTTPProtocol(asyncio.Protocol):
     def add_close_callback(self, callback):
         self.context.tasks.add(callback)
 
-    def add_task(self, task):
-        self.context.tasks.add(task)
-        task.add_done_callback(self.handle_task_done)
-
     def create_task(self, coro):
         task = self.loop.create_task(coro)
-        self.add_task(task)
+
+        self.context.tasks.add(task)
+        task.add_done_callback(self.handle_task_done)
 
         return task
 
@@ -75,8 +73,8 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.events['request'] = self.loop.create_future()
 
-        self.add_close_callback(self.app.create_task(self._send_data()).cancel)
-        self.add_task(self.app.create_task(
+        self.app.add_task(self.create_task(self._send_data()))
+        self.app.add_task(self.create_task(
             self.set_timeout(self.events['request'],
                              timeout=self.options['request_timeout'],
                              timeout_cb=self.request_timeout)
@@ -424,7 +422,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.events['request'] = self.loop.create_future()
 
-        self.add_task(self.app.create_task(
+        self.app.add_task(self.create_task(
             self.set_timeout(self.events['request'],
                              timeout=self.options['keepalive_timeout'],
                              timeout_cb=self.keepalive_timeout)
