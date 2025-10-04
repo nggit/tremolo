@@ -50,11 +50,13 @@ class Tremolo:
     def loop(self):
         return asyncio.get_event_loop()
 
-    def create_task(self, coro):
-        task = self.loop.create_task(coro)
-
+    def add_task(self, task):
         self.context.tasks.add(task)
         task.add_done_callback(self.context.tasks.discard)
+
+    def create_task(self, coro):
+        task = self.loop.create_task(coro)
+        self.add_task(task)
 
         return task
 
