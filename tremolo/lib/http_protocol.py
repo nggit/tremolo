@@ -412,12 +412,11 @@ class HTTPProtocol(asyncio.Protocol):
             self.close(exc)
 
     async def _handle_keepalive(self):
-        if self.request.has_body:
-            if not self.request.eof():
-                self.logger.info('request body was not fully consumed')
-                self.request.clear()
-                self.close()
-                return
+        if self.request.has_body and not self.request.eof():
+            self.logger.info('request body was not fully consumed')
+            self.request.clear()
+            self.close()
+            return
 
         if 'receive' in self.events:
             # waits for all incoming data to enter the queue
