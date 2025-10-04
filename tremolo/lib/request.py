@@ -56,7 +56,7 @@ class Request:
             except asyncio.CancelledError as exc:
                 raise TimeoutError('recv timeout') from exc
 
-            if data is None:
+            if data is None:  # only occurs on a request with Content-Length
                 break
 
             yield data

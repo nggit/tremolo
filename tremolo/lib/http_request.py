@@ -170,15 +170,12 @@ class HTTPRequest(Request):
         if size == -1:
             return await self._stream.__anext__()
 
-        if len(self._read_buf) < size:
-            async for data in self._stream:
-                self._read_buf.extend(data)
-
-                if len(self._read_buf) >= size:
-                    break
+        while len(self._read_buf) < size:
+            self._read_buf.extend(await self._stream.__anext__())
 
         data = bytes(self._read_buf[:size])
         del self._read_buf[:size]
+
         return data
 
     async def stream(self, timeout=None, raw=False):
@@ -201,10 +198,11 @@ class HTTPRequest(Request):
 
                 if bytes_unread > 2:
                     data = bytes(buf[:bytes_unread - 2])
-                    yield data
-
                     del buf[:bytes_unread - 2]
-                    bytes_unread -= len(data)
+
+                    if data:
+                        yield data
+                        bytes_unread -= len(data)
 
                     paused = False
                     continue
@@ -245,11 +243,12 @@ class HTTPRequest(Request):
                     raise BadRequest('bad chunked encoding') from exc
 
                 data = bytes(buf[i + 2:i + 2 + chunk_size])
-                bytes_unread = chunk_size - len(data) + 2
-
                 del buf[:i + 2 + chunk_size]
 
-                yield data
+                if data:
+                    yield data
+
+                bytes_unread = chunk_size - len(data) + 2
                 paused = True
         else:
             if (self.content_length >

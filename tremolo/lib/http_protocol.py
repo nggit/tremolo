@@ -296,7 +296,7 @@ class HTTPProtocol(asyncio.Protocol):
             elif self.request.body_size >= self.request.content_length > -1:
                 self.queue[0].put_nowait(None)
             elif self.request.body_size < self.options['client_max_body_size']:
-                if self.request.has_body:
+                if self.request.has_body and not self.request.eof():
                     self.transport.resume_reading()
             else:
                 self.close(BadRequest('payload too large'))
@@ -412,16 +412,16 @@ class HTTPProtocol(asyncio.Protocol):
             self.close(exc)
 
     async def _handle_keepalive(self):
-        if 'receive' in self.events:
-            # waits for all incoming data to enter the queue
-            await self.events['receive']
-
         if self.request.has_body:
             if not self.request.eof():
                 self.logger.info('request body was not fully consumed')
                 self.request.clear()
                 self.close()
                 return
+
+        if 'receive' in self.events:
+            # waits for all incoming data to enter the queue
+            await self.events['receive']
 
         self.events['request'] = self.loop.create_future()
 
