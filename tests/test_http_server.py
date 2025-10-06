@@ -433,7 +433,7 @@ class TestHTTPServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 500 Internal Server Error')
 
-    def test_post_upload_payloadtoolarge_11(self):
+    def test_post_chunked_payloadtoolarge(self):
         header, body = getcontents(
             host=HTTP_HOST,
             port=HTTP_PORT + 2,
@@ -443,10 +443,9 @@ class TestHTTPServer(unittest.TestCase):
                                                  chunk_size=16384))
         )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 400 Bad Request')
+        self.assertEqual(body, b'payload too large')
 
     def test_payloadtoolarge(self):
         header, body = getcontents(
