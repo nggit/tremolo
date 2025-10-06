@@ -58,6 +58,13 @@ async def app(scope, receive, send):
         return
 
     assert scope['type'] == 'http'
+    loop = scope['state']['server']['loop']
+    response = scope['state']['server']['response']
+
+    if scope['path'].startswith('/exit'):
+        loop.call_soon(response.close)
+        return
+
     more_body = True
 
     while more_body:

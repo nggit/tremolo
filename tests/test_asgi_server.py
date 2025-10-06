@@ -25,6 +25,16 @@ class TestASGIServer(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
+    def test_app_exits_early(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /exit HTTP/1.0\r\n\r\n'
+        )
+
+        self.assertEqual(header, b'')
+        self.assertEqual(body, b'')
+
     def test_get_ok_10(self):
         header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
