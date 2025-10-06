@@ -430,6 +430,7 @@ class HTTPProtocol(asyncio.Protocol):
         # a fresh http request (not a continuation data)
         self.request.clear()
         self.request = None
+        self.queue[1].queue.clear()
 
         if self._recv_buf:
             self.queue[0].put_nowait(self._recv_buf[:])
