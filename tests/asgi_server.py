@@ -55,15 +55,14 @@ async def app(scope, receive, send):
         await send({
             'type': 'websocket.close'
         })
+
+        data = await receive()
+        assert data['type'] == 'websocket.disconnect'
+        assert data['code'] == 1005
         return
 
     assert scope['type'] == 'http'
     loop = scope['state']['server']['loop']
-    request = scope['state']['server']['request']
-
-    if scope['path'].startswith('/exit'):
-        loop.call_soon(request.server.events['close'].cancel)
-        return
 
     more_body = True
 
@@ -82,6 +81,11 @@ async def app(scope, receive, send):
         )
 
         more_body = data.get('more_body', False)
+
+    if scope['path'].startswith('/exit'):
+        task = loop.create_task(receive())
+        loop.call_soon(task.cancel)
+        return
 
     headers = [
         (b'content-type', b'text/plain'),
