@@ -32,8 +32,9 @@ class TestASGIServer(unittest.TestCase):
             raw=b'GET /exit HTTP/1.0\r\n\r\n'
         )
 
-        self.assertEqual(header, b'')
-        self.assertEqual(body, b'')
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 500 Internal Server Error')
+        self.assertEqual(body, b'Internal Server Error')
 
     def test_get_ok_10(self):
         header, body = getcontents(host=ASGI_HOST,

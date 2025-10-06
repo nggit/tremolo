@@ -59,10 +59,10 @@ async def app(scope, receive, send):
 
     assert scope['type'] == 'http'
     loop = scope['state']['server']['loop']
-    response = scope['state']['server']['response']
+    request = scope['state']['server']['request']
 
     if scope['path'].startswith('/exit'):
-        loop.call_soon(response.close)
+        loop.call_soon(request.server.events['close'].cancel)
         return
 
     more_body = True
