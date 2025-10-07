@@ -60,6 +60,9 @@ class HTTPResponse(Response):
         if isinstance(value, str):
             value = value.encode('latin-1')
 
+        if b'\r' in name or b'\n' in name or b'\r' in value or b'\n' in value:
+            raise InternalServerError
+
         key = name.lower()
 
         if key in self.headers:
@@ -74,7 +77,7 @@ class HTTPResponse(Response):
         if isinstance(value, str):
             value = value.encode('latin-1')
 
-        if b'\n' in name or b'\n' in value:
+        if b'\r' in name or b'\n' in name or b'\r' in value or b'\n' in value:
             raise InternalServerError
 
         self.headers[name.lower()] = [name + b': ' + value]
@@ -115,16 +118,13 @@ class HTTPResponse(Response):
             if k:
                 cookie.extend(v)
 
-        if b'\n' in cookie:
-            raise InternalServerError
-
         self.append_header(b'Set-Cookie', cookie)
 
     def set_status(self, status=200, message=b'OK'):
         if isinstance(message, str):
             message = message.encode('latin-1')
 
-        if not isinstance(status, int) or b'\n' in message:
+        if not isinstance(status, int) or b'\r' in message or b'\n' in message:
             raise InternalServerError
 
         if b'_line' in self.headers:
@@ -147,7 +147,7 @@ class HTTPResponse(Response):
         if isinstance(content_type, str):
             content_type = content_type.encode('latin-1')
 
-        if b'\n' in content_type:
+        if b'\r' in content_type or b'\n' in content_type:
             raise InternalServerError
 
         self.headers[b'content-type'] = [b'Content-Type: ' + content_type]

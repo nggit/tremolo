@@ -191,6 +191,9 @@ class ASGIAppWrapper:
     async def send(self, data):
         try:
             if data['type'] in ('http.response.start', 'websocket.accept'):
+                if self.response.headers:
+                    raise InternalServerError('response already started')
+
                 # websocket doesn't have this
                 if 'status' in data:
                     self.response.set_status(data['status'],
@@ -198,14 +201,6 @@ class ASGIAppWrapper:
 
                 if 'headers' in data:
                     for header in data['headers']:
-                        if b'\n' in header[0] or b'\n' in header[1]:
-                            await self.response.handle_exception(
-                                InternalServerError(
-                                    'name or value cannot contain '
-                                    'illegal characters')
-                            )
-                            return
-
                         name = header[0].lower()
 
                         if name == b'content-type':
@@ -232,52 +227,47 @@ class ASGIAppWrapper:
 
                 # websocket has this
                 if 'subprotocol' in data and data['subprotocol']:
-                    if '\n' in data['subprotocol']:
-                        await self.response.handle_exception(
-                            InternalServerError(
-                                'subprotocol value cannot contain '
-                                'illegal characters')
-                        )
-                        return
-
                     self.response.set_header(
-                        b'Sec-WebSocket-Protocol',
-                        data['subprotocol'].encode('utf-8')
+                        b'Sec-WebSocket-Protocol', data['subprotocol']
+                    )
+            elif not (self.response.headers_sent() or self.response.headers):
+                raise InternalServerError('response not started')
+
+            if data['type'] == 'http.response.body':
+                if 'body' in data and data['body'] != b'':
+                    await self.response.write(
+                        data['body'],
+                        rate=self.protocol.options['download_rate'],
+                        buffer_size=self.protocol.options['buffer_size']
                     )
 
-            if self._websocket is None:
-                if data['type'] == 'http.response.body':
-                    if 'body' in data and data['body'] != b'':
-                        await self.response.write(
-                            data['body'],
-                            rate=self.protocol.options['download_rate'],
-                            buffer_size=self.protocol.options['buffer_size']
-                        )
-
-                    if 'more_body' not in data or not data['more_body']:
-                        await self.response.write(b'')
-                        self.response.close(keepalive=True)
-                        self.request = None  # disallows further receive()
-                        self.protocol.events['close'].cancel()
-            else:
-                if data['type'] == 'websocket.send':
-                    if 'bytes' in data and data['bytes']:
-                        await self._websocket.send(data['bytes'])
-                    elif 'text' in data and data['text']:
-                        await self._websocket.send(data['text'], opcode=1)
-                elif data['type'] == 'websocket.accept':
-                    await self._websocket.accept()
-                elif data['type'] == 'websocket.close':
-                    await self._websocket.close(data.get('code', 1000))
-                    self._websocket = None
+                if 'more_body' not in data or not data['more_body']:
+                    await self.response.write(b'')
+                    self.response.close(keepalive=True)
+                    self.request = None  # disallows further receive()
                     self.protocol.events['close'].cancel()
-        except asyncio.CancelledError:
-            pass
-        except Exception as exc:
+            elif data['type'] == 'websocket.send':
+                if 'bytes' in data and data['bytes']:
+                    await self._websocket.send(data['bytes'])
+                elif 'text' in data and data['text']:
+                    await self._websocket.send(data['text'], opcode=1)
+            elif data['type'] == 'websocket.accept':
+                await self._websocket.accept()
+            elif data['type'] == 'websocket.close':
+                await self._websocket.close(data.get('code', 1000))
+                self._websocket = None
+                self.protocol.events['close'].cancel()
+            elif data['type'] != 'http.response.start':
+                raise InternalServerError('invalid ASGI message type')
+        except (asyncio.CancelledError, Exception) as exc:
             if self.response is None or self.protocol.is_closing():
                 self.logger.info(
                     'calling send() after the connection is closed'
                 )
             else:
-                self.protocol.print_exception(exc)
+                if (self.scope['type'] == 'websocket' and
+                        self.response.request.upgraded):
+                    exc = WebSocketServerClosed(cause=exc)
+
+                await self.response.handle_exception(exc)
                 self.response = None  # disallows further send()
