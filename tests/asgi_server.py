@@ -119,15 +119,28 @@ async def app(scope, receive, send):
         # a response splitting attempt
         headers.append((b'referer', scope['path'].encode('utf-8')))
 
-    await send({
-        'type': 'http.response.start',
-        'status': 200,
-        'headers': headers
-    })
+    if scope['path'].startswith('/start'):
+        await send({
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': headers
+        })
+
+    if not scope['path'].startswith('/body'):
+        await send({
+            'type': 'http.response.start',
+            'status': 200,
+            'headers': headers
+        })
+
+    if scope['path'].startswith('/invalid'):
+        await send({'type': 'invalid.message'})
+
     await send({
         'type': 'http.response.body',
         'body': b'Hello world!'
     })
 
 if __name__ == '__main__':
-    tremolo.run(app, host=ASGI_HOST, port=ASGI_PORT, debug=True, worker_num=2)
+    tremolo.run(app, host=ASGI_HOST, port=ASGI_PORT, debug=True, worker_num=2,
+                experimental=True, client_max_body_size=100 * 1048576)
