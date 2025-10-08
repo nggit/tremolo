@@ -66,8 +66,9 @@ class ASGIServer(HTTPProtocol):
             scope['method'] = request.method.decode('latin-1')
             scope['scheme'] = request.scheme.decode('latin-1')
 
+        app = ASGIAppWrapper(self, self.options['app'], scope, response)
+
         try:
-            app = ASGIAppWrapper(self, self.options['app'], scope, response)
             await app
 
             if 'close' in self.events and not self.events['close'].done():
