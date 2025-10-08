@@ -257,7 +257,7 @@ class HTTPProtocol(asyncio.Protocol):
                 try:
                     data = await self.error_received(exc, response)
                 finally:
-                    await response.handle_exception(exc, data)
+                    await response.handle_exception(exc, data=data)
 
     async def _receive_data(self):
         if 'request' in self.events:
@@ -430,6 +430,7 @@ class HTTPProtocol(asyncio.Protocol):
         # a fresh http request (not a continuation data)
         self.request.clear()
         self.request = None
+        self.queue[1].queue.clear()
 
         if self._recv_buf:
             self.queue[0].put_nowait(self._recv_buf[:])

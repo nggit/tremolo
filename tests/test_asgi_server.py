@@ -25,6 +25,50 @@ class TestASGIServer(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
+    def test_app_exits_early(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /exit HTTP/1.0\r\n\r\n'
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 500 Internal Server Error')
+        self.assertEqual(body, b'Internal Server Error')
+
+    def test_double_start(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /start HTTP/1.0\r\n\r\n'
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 500 Internal Server Error')
+        self.assertEqual(body, b'response already started')
+
+    def test_body_before_start(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /body HTTP/1.0\r\n\r\n'
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 500 Internal Server Error')
+        self.assertEqual(body, b'response not started')
+
+    def test_invalid_message_type(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /invalid HTTP/1.0\r\n\r\n'
+        )
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 500 Internal Server Error')
+        self.assertEqual(body, b'invalid ASGI message type')
+
     def test_get_ok_10(self):
         header, body = getcontents(host=ASGI_HOST,
                                    port=ASGI_PORT,
@@ -125,9 +169,6 @@ class TestASGIServer(unittest.TestCase):
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 500 Internal Server Error')
         self.assertFalse(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(
-            b'name or value cannot contain illegal characters' in body
-        )
 
     def test_websocket(self):
         header, body = getcontents(
@@ -141,6 +182,32 @@ class TestASGIServer(unittest.TestCase):
                     WebSocket.create_frame(b'Hello, world!', mask=True))
         )
         self.assertEqual(body[:15], WebSocket.create_frame(b'Hello, world!'))
+
+    def test_websocket_close(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    ASGI_PORT,
+                    WebSocket.create_frame(b'\x03\xe8', opcode=8))
+        )
+        self.assertEqual(body, b'\x88\x02\x03\xe8')
+
+    def test_websocket_invalid_opcode(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    ASGI_PORT,
+                    WebSocket.create_frame(b'', mask=True, opcode=0xc))
+        )
+        self.assertEqual(body, b'\x88\x02\x03\xf0')
 
 
 if __name__ == '__main__':
