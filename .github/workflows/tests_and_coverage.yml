@@ -14,7 +14,7 @@ jobs:
     strategy:
       matrix:
         python_version:
-          - '3.14.0-rc.3'
+          - '3.14'
           - '3.13'
           - '3.12'
           - '3.10'
@@ -59,11 +59,11 @@ jobs:
           python -m flake8 .
         if: |
           contains(env.FILES_MODIFIED, '.py') &&
-          matrix.os == 'ubuntu-22.04' && matrix.python_version == '3.13'
+          matrix.os == 'ubuntu-22.04' && matrix.python_version == '3.14'
 
       - name: Run tests
         run: python alltests.py
-        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version != '3.13' }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version != '3.14' }}
 
       - name: Run tests with coverage
         run: |
@@ -72,7 +72,7 @@ jobs:
           mkdir artifact && mv .coverage artifact/.coverage.${{ matrix.os }}
         if: |
           contains(env.FILES_MODIFIED, '.py') &&
-          matrix.python_version == '3.13' && !startsWith(matrix.os, 'windows-')
+          matrix.python_version == '3.14' && !startsWith(matrix.os, 'windows-')
 
       - name: Run tests with coverage (Windows)
         shell: cmd
@@ -82,14 +82,14 @@ jobs:
           mkdir artifact && move .coverage artifact\.coverage.windows
         if: |
           contains(env.FILES_MODIFIED, '.py') &&
-          matrix.python_version == '3.13' && startsWith(matrix.os, 'windows-')
+          matrix.python_version == '3.14' && startsWith(matrix.os, 'windows-')
 
       - uses: actions/upload-artifact@v4
         with:
           name: artifact-${{ matrix.os }}
           path: artifact
           include-hidden-files: true
-        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version == '3.13' }}
+        if: ${{ contains(env.FILES_MODIFIED, '.py') && matrix.python_version == '3.14' }}
 
   report:
     name: Upload coverage to SonarCloud Scan
