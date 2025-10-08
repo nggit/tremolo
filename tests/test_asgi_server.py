@@ -183,6 +183,32 @@ class TestASGIServer(unittest.TestCase):
         )
         self.assertEqual(body[:15], WebSocket.create_frame(b'Hello, world!'))
 
+    def test_websocket_close(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    ASGI_PORT,
+                    WebSocket.create_frame(b'\x03\xe8', opcode=8))
+        )
+        self.assertEqual(body, b'\x88\x02\x03\xe8')
+
+    def test_websocket_invalid_opcode(self):
+        header, body = getcontents(
+            host=ASGI_HOST,
+            port=ASGI_PORT,
+            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
+                b'Upgrade: websocket\r\n'
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
+                b'Connection: upgrade\r\n\r\n%s' % (
+                    ASGI_PORT,
+                    WebSocket.create_frame(b'', mask=True, opcode=0xc))
+        )
+        self.assertEqual(body, b'\x88\x02\x03\xf0')
+
 
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
