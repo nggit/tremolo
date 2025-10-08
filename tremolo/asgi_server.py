@@ -7,7 +7,6 @@ from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
     InternalServerError,
-    WebSocketException,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
@@ -68,16 +67,20 @@ class ASGIServer(HTTPProtocol):
             scope['scheme'] = request.scheme.decode('latin-1')
 
         try:
-            await ASGIAppWrapper(self, self.options['app'], scope, response)
+            app = ASGIAppWrapper(self, self.options['app'], scope, response)
+            await app
 
-            if not self.events['close'].done():
+            if 'close' in self.events and not self.events['close'].done():
                 self.logger.info('handler exited early (no close?)')
                 await self.events['close']
         except (asyncio.CancelledError, Exception) as exc:
-            if scope['type'] == 'websocket' and request.upgraded:
-                exc = WebSocketServerClosed(cause=exc)
+            if app.response is None:  # sent
+                self.print_exception(exc, 'app')
+            else:
+                if scope['type'] == 'websocket' and request.upgraded:
+                    exc = WebSocketServerClosed(cause=exc)
 
-            await response.handle_exception(exc)
+                await response.handle_exception(exc, 'app')
         finally:
             scope.clear()
 
@@ -122,26 +125,32 @@ class ASGIAppWrapper:
                     'bytes': payload
                 }
             except Exception as exc:
-                code = 1011
+                code = 1005
 
                 if self._websocket is None or self.protocol.is_closing():
-                    code = 1005
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
                 else:
-                    if isinstance(exc, WebSocketException):
+                    if isinstance(exc, WebSocketClientClosed):
                         code = exc.code
+                    else:
+                        self.protocol.print_exception(exc, 'receive')
 
-                    if not isinstance(exc, WebSocketClientClosed):
-                        self.protocol.print_exception(exc)
-                        await self._websocket.close(code)
-                        self._websocket = None
+                    if isinstance(exc, WebSocketServerClosed):
+                        await self._websocket.close(exc.code)
+                    elif code == 1005:
+                        await self._websocket.close(1011)
+                    else:
+                        await self._websocket.close()
 
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
                         self.protocol.options['app_close_timeout']
                     )
+                    self._websocket = None
+                    self.response = None
+
                 return {
                     'type': 'websocket.disconnect',
                     'code': code
@@ -181,11 +190,13 @@ class ASGIAppWrapper:
                     )
                     await self.protocol.events['close']
                 else:
-                    await self.response.handle_exception(exc)
+                    await self.response.handle_exception(exc, 'receive')
 
                 self.protocol.set_handler_timeout(
                     self.protocol.options['app_close_timeout']
                 )
+                self.response = None
+
             return {'type': 'http.disconnect'}
 
     async def send(self, data):
@@ -245,6 +256,7 @@ class ASGIAppWrapper:
                     await self.response.write(b'')
                     self.response.close(keepalive=True)
                     self.request = None  # disallows further receive()
+                    self.response = None
                     self.protocol.events['close'].cancel()
             elif data['type'] == 'websocket.send':
                 if 'bytes' in data and data['bytes']:
@@ -256,6 +268,7 @@ class ASGIAppWrapper:
             elif data['type'] == 'websocket.close':
                 await self._websocket.close(data.get('code', 1000))
                 self._websocket = None
+                self.response = None
                 self.protocol.events['close'].cancel()
             elif data['type'] != 'http.response.start':
                 raise InternalServerError('invalid ASGI message type')
@@ -269,5 +282,5 @@ class ASGIAppWrapper:
                         self.response.request.upgraded):
                     exc = WebSocketServerClosed(cause=exc)
 
-                await self.response.handle_exception(exc)
+                await self.response.handle_exception(exc, 'send')
                 self.response = None  # disallows further send()
