@@ -140,9 +140,8 @@ class ASGIAppWrapper:
                     if isinstance(exc, WebSocketServerClosed):
                         await self._websocket.close(exc.code)
                     else:
-                        await self._websocket.close(
-                            1011 if code == 1005 else 1000
-                        )
+                        await self._websocket.close(1011 if code == 1005
+                                                    else 1000)
 
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
