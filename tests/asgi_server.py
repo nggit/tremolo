@@ -45,20 +45,26 @@ async def app(scope, receive, send):
 
         assert data['type'] == 'websocket.connect'
 
-        await send({
-            'type': 'websocket.accept'
-        })
-        await send({
-            'type': 'websocket.send',
-            'bytes': (await receive()).get('bytes', b'')
-        })
+        if not scope['path'].startswith('/close'):
+            await send({
+                'type': 'websocket.accept'
+            })
+            await send({
+                'type': 'websocket.send',
+                'bytes': (await receive()).get('bytes', b'')
+            })
+
         await send({
             'type': 'websocket.close'
         })
 
         data = await receive()
-        assert data['type'] == 'websocket.disconnect'
-        assert data['code'] == 1005
+
+        if scope['path'].startswith('/close'):
+            assert data['type'] == 'websocket.connect'
+        else:
+            assert data['type'] == 'websocket.disconnect'
+            assert data['code'] == 1005
         return
 
     assert scope['type'] == 'http'
@@ -134,7 +140,9 @@ async def app(scope, receive, send):
         })
 
     if scope['path'].startswith('/invalid'):
-        await send({'type': 'invalid.message'})
+        await send({
+            'type': 'websocket.close'
+        })
 
     await send({
         'type': 'http.response.body',
