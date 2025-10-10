@@ -27,7 +27,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.context = ConnectionContext()
         self.lock = kwargs['lock']
         self.fileno = -1
-        self.request = None
+        self.request = None  # current request object
 
         self.queue = [Queue(), Queue()]  # IN, OUT
         self.events = {}
@@ -54,18 +54,18 @@ class HTTPProtocol(asyncio.Protocol):
         task = self.loop.create_task(coro)
 
         self.context.tasks.add(task)
-        task.add_done_callback(self.handle_task_done)
+        task.add_done_callback(self.task_done)
 
         return task
 
-    def handle_task_done(self, task):
+    def task_done(self, task):
         self.context.tasks.discard(task)
 
         if not task.cancelled():
             exc = task.exception()
 
             if exc:
-                self.print_exception(exc, 'handle_task_done')
+                self.print_exception(exc, 'task_done')
 
     def connection_made(self, transport):
         self.context.update(transport=transport)
@@ -251,13 +251,15 @@ class HTTPProtocol(asyncio.Protocol):
         except (SystemExit, KeyboardInterrupt):
             raise
         except BaseException as exc:
-            if self.request is not None:
+            if response.request.protocol is not None:
                 data = None
 
                 try:
                     data = await self.error_received(exc, response)
                 finally:
                     await response.handle_exception(exc, data=data)
+        finally:
+            await response.request.handler_exit()
 
     async def _receive_data(self):
         if 'request' in self.events:
