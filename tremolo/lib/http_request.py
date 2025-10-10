@@ -142,6 +142,13 @@ class HTTPRequest(Request):
 
         super().clear()
 
+    async def handler_exit(self):
+        if self._files is not None:
+            await self._files.aclose()
+
+        if self._stream is not None:
+            await self._stream.aclose()
+
     async def body(self, **kwargs):
         async for data in self.stream(**kwargs):
             self._body.extend(data)
