@@ -22,7 +22,7 @@ jobs:
           - '3.8'
           - '3.7'
           - 'pypy3.11'
-        os: ['ubuntu-22.04', 'windows-latest', 'macos-14']
+        os: ['ubuntu-22.04', 'windows-latest', 'macos-14-large']
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
