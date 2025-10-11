@@ -12,6 +12,7 @@ import ssl  # noqa: E402
 import sys  # noqa: E402
 
 from importlib import import_module, reload as reload_module  # noqa: E402
+from io import TextIOWrapper  # noqa: E402
 from shutil import get_terminal_size  # noqa: E402
 
 from . import __version__  # noqa: E402
@@ -225,6 +226,7 @@ class Tremolo:
         options.setdefault('app', None)
         options.setdefault('app_dir', os.getcwd())
         options.setdefault('shutdown_timeout', 30)
+        options.setdefault('server_name', 'Tremolo')
 
         if self.logger is None:
             self.logger = logging.getLogger(mp.current_process().name)
@@ -255,11 +257,6 @@ class Tremolo:
             )
         else:
             ssl_context = None
-
-        server_name = options.get('server_name', b'Tremolo')
-
-        if isinstance(server_name, str):
-            server_name = server_name.encode('latin-1')
 
         executor = MultiThreadExecutor(size=options.get('thread_pool_size', 5))
         executor.start()
@@ -317,17 +314,17 @@ class Tremolo:
                 options['app'] = getattr(import_module(module_name), attr_name)
 
             print(log_date(), end=' ')
-            sys.stdout.flush()
-            sys.stdout.buffer.write(
-                b'Starting %s as an ASGI server for: ' % server_name
+            print(
+                'Starting %s as an ASGI server for:' % options['server_name'],
+                end=' '
             )
             print(
                 getattr(options['app'], '__name__',
                         options['app'].__class__.__name__)
             )
 
-            if server_name == b'Tremolo':
-                server_name += b' (ASGI)'
+            if options['server_name'] == 'Tremolo':
+                options['server_name'] += ' (ASGI)'
 
             self.context.lifespan = ASGILifespan(self, options=options)
             self.context.lifespan.startup()
@@ -346,7 +343,8 @@ class Tremolo:
             self.context.info['server'] = (sockname, None)
 
         self.context.info['server_date'] = server_date()
-        self.context.info['server_name'] = server_name
+        self.context.info['server_name'] = options[
+                                           'server_name'].encode('latin-1')
 
         options.setdefault('debug', False)
         options.setdefault('experimental', False)
@@ -370,18 +368,18 @@ class Tremolo:
         )
 
         print(log_date(), end=' ')
-        sys.stdout.flush()
-        sys.stdout.buffer.write(
-            b'%s worker (pid %d) is started at ' % (server_name, os.getpid())
+        print(
+            '%s worker (pid %d) is started at' % (options['server_name'],
+                                                  os.getpid()),
+            end=' '
         )
-        print(self.context.info['server'][0], end='')
+        print(self.context.info['server'][0], end=' ')
 
         if self.context.info['server'][1] is not None:
-            print(' port %d' % self.context.info['server'][1], end='')
+            print('port %d' % self.context.info['server'][1], end=' ')
 
         if ssl_context is not None:
-            sys.stdout.flush()
-            sys.stdout.buffer.write(b' (https)')
+            print('(https)', end='')
 
         print()
 
@@ -483,6 +481,7 @@ class Tremolo:
                     break
 
     def _worker(self, host, port, **kwargs):
+        sys.stdout = TextIOWrapper(sys.stdout.buffer, line_buffering=True)
         loop_name = kwargs.get('loop', 'asyncio.')
 
         if '.' not in loop_name:
