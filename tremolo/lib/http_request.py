@@ -27,7 +27,7 @@ class HTTPRequest(Request):
     __slots__ = ('_ip', '_scheme', 'header', 'headers', 'is_valid',
                  'host', 'method', 'url', 'path', 'query_string', 'version',
                  'content_length', 'http_continue', 'http_keepalive',
-                 '_body', '_read_buf', '_stream', '_files')
+                 'has_body', '_body', '_read_buf', '_stream', '_files')
 
     def __init__(self, protocol, header):
         super().__init__(protocol)
@@ -50,11 +50,12 @@ class HTTPRequest(Request):
 
         if self.version not in (b'1.0', b'1.1'):
             self.is_valid = False
-            self.version = b'1.1'
+            self.version = b'1.0'
 
         self.content_length = -1
         self.http_continue = False
         self.http_keepalive = False
+        self.has_body = False
 
         self._body = bytearray()
         self._read_buf = bytearray()
@@ -107,12 +108,6 @@ class HTTPRequest(Request):
     def upgraded(self, value):
         self._body = None
         del self._read_buf[:]
-
-    @property
-    def has_body(self):
-        return (b'content-length' in self.headers and
-                self.headers[b'content-length'] != b'0' or
-                b'transfer-encoding' in self.headers)
 
     def uid(self, length=32):
         if self.client is None:
@@ -171,13 +166,15 @@ class HTTPRequest(Request):
         if size == -1:
             return await self._stream.__anext__()
 
-        while len(self._read_buf) < size:
-            self._read_buf.extend(await self._stream.__anext__())
+        try:
+            while len(self._read_buf) < size:
+                self._read_buf.extend(await self._stream.__anext__())
 
-        data = bytes(self._read_buf[:size])
-        del self._read_buf[:size]
-
-        return data
+            return bytes(self._read_buf[:size])
+        except StopAsyncIteration:
+            return bytes(self._read_buf)
+        finally:
+            del self._read_buf[:size]
 
     async def stream(self, timeout=None, raw=False):
         if self.content_length == 0:
@@ -186,7 +183,14 @@ class HTTPRequest(Request):
         if self.http_continue:
             self.server.send_continue()
 
-        if not raw and b'chunked' in self.transfer_encoding:
+        if raw or self.content_length != -1:
+            if (self.content_length >
+                    self.server.options['client_max_body_size']):
+                raise PayloadTooLarge
+
+            async for data in super().recv(timeout):
+                yield data
+        elif b'chunked' in self.transfer_encoding:
             buf = bytearray()
             agen = super().recv(timeout)
             paused = False
@@ -251,15 +255,11 @@ class HTTPRequest(Request):
 
                 bytes_unread = chunk_size - len(data) + 2
                 paused = True
-        else:
-            if (self.content_length >
-                    self.server.options['client_max_body_size']):
-                raise PayloadTooLarge
-
-            async for data in super().recv(timeout):
-                yield data
 
         self.content_length = 0
+
+        if self._stream is not None:  # extra for recv(size=-1)
+            yield b''
 
     @property
     def params(self):
@@ -383,16 +383,13 @@ class HTTPRequest(Request):
         paused = False
         part = None  # represents a field/file received in a multipart request
 
-        if self._stream is None:
-            self._stream = self.stream()
-
         while max_files > 0:
             data = b''
 
             if not paused:
-                try:
-                    data = await self._stream.__anext__()
-                except StopAsyncIteration as exc:
+                data = await self.read()
+
+                if not data:
                     if self._read_buf.startswith(b'--%s--' % boundary):
                         del self._read_buf[:]  # set eof()
                         return
@@ -400,7 +397,7 @@ class HTTPRequest(Request):
                     if header_size == 1 or body_size == -1:
                         raise BadRequest(
                             'malformed multipart/form-data: incomplete read'
-                        ) from exc
+                        )
 
             if part is None:
                 self._read_buf.extend(data)
