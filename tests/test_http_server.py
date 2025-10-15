@@ -569,7 +569,7 @@ class TestHTTPServer(unittest.TestCase):
         )
 
         self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
+                         b'HTTP/1.0 400 Bad Request')
 
     def test_badrequest_notarequest(self):
         header, body = getcontents(

@@ -209,31 +209,32 @@ class HTTPProtocol(asyncio.Protocol):
                 self.globals.connections.add(self)
                 self.request.http_keepalive = True
 
-            if self.request.has_body:
-                # assuming a request with a body, such as POST
-                if b'transfer-encoding' in self.request.headers:
-                    if self.request.version == b'1.0':
-                        raise BadRequest('unexpected Transfer-Encoding')
+            if b'transfer-encoding' in self.request.headers:
+                if (self.request.version != b'1.1' or
+                        b'chunked' not in self.request.transfer_encoding):
+                    raise BadRequest('unexpected Transfer-Encoding')
 
-                if b'content-length' in self.request.headers:
-                    if b'chunked' in self.request.transfer_encoding:
-                        raise BadRequest
+                self.request.has_body = True
 
-                    try:
-                        self.request.content_length = parse_int(
-                            self.request.headers[b'content-length']
-                        )
-                    except ValueError as exc:
-                        raise BadRequest('bad Content-Length') from exc
+            if b'content-length' in self.request.headers:
+                if self.request.has_body:
+                    raise BadRequest
 
-                if (b'expect' in self.request.headers and
-                        self.request.headers[b'expect']
-                        .lower() == b'100-continue'):
-                    # we can handle continue later after the route is found
-                    # by checking this state
-                    self.request.http_continue = True
-            else:
-                self.queue[0].put_nowait(b'')
+                try:
+                    self.request.content_length = parse_int(
+                        self.request.headers[b'content-length']
+                    )
+                except ValueError as exc:
+                    raise BadRequest('bad Content-Length') from exc
+
+                self.request.has_body = self.request.content_length != 0
+
+            if (self.request.has_body and b'expect' in self.request.headers and
+                    self.request.headers[b'expect']
+                    .lower() == b'100-continue'):
+                # we can handle continue later after the route is found
+                # by checking this state
+                self.request.http_continue = True
 
             # successfully got header,
             # clear either the request or keepalive timeout
