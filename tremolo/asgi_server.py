@@ -154,15 +154,14 @@ class ASGIAppWrapper:
 
         try:
             data = await self.request.read()
-            more_body = self.request.has_body and not self.request.eof()
 
-            if not more_body:
+            if not data:
                 self.request = None
 
             return {
                 'type': 'http.request',
                 'body': data,
-                'more_body': more_body
+                'more_body': bool(data)
             }
         except Exception as exc:
             if self.response is None or self.protocol.is_closing():
@@ -170,16 +169,12 @@ class ASGIAppWrapper:
                     'calling receive() after the connection is closed'
                 )
             else:
-                if self.request is None or isinstance(exc, StopAsyncIteration):
+                if self.request is None:
                     # delay http.disconnect. see:
                     # https://github.com/nggit/tremolo/issues/202
                     if self.protocol.events['close'].done():
                         self.protocol.events[
                             'close'] = self.loop.create_future()
-
-                    if self.request is not None:
-                        self.request = None
-                        return {'type': 'http.request'}
 
                     self.logger.info(
                         'calling receive() when there is no more body'
