@@ -146,7 +146,7 @@ class HTTPServer(HTTPProtocol):
         response.set_status(*status)
 
         if not no_content:
-            response.set_header(b'Content-Type', response.get_content_type())
+            response.set_header(b'Content-Type', response.content_type)
 
         if response.http_chunked:
             response.set_header(b'Transfer-Encoding', b'chunked')

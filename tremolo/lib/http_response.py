@@ -32,11 +32,13 @@ UPGRADE_OR_KEEPALIVE = {
 
 
 class HTTPResponse(Response):
-    __slots__ = ('http_chunked', '_headers')
+    __slots__ = ('line', 'content_type', 'http_chunked', '_headers')
 
     def __init__(self, request):
         super().__init__(request)
 
+        self.line = None
+        self.content_type = b'text/html; charset=utf-8'
         self.http_chunked = None
         self._headers = {}
 
@@ -127,21 +129,19 @@ class HTTPResponse(Response):
         if not isinstance(status, int) or b'\r' in message or b'\n' in message:
             raise InternalServerError
 
-        if b'_line' in self.headers:
-            self.headers[b'_line'][1] = b'%d' % status
-            self.headers[b'_line'][2] = message
+        if self.line is None:
+            self.line = [b'HTTP/%s' % self.request.version,
+                         b'%d' % status,
+                         message]
         else:
-            self.headers[b'_line'] = [b'HTTP/%s' % self.request.version,
-                                      b'%d' % status,
-                                      message]
+            self.line[1] = b'%d' % status
+            self.line[2] = message
 
     def get_status(self):
-        try:
-            _, status, message = self.headers.pop(b'_line')
-
-            return (int(status), message)
-        except KeyError:
+        if self.line is None:
             return (200, b'OK')
+
+        return (int(self.line[1]), self.line[2])
 
     def set_content_type(self, content_type=b'text/html; charset=utf-8'):
         if isinstance(content_type, str):
@@ -150,13 +150,7 @@ class HTTPResponse(Response):
         if b'\r' in content_type or b'\n' in content_type:
             raise InternalServerError
 
-        self.headers[b'content-type'] = [b'Content-Type: ' + content_type]
-
-    def get_content_type(self):
-        try:
-            return self.headers.pop(b'content-type')[0][13:].strip(b' \t')
-        except KeyError:
-            return b'text/html; charset=utf-8'
+        self.content_type = content_type
 
     def close(self, keepalive=False):
         if not keepalive:
@@ -187,7 +181,7 @@ class HTTPResponse(Response):
                 b'Connection: %s\r\n%s\r\n\r\n%s' %
                 (self.request.version,
                  *status,
-                 self.get_content_type(),
+                 self.content_type,
                  content_length,
                  KEEPALIVE_OR_CLOSE[keepalive and self.request.http_keepalive],
                  b'\r\n'.join(b'\r\n'.join(v) for k, v in self.headers.items()
@@ -222,7 +216,7 @@ class HTTPResponse(Response):
                 self.set_status(*status)
 
                 if not no_content:
-                    self.set_header(b'Content-Type', self.get_content_type())
+                    self.set_header(b'Content-Type', self.content_type)
 
                 if self.http_chunked:
                     self.set_header(b'Transfer-Encoding', b'chunked')
@@ -255,7 +249,7 @@ class HTTPResponse(Response):
                     )
 
             await self.send(
-                b' '.join(self.headers.pop(b'_line')) + b'\r\n' +
+                b' '.join(self.line) + b'\r\n' +
                 b'\r\n'.join(b'\r\n'.join(v) for v in self.headers.values()) +
                 b'\r\n\r\n'
             )
