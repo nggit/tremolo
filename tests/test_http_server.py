@@ -629,7 +629,7 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad Content-Length')
+        self.assertEqual(body, b'ambiguous Content-Length')
 
     def test_sec_empty_content_length(self):
         header, body = getcontents(

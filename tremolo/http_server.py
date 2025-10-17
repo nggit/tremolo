@@ -105,7 +105,7 @@ class HTTPServer(HTTPProtocol):
             if ('websocket' in options and self.options['ws'] and
                     b'sec-websocket-key' in request.headers and
                     b'upgrade' in request.headers and
-                    request.headers[b'upgrade'].lower() == b'websocket'):
+                    request.headers[b'upgrade'][0].lower() == b'websocket'):
                 self.server['websocket'] = WebSocket(request, response)
 
             if 'sse' in options:

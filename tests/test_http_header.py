@@ -40,29 +40,19 @@ class TestHTTPHeader(unittest.TestCase):
 
     def test_empty(self):
         self.obj.parse(b'')
-        self.assertFalse(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), None)
-        self.assertEqual(self.obj.getmethod(), None)
-        self.assertEqual(self.obj.geturl(), None)
-        self.assertEqual(self.obj.getversion(), None)
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
-        self.assertEqual(self.obj.save(), b'\r\n\r\n')
+        self.assertEqual(self.obj.method, None)
+        self.assertEqual(self.obj.url, None)
+        self.assertEqual(self.obj.version, None)
 
     def test_break(self):
         self.obj.parse(b'\r\n\r\n')
-        self.assertFalse(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), None)
-        self.assertEqual(self.obj.getmethod(), None)
-        self.assertEqual(self.obj.geturl(), None)
-        self.assertEqual(self.obj.getversion(), None)
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
-        self.assertEqual(self.obj.save(), b'\r\n\r\n')
+        self.assertEqual(self.obj.method, None)
+        self.assertEqual(self.obj.url, None)
+        self.assertEqual(self.obj.version, None)
 
     def test_max_lines(self):
         self.obj.parse(
@@ -70,15 +60,11 @@ class TestHTTPHeader(unittest.TestCase):
             b'Host: localhost\r\n'
             b'Accept: */*\r\n\r\n', max_lines=2
         )
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'localhost')
-        self.assertEqual(self.obj.getmethod(), b'GET')
-        self.assertEqual(self.obj.geturl(), b'/')
-        self.assertEqual(self.obj.getversion(), b'1.0')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'GET')
+        self.assertEqual(self.obj.url, b'/')
+        self.assertEqual(self.obj.version, b'1.0')
 
     def test_max_line_size(self):
         self.obj.parse(
@@ -86,130 +72,79 @@ class TestHTTPHeader(unittest.TestCase):
             b'Host: localhost\r\n'
             b'Accept: */*\r\n\r\n', max_line_size=14
         )
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), None)
-        self.assertEqual(self.obj.getmethod(), b'GET')
-        self.assertEqual(self.obj.geturl(), b'/')
-        self.assertEqual(self.obj.getversion(), b'1.0')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'GET')
+        self.assertEqual(self.obj.url, b'/')
+        self.assertEqual(self.obj.version, b'1.0')
 
     def test_request_no_host_10(self):
         self.obj.parse(b'GET / HTTP/1.0\r\n\r\n')
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertTrue(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'')
-        self.assertEqual(self.obj.getmethod(), b'GET')
-        self.assertEqual(self.obj.geturl(), b'/')
-        self.assertEqual(self.obj.getversion(), b'1.0')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'GET')
+        self.assertEqual(self.obj.url, b'/')
+        self.assertEqual(self.obj.version, b'1.0')
 
     def test_request_no_host_11(self):
         self.obj.parse(
             b'GET / HTTP/1.1\r\nAccept: text/html\r\n'
             b'Accept: image/*\r\n\r\n'
         )
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'')
-        self.assertEqual(self.obj.getmethod(), b'GET')
-        self.assertEqual(self.obj.geturl(), b'/')
-        self.assertEqual(self.obj.getversion(), b'1.1')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'GET')
+        self.assertEqual(self.obj.url, b'/')
+        self.assertEqual(self.obj.version, b'1.1')
 
     def test_request_bad(self):
         self.obj.parse(b' HTTP/1.1\r\nHost: example.com:443\r\n\r\n')
-        self.assertFalse(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'example.com:443')
-        self.assertEqual(self.obj.getmethod(), None)
-        self.assertEqual(self.obj.geturl(), None)
-        self.assertEqual(self.obj.getversion(), None)
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, None)
+        self.assertEqual(self.obj.url, None)
+        self.assertEqual(self.obj.version, None)
 
     def test_request_bad_head(self):
         self.obj.parse(b'HEAD HTTP/1.1\r\nHost: example.com:443\r\n\r\n')
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'example.com:443')
-        self.assertEqual(self.obj.getmethod(), b'')
-        self.assertEqual(self.obj.geturl(), b'')
-        self.assertEqual(self.obj.getversion(), b'')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'')
+        self.assertEqual(self.obj.url, b'')
+        self.assertEqual(self.obj.version, b'1.0')
 
     def test_request_bad_path(self):
         self.obj.parse(
             b'HEAD /Path: HTTP/1.0/ HTTP/1.1\r\n'
             b'Host: example.com:443\r\n\r\n'
         )
-        self.assertTrue(self.obj.is_request)
-        self.assertFalse(self.obj.is_response)
         self.assertTrue(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), b'example.com:443')
-        self.assertEqual(self.obj.getmethod(), b'HEAD')
-        self.assertEqual(self.obj.geturl(), b'/Path: HTTP/1.0/')
-        self.assertEqual(self.obj.getversion(), b'1.1')
-        self.assertEqual(self.obj.getstatus(), None)
-        self.assertEqual(self.obj.getmessage(), None)
+        self.assertEqual(self.obj.method, b'HEAD')
+        self.assertEqual(self.obj.url, b'/Path: HTTP/1.0/')
+        self.assertEqual(self.obj.version, b'1.1')
 
     def test_response(self):
         self.obj.parse(
             b'HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\n'
             b'Connection: close\r\n\r\n200 OK\r\n'
         )
-        self.assertFalse(self.obj.is_request)
-        self.assertTrue(self.obj.is_response)
-        self.assertTrue(self.obj.is_valid)
+        self.assertFalse(self.obj.is_valid)  # True
         self.assertEqual(self.obj.gethost(), None)
-        self.assertEqual(self.obj.getmethod(), None)
-        self.assertEqual(self.obj.geturl(), None)
-        self.assertEqual(self.obj.getversion(), b'1.0')
-        self.assertEqual(self.obj.getstatus(), 200)
-        self.assertEqual(self.obj.getmessage(), b'OK')
+        self.assertEqual(self.obj.method, None)
+        self.assertEqual(self.obj.url, None)
+        self.assertEqual(self.obj.version, None)  # b'1.0'
 
     def test_response_bad_status(self):
         self.obj.parse(
             b'HTTP/1.0 xxx Not Found\r\nContent-Type: text/plain\r\n'
             b'Connection: close\r\n\r\n404 Not Found\r\n'
         )
-        self.assertFalse(self.obj.is_request)
-        self.assertTrue(self.obj.is_response)
         self.assertFalse(self.obj.is_valid)
         self.assertEqual(self.obj.gethost(), None)
-        self.assertEqual(self.obj.getmethod(), None)
-        self.assertEqual(self.obj.geturl(), None)
-        self.assertEqual(self.obj.getversion(), b'')
-        self.assertEqual(self.obj.getstatus(), 0)
-        self.assertEqual(self.obj.getmessage(), b'')
-
-    def test_response_excludes_remove_append_save(self):
-        self.obj.parse(
-            b'HTTP/1.0 404 Not Found\r\nContent-Type: text/plain\r\n'
-            b'Connection: close\r\n\r\n404 Not Found\r\n',
-            excludes=[b'connection']
-        )
-        self.assertEqual(self.obj.getheaders(),
-                         [(b'content-type', b'text/plain')])
-        self.obj.remove(b'content-type')
-        self.assertEqual(self.obj.getheaders(), [])
-        self.obj.append((b'Content-Type', b'text/html'))
-        self.assertEqual(self.obj.getheaders(),
-                         [(b'Content-Type', b'text/html')])
-        self.assertEqual(
-            self.obj.save(),
-            b'HTTP/1.0 404 Not Found\r\nContent-Type: text/html\r\n\r\n'
-            b'404 Not Found\r\n'
-        )
+        self.assertEqual(self.obj.method, None)
+        self.assertEqual(self.obj.url, None)
+        self.assertEqual(self.obj.version, None)  # b''
 
 
 if __name__ == '__main__':

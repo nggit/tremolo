@@ -51,7 +51,7 @@ class ASGIServer(HTTPProtocol):
 
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
                 b'upgrade' in request.headers and
-                request.headers[b'upgrade'].lower() == b'websocket'):
+                request.headers[b'upgrade'][0].lower() == b'websocket'):
             scope['type'] = 'websocket'
             scope['scheme'] = b'wss' if request.scheme == b'https' else b'ws'
             scope['subprotocols'] = [

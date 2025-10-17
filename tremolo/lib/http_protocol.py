@@ -217,12 +217,13 @@ class HTTPProtocol(asyncio.Protocol):
                 self.request.has_body = True
 
             if b'content-length' in self.request.headers:
-                if self.request.has_body:
-                    raise BadRequest
+                if (self.request.has_body or
+                        len(self.request.headers[b'content-length']) != 1):
+                    raise BadRequest('ambiguous Content-Length')
 
                 try:
                     self.request.content_length = parse_int(
-                        self.request.headers[b'content-length']
+                        self.request.headers[b'content-length'][0]
                     )
                 except ValueError as exc:
                     raise BadRequest('bad Content-Length') from exc
@@ -230,7 +231,7 @@ class HTTPProtocol(asyncio.Protocol):
                 self.request.has_body = self.request.content_length != 0
 
             if (self.request.has_body and b'expect' in self.request.headers and
-                    self.request.headers[b'expect']
+                    self.request.headers[b'expect'][0]
                     .lower() == b'100-continue'):
                 # we can handle continue later after the route is found
                 # by checking this state
@@ -313,9 +314,7 @@ class HTTPProtocol(asyncio.Protocol):
             if header_size > self.options['client_max_header_size']:
                 self.close(BadRequest('request header too large'))
             elif header_size != 1:
-                header = HTTPHeader(self._recv_buf[:header_size],
-                                    header_size=header_size,
-                                    excludes=[b'proxy'])
+                header = HTTPHeader().parse(self._recv_buf, header_size)
                 del self._recv_buf[:header_size + 2]
 
                 if header.is_request:

@@ -34,7 +34,7 @@ class WebSocket:
 
     async def accept(self):
         sha1_hash = hashlib.sha1(  # nosec B303, B324
-            self.request.headers[b'sec-websocket-key'] + _MAGIC
+            self.request.headers[b'sec-websocket-key'][0] + _MAGIC
         ).digest()
         accept_key = base64.b64encode(sha1_hash)
 
