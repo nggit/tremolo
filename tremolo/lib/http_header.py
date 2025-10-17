@@ -44,14 +44,16 @@ class HTTPHeader:
         self.method = None
         self.url = None
         self.version = None
-        self.headers = None
+        self.headers = Headers()
 
     @property
     def is_request(self):
         return not (self.method is None or self.url is None)
 
     def parse(self, data, header_size=0, max_lines=100, max_line_size=8190):
-        self.headers = Headers()
+        if self.line is not None:
+            return self.__class__().parse(data, header_size,
+                                          max_lines, max_line_size)
 
         if not data:
             return self
