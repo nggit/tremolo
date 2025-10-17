@@ -130,7 +130,7 @@ async def on_response(content_type=b'text/plain', **server):
 
     response.set_header(b'X-Foo', b'baz')
 
-    if response.headers[b'_line'][1] == b'503':
+    if response.line[1] == b'503':
         response.set_status(503, b'Under Maintenance')
 
         return 'Under Maintenance'
