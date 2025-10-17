@@ -40,6 +40,7 @@ class HTTPResponse(Response):
         self.line = None
         self.content_type = b'text/html; charset=utf-8'
         self.http_chunked = None
+
         self._headers = {}
 
     @property
