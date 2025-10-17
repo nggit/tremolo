@@ -308,7 +308,7 @@ class HTTPResponse(Response):
 
         if self.request.version == b'1.1' and b'range' in self.request.headers:
             if (b'if-range' in self.request.headers and
-                    self.request.headers[b'if-range'] != mdate):
+                    self.request.headers[b'if-range'][0] != mdate):
                 self.set_content_type(content_type)
                 self.set_header(b'Last-Modified', mdate)
                 self.set_header(b'Content-Length', b'%d' % file_size)
@@ -324,11 +324,7 @@ class HTTPResponse(Response):
                 self.close(keepalive=True)
                 return
 
-            _range = self.request.headers[b'range']
-
-            if isinstance(_range, list):
-                _range = b';'.join(_range)
-
+            _range = b';'.join(self.request.headers[b'range'])
             ranges = []
 
             for key, _bytes in parse_fields(_range):
@@ -417,7 +413,7 @@ class HTTPResponse(Response):
                 await self.write(b'', **kwargs)
         else:
             if (b'if-modified-since' in self.request.headers and
-                    self.request.headers[b'if-modified-since'] == mdate):
+                    self.request.headers[b'if-modified-since'][0] == mdate):
                 self.set_status(304, b'Not Modified')
                 await self.write()
                 return

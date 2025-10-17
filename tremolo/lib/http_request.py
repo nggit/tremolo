@@ -35,22 +35,13 @@ class HTTPRequest(Request):
         self._ip = None
         self._scheme = None
         self.header = header
-        self.headers = header.headers.copy()
+        self.headers = header.headers
         self.is_valid = header.is_valid
         self.host = header.gethost()
-
-        if isinstance(self.host, list):
-            self.is_valid = False
-            self.host = self.host[0]
-
-        self.method = header.getmethod()
-        self.url = header.geturl()
+        self.method = header.method
+        self.url = header.url
         self.path, _, self.query_string = self.url.partition(b'?')
-        self.version = header.getversion()
-
-        if self.version not in (b'1.0', b'1.1'):
-            self.is_valid = False
-            self.version = b'1.0'
+        self.version = header.version
 
         self.content_length = -1
         self.http_continue = False
@@ -65,12 +56,8 @@ class HTTPRequest(Request):
     @property
     def ip(self):
         if not self._ip:
-            ip = self.headers.get(b'x-forwarded-for', b'')
-
-            if isinstance(ip, list):
-                ip = ip[0]
-
-            ip = ip.strip()
+            values = self.headers.get(b'x-forwarded-for')
+            ip = values[0].strip() if values else b''
 
             if ip == b'' and self.client is not None:
                 self._ip = self.client[0].encode('utf-8')
@@ -82,7 +69,8 @@ class HTTPRequest(Request):
     @property
     def scheme(self):
         if not self._scheme:
-            scheme = self.headers.get(b'x-forwarded-proto', b'').strip()
+            values = self.headers.get(b'x-forwarded-proto')
+            scheme = values[0].strip() if values else b''
 
             if scheme == b'' and self.is_secure:
                 self._scheme = b'https'
@@ -94,7 +82,10 @@ class HTTPRequest(Request):
     @property
     def content_type(self):
         # don't lower() content-type, as it may contain a boundary
-        return self.headers.get(b'content-type', b'application/octet-stream')
+        if b'content-type' in self.headers:
+            return self.headers[b'content-type'][0]
+
+        return b'application/octet-stream'
 
     @property
     def transfer_encoding(self):
@@ -127,7 +118,6 @@ class HTTPRequest(Request):
         return HTTPResponse(self)
 
     def clear(self):
-        self.header.clear()
         self.headers.clear()
 
         if self._body:
@@ -287,10 +277,7 @@ class HTTPRequest(Request):
             self.params['cookies'] = {}
 
             if b'cookie' in self.headers:
-                cookie = self.headers[b'cookie']
-
-                if isinstance(self.headers[b'cookie'], list):
-                    cookie = b';'.join(self.headers[b'cookie'])
+                cookie = b';'.join(self.headers[b'cookie'])
 
                 for k, v in parse_fields(cookie):
                     k = k.decode('latin-1')
@@ -417,18 +404,17 @@ class HTTPRequest(Request):
                     # use find() instead of startswith() to ignore the preamble
                     if self._read_buf.find(b'--%s\r\n' % boundary,
                                            0, header_size) != -1:
-                        header = self.header.parse(
-                            self._read_buf, header_size=header_size
-                        ).headers
+                        header = self.header.parse(self._read_buf,
+                                                   header_size).headers
 
                         if b'content-disposition' in header:
                             for k, v in parse_fields(
-                                    header[b'content-disposition']):
+                                    header[b'content-disposition'][0]):
                                 part[k.decode('latin-1')] = v.decode('latin-1')
 
                         if b'content-type' in header:
-                            part['type'] = header[
-                                           b'content-type'].decode('latin-1')
+                            part['type'] = header[b'content-type'][
+                                                  0].decode('latin-1')
                 continue
 
             body.extend(data)
