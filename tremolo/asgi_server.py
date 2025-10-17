@@ -197,7 +197,7 @@ class ASGIAppWrapper:
     async def send(self, data):
         try:
             if data['type'] in ('http.response.start', 'websocket.accept'):
-                if self.response.headers:
+                if self.response.line is not None:
                     raise InternalServerError('already started or accepted')
 
                 # websocket doesn't have this
@@ -236,7 +236,7 @@ class ASGIAppWrapper:
                     self.response.set_header(
                         b'Sec-WebSocket-Protocol', data['subprotocol']
                     )
-            elif not (self.response.headers_sent() or self.response.headers):
+            elif self.response.line is None:
                 if data['type'] == 'websocket.close':
                     self._websocket = None
                     raise Forbidden('connection rejected')
