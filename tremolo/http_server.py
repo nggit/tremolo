@@ -130,7 +130,7 @@ class HTTPServer(HTTPProtocol):
             data = await agen
 
             if data is None:
-                response.close()
+                response.close(keepalive=response.headers_sent())
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
