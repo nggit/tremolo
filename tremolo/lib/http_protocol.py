@@ -33,7 +33,6 @@ class HTTPProtocol(asyncio.Protocol):
         self.events = {}
         self.handlers = set()
         self._recv_buf = bytearray()
-        self._watermarks = {'high': 65536, 'low': 8192}
 
     @property
     def server(self):  # all properties except those that are slotted
@@ -343,9 +342,6 @@ class HTTPProtocol(asyncio.Protocol):
 
     def set_watermarks(self, high=65536, low=8192):
         if self.transport is not None:
-            self._watermarks['high'] = high
-            self._watermarks['low'] = low
-
             self.transport.set_write_buffer_limits(high=high, low=low)
 
     async def _send_data(self):
@@ -383,14 +379,13 @@ class HTTPProtocol(asyncio.Protocol):
 
                 # send data
                 write_buffer_size = self.transport.get_write_buffer_size()
+                low, high = self.transport.get_write_buffer_limits()
 
-                if write_buffer_size > self._watermarks['high']:
+                if write_buffer_size > high:
                     self.logger.info(
                         '%d exceeds the current watermark limits '
                         '(high=%d, low=%d)',
-                        write_buffer_size,
-                        self._watermarks['high'],
-                        self._watermarks['low']
+                        write_buffer_size, high, low
                     )
                     self.events['send'] = self.loop.create_future()
 
@@ -458,7 +453,6 @@ class HTTPProtocol(asyncio.Protocol):
 
         self.context.clear()
         self.events.clear()
-        self._watermarks.clear()
 
         self.set_handler_timeout(self.options['app_close_timeout'])
         self.globals.connections.discard(self)
