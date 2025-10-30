@@ -183,8 +183,8 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 404 Not Found')
-        self.assertFalse(b'\r\nContent-Length: ' in header)
-        self.assertTrue(b'\r\nTransfer-Encoding: chunked\r\n' in header)
+        self.assertTrue(b'\r\nContent-Length: ' in header)
+        self.assertFalse(b'\r\nTransfer-Encoding: chunked\r\n' in header)
         self.assertEqual(body, b'')
 
     def test_get_lock_11(self):

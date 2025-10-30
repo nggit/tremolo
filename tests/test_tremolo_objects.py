@@ -9,7 +9,6 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tremolo import Application  # noqa: E402
-from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.lib.connections import KeepAliveConnections  # noqa: E402
 from tremolo.lib.contexts import WorkerContext, RequestContext  # noqa: E402
 from tests import handlers, middlewares, hooks  # noqa: E402
@@ -103,12 +102,12 @@ class TestTremoloObjects(unittest.TestCase):
         self.assertEqual(options, {})
 
     def test_route_error(self):
-        app.route(404)(handlers.error_404)
+        app.error(404)(handlers.error_404)
 
         for code, func, options, _ in app.routes[0]:
             if code == 404:
                 self.assertEqual(func(), b'Not Found!!!')
-                self.assertEqual(options['status'], (404, b'Not Found'))
+                self.assertEqual(options, {})
                 break
         else:
             self.fail('route does not exist!')
@@ -144,22 +143,17 @@ class TestTremoloObjects(unittest.TestCase):
             self.assertEqual(await handler[1](), b'Service Unavailable')
 
         for handler in app.routes[0]:
-            if handler[0] == 400:
-                with self.assertRaises(BadRequest):
-                    await handler[1]()
-
-            elif handler[0] == 404:
+            if handler[0] == 404:
                 g = WorkerContext()
 
                 self.assertEqual(repr(g), repr(g.__dict__))
 
                 g.info['server_name'] = b'Tremolo'
                 g.path = b'/invalid">url'
+                g.globals = g
+                g.server = g
 
-                data = bytearray()
-
-                async for buf in handler[1](request=g, globals=g):
-                    data.extend(buf)
+                data = await handler[1](request=g)
 
                 self.assertTrue(data[:15] == b'<!DOCTYPE html>')
                 self.assertTrue(data[-7:] == b'</html>')
