@@ -6,12 +6,12 @@ from http import HTTPStatus
 from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
+    BadRequest,
     Forbidden,
     InternalServerError,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
-from .handlers import error_400
 from .lib.http_protocol import HTTPProtocol
 from .lib.websocket import WebSocket
 
@@ -30,8 +30,7 @@ class ASGIServer(HTTPProtocol):
 
     async def request_received(self, request, response):
         if not request.is_valid:
-            await error_400(request=request, response=response)
-            return
+            raise BadRequest
 
         scope = {
             'asgi': {'version': '3.0', 'spec_version': '2.3'},

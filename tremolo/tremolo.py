@@ -62,9 +62,6 @@ class Tremolo:
         return task
 
     def route(self, path, **options):
-        if isinstance(path, int):
-            return self.error(path)
-
         def decorator(func):
             self.add_route(func, path, **options)
             return func
@@ -73,12 +70,10 @@ class Tremolo:
 
     def error(self, code):
         def decorator(func):
-            for i, h in enumerate(self.routes[0]):
-                if code == h[0]:
-                    self.routes[0][i] = (
-                        h[0], func, dict(h[2], **getoptions(func)), h[3]
-                    )
-                    break
+            i = code - 400
+
+            if 0 <= i < len(self.routes[0]):
+                self.routes[0][i] = (code, func, getoptions(func), {})
 
             return func
 
@@ -678,6 +673,9 @@ class Tremolo:
 
                 for routes in self.routes.values():
                     for pattern, func, kw, _ in routes:
+                        if func is None:
+                            continue
+
                         print(
                             '  %s -> %s(%s)' %
                             (pattern,

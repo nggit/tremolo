@@ -1,5 +1,6 @@
 # Copyright (c) 2023 nggit
 
+from .exceptions import BadRequest, MethodNotAllowed, NotFound
 from .lib.http_protocol import HTTPProtocol
 from .lib.http_response import KEEPALIVE_OR_CLOSE, UPGRADE_OR_KEEPALIVE
 from .lib.sse import SSE
@@ -266,11 +267,7 @@ class HTTPServer(HTTPProtocol):
             return
 
         if not request.is_valid:
-            # bad request
-            await self._handle_response(
-                self.app.routes[0][0][1], self.app.routes[0][0][2]
-            )
-            return
+            raise BadRequest
 
         if key not in self.app.routes:
             key = parts[0]
@@ -332,13 +329,8 @@ class HTTPServer(HTTPProtocol):
 
             key = -1
 
-        if methods:  # method not allowed
+        if methods:
             response.set_header(b'Allow', b', '.join(methods))
+            raise MethodNotAllowed
 
-            await self._handle_response(
-                self.app.routes[0][2][1], self.app.routes[0][2][2]
-            )
-        else:  # not found
-            await self._handle_response(
-                self.app.routes[0][1][1], self.app.routes[0][1][2]
-            )
+        raise NotFound

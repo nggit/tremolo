@@ -11,22 +11,17 @@ from .utils import getoptions, is_async, to_sync
 class Routes(dict):
     def __init__(self):
         self[0] = [
-            (400, handlers.error_400, dict(status=(400, b'Bad Request')), {}),
-            (404, handlers.error_404, dict(request=None,
-                                           globals=None,
-                                           status=(404, b'Not Found'),
-                                           stream=False), {}),
-            (405, handlers.error_405,
-             dict(status=(405, b'Method Not Allowed')), {}),
-
-            # must be at the very end
-            (500, handlers.error_500, {}, {})
+            (400, handlers.error_400, {}, {}),
+            (401, None, {}, {}),
+            (402, None, {}, {}),
+            (403, None, {}, {}),
+            (404, handlers.error_404, {}, {}),
+            (405, handlers.error_405, {}, {})] + [
+            (code, handlers.error_500 if code == 500 else None, {}, {})
+            for code in range(406, 512)
         ]
         self[1] = [
-            (
-                b'^/+(?:\\?.*)?$',
-                handlers.index, dict(status=(503, b'Service Unavailable')), {}
-            )
+            (b'^/+(?:\\?.*)?$', handlers.index, getoptions(handlers.index), {})
         ]
         self[-1] = []
 
@@ -59,6 +54,9 @@ class Routes(dict):
     def compile(self, executor=None):
         for key in self:
             for i, (pattern, func, kwargs, options) in enumerate(self[key]):
+                if func is None:
+                    continue
+
                 if isinstance(pattern, bytes):
                     pattern = re.compile(pattern)
 

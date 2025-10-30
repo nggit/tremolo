@@ -463,7 +463,9 @@ class HTTPResponse(Response):
         elif not isinstance(exc, HTTPException):
             exc = InternalServerError(cause=exc)
 
-        self.headers.clear()
+        if self.line is not None:
+            self.headers.clear()
+
         self.set_status(exc.code, exc.message)
         self.set_content_type(exc.content_type)
 
