@@ -160,15 +160,17 @@ class HTTPProtocol(asyncio.Protocol):
         i = exc.code - 400 if isinstance(exc, HTTPException) else 100
 
         if 0 <= i < len(self.app.routes[0]):
+            if self.app.routes[0][i][1] is None:
+                i = 100
+
             _, func, kwargs, _ = self.app.routes[0][i]
 
-            if func is not None:
-                return await func(func=func,
-                                  kwargs=kwargs,
-                                  request=response.request,
-                                  response=response,
-                                  loop=self.loop,
-                                  exc=exc)
+            return await func(func=func,
+                              kwargs=kwargs,
+                              request=response.request,
+                              response=response,
+                              loop=self.loop,
+                              exc=exc)
 
     def handlers_timeout(self):
         if self.request is None or not self.request.upgraded:
