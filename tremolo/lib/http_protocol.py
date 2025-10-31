@@ -206,6 +206,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[1].put_nowait(None)
 
     async def _handle_request(self):
+        timer = self.set_handler_timeout(self.options['app_handler_timeout'])
+
         try:
             response = self.request.create_response()
 
@@ -250,14 +252,7 @@ class HTTPProtocol(asyncio.Protocol):
             if not self.events['request'].done():
                 self.events['request'].set_result(None)
 
-            timer = self.set_handler_timeout(
-                self.options['app_handler_timeout']
-            )
-
-            try:
-                await self.request_received(self.request, response)
-            finally:
-                timer.cancel()
+            await self.request_received(self.request, response)
         except (SystemExit, KeyboardInterrupt):
             raise
         except BaseException as exc:
@@ -266,9 +261,12 @@ class HTTPProtocol(asyncio.Protocol):
 
                 try:
                     data = await self.error_received(exc, response)
+                except Exception as e:
+                    exc = e
                 finally:
                     await response.handle_exception(exc, data=data)
         finally:
+            timer.cancel()
             await response.request.handler_exit()
 
     async def _receive_data(self):
