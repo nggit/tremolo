@@ -330,7 +330,6 @@ class HTTPServer(HTTPProtocol):
             key = -1
 
         if methods:
-            response.set_header(b'Allow', b', '.join(methods))
-            raise MethodNotAllowed
+            raise MethodNotAllowed(methods=methods)
 
         raise NotFound

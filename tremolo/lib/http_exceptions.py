@@ -37,6 +37,9 @@ class HTTPException(TremoloException):
         if isinstance(cause, Exception):
             self.__cause__ = cause
 
+            if cause.args:
+                self.args = cause.args
+
     @property
     def encoding(self):
         for key, value in parse_fields(self.content_type.encode('latin-1')):
@@ -69,6 +72,11 @@ class NotFound(HTTPException):
 class MethodNotAllowed(HTTPException):
     code = 405
     message = 'Method Not Allowed'
+
+    def __init__(self, *args, methods=(), **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.methods = methods
 
 
 class RequestTimeout(HTTPException):
