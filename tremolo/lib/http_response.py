@@ -15,7 +15,6 @@ from .http_exceptions import (
     InternalServerError,
     MethodNotAllowed,
     RangeNotSatisfiable,
-    RequestTimeout,
     WebSocketException,
     WebSocketServerClosed
 )
@@ -459,10 +458,7 @@ class HTTPResponse(Response):
             self.close()
             return
 
-        if isinstance(exc, TimeoutError):
-            exc = RequestTimeout(cause=exc)
-        elif not isinstance(exc, HTTPException):
-            exc = InternalServerError(cause=exc)
+        exc = HTTPException(cause=exc)
 
         if data is None:
             self.headers.clear()

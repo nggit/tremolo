@@ -21,10 +21,20 @@ class HTTPException(TremoloException):
     message = 'Internal Server Error'
     content_type = 'text/html; charset=utf-8'
 
+    def __new__(cls, *args, cause=None, **kwargs):
+        if isinstance(cause, HTTPException):
+            return cause
+
+        if cause is not None and cls is HTTPException:
+            if isinstance(cause, TimeoutError):
+                cls = RequestTimeout
+            else:
+                cls = InternalServerError
+
+        return super().__new__(cls)
+
     def __init__(self, *args, code=None, message=None, content_type=None,
                  cause=None):
-        self.args = args
-
         if isinstance(code, int):
             self.code = code
 
@@ -35,10 +45,13 @@ class HTTPException(TremoloException):
             self.content_type = content_type
 
         if isinstance(cause, Exception):
-            self.__cause__ = cause
+            if cause is not self:
+                self.__cause__ = cause
 
-            if cause.args:
-                self.args = cause.args
+            if cause.args and not args:
+                args = cause.args
+
+        self.args = args
 
     @property
     def encoding(self):
@@ -75,6 +88,9 @@ class MethodNotAllowed(HTTPException):
 
     def __init__(self, *args, methods=(), **kwargs):
         super().__init__(*args, **kwargs)
+
+        if kwargs.get('cause') is self and not methods:
+            methods = self.methods
 
         self.methods = methods
 
@@ -120,6 +136,9 @@ class ServiceUnavailable(HTTPException):
 
 class WebSocketException(HTTPException):
     code = 1011
+
+    def __new__(cls, *args, **kwargs):
+        return super().__new__(cls)
 
 
 class WebSocketClientClosed(WebSocketException):

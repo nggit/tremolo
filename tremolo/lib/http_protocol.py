@@ -8,7 +8,6 @@ from .http_exceptions import (
     HTTPException,
     BadRequest,
     ExpectationFailed,
-    InternalServerError,
     RequestTimeout
 )
 from .http_header import HTTPHeader
@@ -158,11 +157,7 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     async def error_received(self, exc, response):
-        if isinstance(exc, TimeoutError):
-            exc = RequestTimeout(cause=exc)
-        elif not isinstance(exc, HTTPException):
-            exc = InternalServerError(cause=exc)
-
+        exc = HTTPException(cause=exc)
         i = exc.code - 400
 
         if 0 <= i < len(self.app.routes[0]) and not response.headers_sent():
