@@ -13,8 +13,8 @@ from .http_exceptions import (
     HTTPException,
     BadRequest,
     InternalServerError,
+    MethodNotAllowed,
     RangeNotSatisfiable,
-    RequestTimeout,
     WebSocketException,
     WebSocketServerClosed
 )
@@ -458,17 +458,17 @@ class HTTPResponse(Response):
             self.close()
             return
 
-        if isinstance(exc, TimeoutError):
-            exc = RequestTimeout(cause=exc)
-        elif not isinstance(exc, HTTPException):
-            exc = InternalServerError(cause=exc)
+        exc = HTTPException(cause=exc)
 
-        self.headers.clear()
-        self.set_status(exc.code, exc.message)
-        self.set_content_type(exc.content_type)
+        if data is None:
+            self.headers.clear()
+            self.set_status(exc.code, exc.message)
+            self.set_content_type(exc.content_type)
 
-        if not data:
             data = str(exc)
+
+        if isinstance(exc, MethodNotAllowed):
+            self.set_header(b'Allow', b', '.join(exc.methods))
 
         if isinstance(data, str):
             data = data.encode(exc.encoding)

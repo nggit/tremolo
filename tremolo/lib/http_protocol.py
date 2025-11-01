@@ -156,10 +156,25 @@ class HTTPProtocol(asyncio.Protocol):
         raise NotImplementedError
 
     async def error_received(self, exc, response):
-        # internal server error
-        return await self.app.routes[0][-1][1](request=response.request,
-                                               response=response,
-                                               exc=exc)
+        exc = HTTPException(cause=exc)
+        i = exc.code - 400
+
+        if 0 <= i < len(self.app.routes[0]) and not response.headers_sent():
+            if self.app.routes[0][i][1] is None:
+                i = 100
+
+            _, func, kwargs, _ = self.app.routes[0][i]
+
+            response.headers.clear()
+            response.set_status(exc.code, exc.message)
+            response.set_content_type(exc.content_type)
+
+            return await func(func=func,
+                              kwargs=kwargs,
+                              request=response.request,
+                              response=response,
+                              loop=self.loop,
+                              exc=exc)
 
     def handlers_timeout(self):
         if self.request is None or not self.request.upgraded:
@@ -197,6 +212,8 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[1].put_nowait(None)
 
     async def _handle_request(self):
+        timer = self.set_handler_timeout(self.options['app_handler_timeout'])
+
         try:
             response = self.request.create_response()
 
@@ -241,14 +258,7 @@ class HTTPProtocol(asyncio.Protocol):
             if not self.events['request'].done():
                 self.events['request'].set_result(None)
 
-            timer = self.set_handler_timeout(
-                self.options['app_handler_timeout']
-            )
-
-            try:
-                await self.request_received(self.request, response)
-            finally:
-                timer.cancel()
+            await self.request_received(self.request, response)
         except (SystemExit, KeyboardInterrupt):
             raise
         except BaseException as exc:
@@ -257,9 +267,12 @@ class HTTPProtocol(asyncio.Protocol):
 
                 try:
                     data = await self.error_received(exc, response)
+                except Exception as e:
+                    exc = e
                 finally:
                     await response.handle_exception(exc, data=data)
         finally:
+            timer.cancel()
             await response.request.handler_exit()
 
     async def _receive_data(self):
