@@ -1,9 +1,20 @@
 # https://github.com/nggit/tremolo/discussions/306#discussioncomment-13772290
 
 import os
+import stat
+
 from urllib.parse import unquote_to_bytes
 
 from tremolo.exceptions import Forbidden
+
+
+def file_exists(path, follow_symlinks=True):
+    try:
+        st = os.stat(path, follow_symlinks=follow_symlinks)
+
+        return stat.S_ISREG(st.st_mode)
+    except (OSError, FileNotFoundError):
+        return False
 
 
 class StaticMiddleware:
@@ -12,6 +23,7 @@ class StaticMiddleware:
         self.document_root = os.path.abspath(
             options.get('document_root', os.getcwd())
         )
+        self.follow_symlinks = options.get('follow_symlinks', False)
         self.mime_types = {
             # core documents
             '.html': 'text/html; charset=utf-8',
@@ -76,7 +88,7 @@ class StaticMiddleware:
         dirname, basename = os.path.split(filepath)
         ext = os.path.splitext(basename)[-1]
 
-        if ext != '' and os.path.isfile(filepath):
+        if ext != '' and file_exists(filepath, self.follow_symlinks):
             if ext not in self.mime_types:
                 raise Forbidden(f'Disallowed file extension: {ext}')
 
