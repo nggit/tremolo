@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Author: nggit
+# Author: Anggit Arfanto
 # Description: Upload and stream multipart/form-data.
 
 from tremolo import Application

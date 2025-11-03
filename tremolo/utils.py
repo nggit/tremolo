@@ -1,18 +1,19 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
-__all__ = ('file_signature', 'getoptions', 'html_escape', 'is_async',
+import os
+import stat
+import sys
+
+from asyncio import run_coroutine_threadsafe as run_coroutine
+from datetime import datetime, timezone
+from html import escape
+from inspect import iscoroutinefunction, isasyncgenfunction
+from urllib.parse import unquote_to_bytes as unquote
+
+__all__ = ['file_signature', 'getoptions', 'html_escape', 'is_async',
            'log_date', 'memory_usage', 'parse_args', 'parse_fields',
-           'parse_int', 'print_logo', 'server_date', 'to_sync')
-
-import os  # noqa: E402
-import stat  # noqa: E402
-import sys  # noqa: E402
-
-from asyncio import run_coroutine_threadsafe as run_coroutine  # noqa: E402
-from datetime import datetime, timezone  # noqa: E402
-from html import escape  # noqa: E402
-from inspect import iscoroutinefunction, isasyncgenfunction  # noqa: E402
-from urllib.parse import unquote_to_bytes as unquote  # noqa: E402
+           'parse_int', 'print_logo', 'server_date', 'to_sync']
 
 
 def file_signature(path):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Author: nggit
+# Author: Anggit Arfanto
 # Description: Upload, stream multipart/form-data and save.
 
 import os

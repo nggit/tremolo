@@ -1,7 +1,8 @@
-__version__ = '0.4.10'
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
-from .tremolo import Tremolo, Tremolo as Application  # noqa: E402,F401
-from . import exceptions  # noqa: E402,F401
+from .tremolo import __version__, Tremolo, Tremolo as Application  # noqa: F401
+from . import exceptions  # noqa: F401
 
 
 def run(app, **options):

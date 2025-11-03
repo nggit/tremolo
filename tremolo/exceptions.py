@@ -1,4 +1,5 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
 from .lib.http_exceptions import (  # noqa: F401
     TremoloException,

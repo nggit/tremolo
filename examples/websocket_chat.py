@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Author: nggit
+# Author: Anggit Arfanto
 # Description: A simple WebSocket Chat with HTML and vanilla JS.
 
 import time

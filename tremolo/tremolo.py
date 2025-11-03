@@ -1,30 +1,30 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
-__all__ = ('Tremolo',)
+import asyncio
+import logging
+import multiprocessing as mp
+import os
+import signal
+import socket
+import ssl
+import sys
 
-import asyncio  # noqa: E402
-import logging  # noqa: E402
-import multiprocessing as mp  # noqa: E402
-import os  # noqa: E402
-import signal  # noqa: E402
-import socket  # noqa: E402
-import ssl  # noqa: E402
-import sys  # noqa: E402
+from importlib import import_module, reload as reload_module
+from io import TextIOWrapper
+from shutil import get_terminal_size
 
-from importlib import import_module, reload as reload_module  # noqa: E402
-from io import TextIOWrapper  # noqa: E402
-from shutil import get_terminal_size  # noqa: E402
-
-from . import __version__  # noqa: E402
-from .managers import ProcessManager  # noqa: E402
-from .routes import Routes  # noqa: E402
-from .utils import (  # noqa: E402
+from .managers import ProcessManager
+from .routes import Routes
+from .utils import (
     file_signature, getoptions, log_date, memory_usage, print_logo, server_date
 )
-from .lib.connections import KeepAliveConnections  # noqa: E402
-from .lib.contexts import WorkerContext  # noqa: E402
-from .lib.executors import MultiThreadExecutor  # noqa: E402
-from .lib.locks import ServerLock  # noqa: E402
+from .lib.connections import KeepAliveConnections
+from .lib.contexts import WorkerContext
+from .lib.executors import MultiThreadExecutor
+from .lib.locks import ServerLock
+
+__version__ = '0.4.10'
 
 
 class Tremolo:

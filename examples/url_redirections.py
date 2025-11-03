@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Author: nggit
+# Author: Anggit Arfanto
 # Description: URL Redirections
 
 from tremolo import Application

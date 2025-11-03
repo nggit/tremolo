@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Author: nggit
+# Author: Anggit Arfanto
 # Description: Serving static files with StaticMiddleware
 
 from tremolo import Application

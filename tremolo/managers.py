@@ -1,15 +1,16 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
-__all__ = ('ProcessManager',)
+import multiprocessing as mp
+import os
+import signal
 
-import multiprocessing as mp  # noqa: E402
-import os  # noqa: E402
-import signal  # noqa: E402
-
-from threading import Thread  # noqa: E402
+from threading import Thread
 
 PARENT = 0
 CHILD = 1
+
+__all__ = ['ProcessManager']
 
 
 def sigterm_handler(signum, frame):

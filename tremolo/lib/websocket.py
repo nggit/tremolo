@@ -1,4 +1,5 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
 import base64
 import hashlib
@@ -33,7 +34,7 @@ class WebSocket:
             raise StopAsyncIteration from exc
 
     async def accept(self):
-        sha1_hash = hashlib.sha1(  # nosec B303, B324
+        sha1_hash = hashlib.sha1(  # nosec B303,B324
             self.request.headers[b'sec-websocket-key'][0] + _MAGIC
         ).digest()
         accept_key = base64.b64encode(sha1_hash)
