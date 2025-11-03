@@ -1,14 +1,15 @@
-__all__ = ('syncify', 'read_header', 'getcontents',
+
+import asyncio
+import logging
+import socket
+import time
+
+from functools import wraps
+
+__all__ = ['syncify', 'read_header', 'getcontents',
            'chunked_detected', 'read_chunked', 'valid_chunked',
            'create_dummy_data', 'create_chunked_body',
-           'create_dummy_body', 'create_multipart_body', 'logger')
-
-import asyncio  # noqa: E402
-import logging  # noqa: E402
-import socket  # noqa: E402
-import time  # noqa: E402
-
-from functools import wraps  # noqa: E402
+           'create_dummy_body', 'create_multipart_body', 'logger']
 
 
 def syncify(coro):

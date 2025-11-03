@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 [project]
 name = 'tremolo'
 authors = [
-    { name = 'nggit', email = 'contact@anggit.com' },
+    { name = ' Anggit Arfanto', email = 'contact@anggit.com' },
 ]
 description = """\
     Tremolo is a stream-oriented, asynchronous, programmable HTTP server \

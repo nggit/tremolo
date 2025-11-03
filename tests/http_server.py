@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
-__all__ = ('app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE', 'LIMIT_MEMORY')
-
-import asyncio  # noqa: E402
-import concurrent.futures  # noqa: E402
-import os  # noqa: E402
-import sys  # noqa: E402
+import asyncio
+import concurrent.futures
+import os
+import sys
 
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -26,6 +24,8 @@ TEST_FILE = __file__
 app = Application()
 sub = Application()
 subsub = Application()
+
+__all__ = ['app', 'HTTP_HOST', 'HTTP_PORT', 'TEST_FILE', 'LIMIT_MEMORY']
 
 
 @app.on_worker_start  # priority=999 (low)

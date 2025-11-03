@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
-__all__ = ('app', 'ASGI_HOST', 'ASGI_PORT')
-
-import os  # noqa: E402
-import sys  # noqa: E402
+import os
+import sys
 
 # makes imports relative from the repo directory
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import tremolo  # noqa: E402
-
 from tests.http_server import HTTP_PORT, TEST_FILE  # noqa: E402
 
 if sys.version_info[:2] < (3, 8) or sys.implementation.name != 'cpython':
@@ -20,6 +17,8 @@ else:
     ASGI_HOST = '::'
 
 ASGI_PORT = HTTP_PORT + 10
+
+__all__ = ['app', 'ASGI_HOST', 'ASGI_PORT']
 
 
 async def app(scope, receive, send):

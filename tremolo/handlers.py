@@ -1,4 +1,5 @@
-# Copyright (c) 2023 nggit
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2023 Anggit Arfanto
 
 from traceback import TracebackException
 
