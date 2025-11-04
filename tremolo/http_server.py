@@ -331,6 +331,6 @@ class HTTPServer(HTTPProtocol):
             key = -1
 
         if methods:
-            raise MethodNotAllowed(methods=methods)
+            raise MethodNotAllowed(allow=b', '.join(methods))
 
         raise NotFound

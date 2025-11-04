@@ -395,6 +395,14 @@ async def timeouts(request, response):
         await asyncio.sleep(10)
 
 
+@app.route('/redirect')
+async def redirect(request, response):
+    if request.query_string:
+        raise response.redirect('/new', code=int(request.query_string))
+
+    raise response.redirect('/new')
+
+
 @app.route('/reload')
 async def reload(request, **server):
     assert server != {}

@@ -35,7 +35,7 @@ class HTTPException(TremoloException):
         return super().__new__(cls)
 
     def __init__(self, *args, code=None, message=None, content_type=None,
-                 cause=None):
+                 cause=None, **options):
         if isinstance(code, int):
             self.code = code
 
@@ -46,13 +46,17 @@ class HTTPException(TremoloException):
             self.content_type = content_type
 
         if isinstance(cause, Exception):
-            if cause is not self:
+            if cause is self:
+                if not options:
+                    options = self.options
+            else:
                 self.__cause__ = cause
 
             if cause.args and not args:
                 args = cause.args
 
         self.args = args
+        self.options = options
 
     @property
     def encoding(self):
@@ -61,6 +65,11 @@ class HTTPException(TremoloException):
                 return value.decode('latin-1')
 
         return 'utf-8'
+
+
+class HTTPRedirect(HTTPException):
+    code = 302
+    message = 'Found'
 
 
 class BadRequest(HTTPException):
@@ -86,14 +95,6 @@ class NotFound(HTTPException):
 class MethodNotAllowed(HTTPException):
     code = 405
     message = 'Method Not Allowed'
-
-    def __init__(self, *args, methods=(), **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if kwargs.get('cause') is self and not methods:
-            methods = self.methods
-
-        self.methods = methods
 
 
 class RequestTimeout(HTTPException):

@@ -16,5 +16,11 @@ async def redirect_handler(response, **server):
     return ''
 
 
+@app.route('/redirect')
+async def redirect_helper_handler(response, **server):
+    # or use a helper. it's an instance of `tremolo.exceptions.HTTPRedirect`
+    raise response.redirect('http://example.com/', code=301)
+
+
 if __name__ == '__main__':
     app.run('0.0.0.0', 8000)

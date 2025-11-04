@@ -1085,7 +1085,40 @@ class TestHTTPServer(unittest.TestCase):
 
         self.assertEqual(header[:header.find(b'\r\n')],
                          b'HTTP/1.1 405 Method Not Allowed')
-        self.assertTrue(b'\r\nAllow: GET' in header)
+        self.assertTrue(b'\r\nallow: GET' in header)
+
+    def test_redirect(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/redirect?303',
+                                   version='1.0')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 302 Found')
+        self.assertTrue(b'\r\nlocation: /new' in header)
+
+    def test_redirect_301(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/redirect?301',
+                                   version='1.0')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.0 301 Moved Permanently')
+        self.assertTrue(b'\r\nlocation: /new' in header)
+
+    def test_redirect_303(self):
+        header, body = getcontents(host=HTTP_HOST,
+                                   port=HTTP_PORT,
+                                   method='GET',
+                                   url='/redirect?303',
+                                   version='1.1')
+
+        self.assertEqual(header[:header.find(b'\r\n')],
+                         b'HTTP/1.1 303 See Other')
+        self.assertTrue(b'\r\nlocation: /new' in header)
 
 
 if __name__ == '__main__':

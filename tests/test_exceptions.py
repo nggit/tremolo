@@ -55,24 +55,24 @@ class TestExceptions(unittest.TestCase):
         self.assertEqual(b.args, ('bar',))
 
     def test_from_methodnotallowed(self):
-        a = MethodNotAllowed('foo', methods=(b'GET',))
+        a = MethodNotAllowed('foo', allow=b'GET')
         b = HTTPException(cause=a)
 
         self.assertTrue(b is a)
         self.assertEqual(b.__class__, MethodNotAllowed)
         self.assertEqual(b.__cause__, None)
         self.assertEqual(b.args, ('foo',))
-        self.assertEqual(b.methods, (b'GET',))
+        self.assertEqual(b.options['allow'], b'GET')
 
-    def test_from_methodnotallowed_override_args_methods(self):
-        a = MethodNotAllowed('foo', methods=(b'GET',))
-        b = HTTPException('bar', cause=a, methods=(b'POST',))
+    def test_from_methodnotallowed_override_args_options(self):
+        a = MethodNotAllowed('foo', allow=b'GET')
+        b = HTTPException('bar', cause=a, allow=b'POST')
 
         self.assertTrue(b is a)
         self.assertEqual(b.__class__, MethodNotAllowed)
         self.assertEqual(b.__cause__, None)
         self.assertEqual(b.args, ('bar',))
-        self.assertEqual(b.methods, (b'POST',))
+        self.assertEqual(b.options['allow'], b'POST')
 
     def test_to_forbidden(self):
         a = ValueError('foo')

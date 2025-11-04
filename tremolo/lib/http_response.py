@@ -12,9 +12,9 @@ from urllib.parse import quote, unquote_to_bytes
 from tremolo.utils import parse_fields
 from .http_exceptions import (
     HTTPException,
+    HTTPRedirect,
     BadRequest,
     InternalServerError,
-    MethodNotAllowed,
     RangeNotSatisfiable,
     WebSocketException,
     WebSocketServerClosed
@@ -430,6 +430,16 @@ class HTTPResponse(Response):
 
         self.close(keepalive=True)
 
+    def redirect(self, url, code=None):
+        if code == 301:
+            message = 'Moved Permanently'
+        elif code == 303 and self.request.version != b'1.0':
+            message = 'See Other'
+        else:
+            return HTTPRedirect('', location=url)
+
+        return HTTPRedirect('', code=code, message=message, location=url)
+
     async def handle_exception(self, exc, *args, data=None):
         if self.request.protocol is None or self.request.transport is None:
             return
@@ -438,7 +448,7 @@ class HTTPResponse(Response):
             self.request.transport.abort()
             return
 
-        if not isinstance(exc, asyncio.CancelledError):
+        if not isinstance(exc, (asyncio.CancelledError, HTTPRedirect)):
             self.request.protocol.print_exception(
                 exc, *args, quote(unquote_to_bytes(self.request.path))
             )
@@ -468,10 +478,10 @@ class HTTPResponse(Response):
 
             data = str(exc)
 
-        if isinstance(exc, MethodNotAllowed):
-            self.set_header(b'Allow', b', '.join(exc.methods))
+        for name, value in exc.options.items():
+            self.set_header(name.replace('_', '-'), value)
 
         if isinstance(data, str):
             data = data.encode(exc.encoding)
 
-        await self.end(data, keepalive=False)
+        await self.end(data, keepalive=exc.code < 400)
