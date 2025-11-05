@@ -130,11 +130,10 @@ class WebSocket:
         payload = bytearray()
 
         while self.opcode != 8:
+            loop = self.request.server.loop  # may raise RuntimeError
             coro = self.ping()
-            timer = self.request.server.loop.call_at(
-                self.request.server.loop.time() + self.ping_interval,
-                self.request.server.create_task, coro
-            )
+            timer = loop.call_at(loop.time() + self.ping_interval,
+                                 self.request.server.create_task, coro)
 
             try:
                 frame = await self.recv(timeout)
@@ -221,12 +220,10 @@ class WebSocket:
     async def close(self, code=1000, *, timeout=None):
         try:
             await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
+            await self.receive(timeout)
         except RuntimeError:
             return
-
-        try:
-            await self.receive(timeout)
         except (WebSocketClientClosed, WebSocketServerClosed):
             pass
-        finally:
-            self.response.close()
+
+        self.response.close()
