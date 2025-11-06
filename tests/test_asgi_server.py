@@ -178,7 +178,8 @@ class TestASGIServer(unittest.TestCase):
                 b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
                 b'Connection: upgrade\r\n\r\n%s' % (
                     ASGI_PORT,
-                    WebSocket.create_frame(b'Hello, world!', mask=True))
+                    WebSocket.create_frame(b'Hello, world!', mask=True) +
+                    WebSocket.create_frame(b'\x03\xe8', opcode=8))
         )
         self.assertEqual(body[:15], WebSocket.create_frame(b'Hello, world!'))
 
@@ -219,7 +220,8 @@ class TestASGIServer(unittest.TestCase):
                 b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
                 b'Connection: upgrade\r\n\r\n%s' % (
                     ASGI_PORT,
-                    WebSocket.create_frame(b'', mask=True, opcode=0xc))
+                    WebSocket.create_frame(b'', mask=True, opcode=0xc) +
+                    WebSocket.create_frame(b'\x03\xe8', opcode=8))
         )
         self.assertEqual(body, b'\x88\x02\x03\xf0')
 

@@ -7,12 +7,13 @@ from .contexts import RequestContext
 
 
 class Request:
-    __slots__ = ('protocol', 'context', 'body_size')
+    __slots__ = ('protocol', 'context', 'body_size', 'timeout')
 
     def __init__(self, protocol):
         self.protocol = protocol
         self.context = RequestContext()
         self.body_size = 0
+        self.timeout = protocol.options['keepalive_timeout']
 
     @property
     def server(self):
@@ -48,12 +49,12 @@ class Request:
         self.protocol = None  # cut off access to the protocol object
 
     async def recv(self, timeout=None):
-        if timeout is None:
-            timeout = self.server.options['keepalive_timeout']
+        if timeout is not None:
+            self.timeout = timeout
 
         while self.server.queue:
             try:
-                data = await self.server.queue[0].get(timeout)
+                data = await self.server.queue[0].get(self.timeout)
             except asyncio.CancelledError as exc:
                 raise TimeoutError('recv timeout') from exc
 

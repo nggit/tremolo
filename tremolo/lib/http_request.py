@@ -153,6 +153,8 @@ class HTTPRequest(Request):
 
         if self._stream is None:
             self._stream = self.stream(timeout, raw)
+        elif timeout is not None:  # update
+            self.timeout = timeout
 
         if size == -1:
             return await self._stream.__anext__()

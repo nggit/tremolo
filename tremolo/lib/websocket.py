@@ -14,11 +14,11 @@ class WebSocket:
     def __init__(self, request, response):
         self.request = request
         self.response = response
+        self.max_payload_size = request.server.options['ws_max_payload_size']
+        self.ping_interval = request.server.options['keepalive_timeout'] / 2
+
         self.fin = 1
         self.opcode = 0
-
-        self._max_payload_size = request.server.options['ws_max_payload_size']
-        self._receive_timeout = request.server.options['keepalive_timeout'] / 2
 
     def __aiter__(self):
         return self
@@ -44,18 +44,18 @@ class WebSocket:
         self.response.set_header(b'Sec-WebSocket-Accept', accept_key)
         await self.response.write()
 
-    async def recv(self):
+    async def recv(self, timeout=None):
         try:
-            first_byte, second_byte = await self.request.recv(2)
+            b1, b2 = await self.request.recv(2, timeout=timeout)
         except ValueError as exc:
             raise WebSocketClientClosed(
                 'connection closed: recv failed'
             ) from exc
 
-        fin = (first_byte & 0x80) >> 7
-        opcode = first_byte & 0x0f
-        is_masked = (second_byte & 0x80) >> 7
-        payload_length = second_byte & 0x7f
+        fin = (b1 & 0x80) >> 7
+        opcode = b1 & 0x0f
+        is_masked = (b2 & 0x80) >> 7
+        payload_length = b2 & 0x7f
 
         if opcode != 0:
             if self.fin != 1:
@@ -80,10 +80,10 @@ class WebSocket:
             payload_length = int.from_bytes(await self.request.recv(8),
                                             byteorder='big')
 
-            if payload_length > self._max_payload_size:
+            if payload_length > self.max_payload_size:
                 raise WebSocketServerClosed(
                     '%d exceeds maximum payload size (%d)' %
-                    (payload_length, self._max_payload_size),
+                    (payload_length, self.max_payload_size),
                     code=1009
                 )
 
@@ -126,18 +126,17 @@ class WebSocket:
             code=1008
         )
 
-    async def receive(self):
+    async def receive(self, timeout=None):
         payload = bytearray()
 
-        while True:
+        while self.opcode != 8:
+            loop = self.request.server.loop  # may raise RuntimeError
             coro = self.ping()
-            timer = self.request.server.loop.call_at(
-                self.request.server.loop.time() + self._receive_timeout,
-                self.request.server.create_task, coro
-            )
+            timer = loop.call_at(loop.time() + self.ping_interval,
+                                 self.request.server.create_task, coro)
 
             try:
-                frame = await self.recv()
+                frame = await self.recv(timeout)
             except TimeoutError as exc:
                 raise WebSocketServerClosed('receive timeout',
                                             code=1000) from exc
@@ -151,12 +150,14 @@ class WebSocket:
 
             payload.extend(frame)
 
-            if len(payload) > self._max_payload_size:
+            if len(payload) > self.max_payload_size:
                 raise WebSocketServerClosed('maximum payload size exceeded',
                                             code=1009)
 
             if self.fin == 1:
                 break
+        else:
+            raise WebSocketClientClosed('connection already closed')
 
         if self.opcode == 1:
             return payload.decode('utf-8')
@@ -174,24 +175,24 @@ class WebSocket:
         if opcode == 1:
             payload_data = payload_data.encode('utf-8')
 
-        first_byte = (fin << 7) | opcode
+        b1 = (fin << 7) | opcode
         payload_length = len(payload_data)
 
         if payload_length < 126:
-            second_byte = payload_length
+            b2 = payload_length
             payload_length_data = b''
         elif payload_length < 65536:
-            second_byte = 126
+            b2 = 126
             payload_length_data = payload_length.to_bytes(2, byteorder='big')
         else:
-            second_byte = 127
+            b2 = 127
             payload_length_data = payload_length.to_bytes(8, byteorder='big')
 
         if mask:
-            second_byte |= (1 << 7)
+            b2 |= (1 << 7)
             masking_key = os.urandom(4)
 
-        frame_header = bytes([first_byte, second_byte]) + payload_length_data
+        frame_header = bytes([b1, b2]) + payload_length_data
 
         if mask:
             masked_payload_data = bytes(
@@ -216,9 +217,13 @@ class WebSocket:
     async def pong(self, data=b''):
         await self.send(data, opcode=10)
 
-    async def close(self, code=1000):
+    async def close(self, code=1000, *, timeout=None):
         try:
             await self.send(code.to_bytes(2, byteorder='big'), opcode=8)
-            self.response.close(keepalive=True)
+            await self.receive(timeout)
         except RuntimeError:
+            return
+        except (WebSocketClientClosed, WebSocketServerClosed):
             pass
+
+        self.response.close()
