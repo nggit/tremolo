@@ -448,7 +448,7 @@ class HTTPResponse(Response):
             self.request.transport.abort()
             return
 
-        if not isinstance(exc, (asyncio.CancelledError, HTTPRedirect)):
+        if not isinstance(exc, HTTPRedirect):
             self.request.protocol.print_exception(
                 exc, *args, quote(unquote_to_bytes(self.request.path))
             )
@@ -461,7 +461,7 @@ class HTTPResponse(Response):
                 )
                 await self.send(data)
 
-            self.close(keepalive=True)
+            self.close()
             return
 
         # HTTP

@@ -195,10 +195,12 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
     def print_exception(self, exc, *args):
-        self.logger.error(
-            ': '.join((*args, exc.__class__.__name__, str(exc))),
-            exc_info=self.options['debug'] and exc
-        )
+        msg = ': '.join((*args, exc.__class__.__name__, str(exc)))
+
+        if isinstance(exc, HTTPException) and exc.code < 500:
+            self.logger.info(msg, exc_info=self.options['debug'] and exc)
+        elif not isinstance(exc, asyncio.CancelledError):
+            self.logger.error(msg, exc_info=self.options['debug'] and exc)
 
     def send_continue(self):
         if self.request is None or not self.request.http_continue:

@@ -78,6 +78,7 @@ class ASGIServer(HTTPProtocol):
                     exc = WebSocketServerClosed(cause=exc)
 
                 await response.handle_exception(exc, 'app')
+                app.response = None
         finally:
             scope.clear()
 
@@ -140,12 +141,12 @@ class ASGIAppWrapper:
                         await self._websocket.close(1011 if code == 1005
                                                     else 1000)
 
+                    self._websocket = None
+                    self.response = None
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
                         self.protocol.options['app_close_timeout']
                     )
-                    self._websocket = None
-                    self.response = None
 
                 return {
                     'type': 'websocket.disconnect',
@@ -186,11 +187,12 @@ class ASGIAppWrapper:
                             raise
                 else:
                     await self.response.handle_exception(exc, 'receive')
+                    self.response = None
+                    raise asyncio.CancelledError from None
 
                 self.protocol.set_handler_timeout(
                     self.protocol.options['app_close_timeout']
                 )
-                self.response = None
 
             return {'type': 'http.disconnect'}
 
