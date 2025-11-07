@@ -12,7 +12,7 @@ class TremoloException(Exception):
 
     def __str__(self):
         if self.args:
-            return ' '.join(self.args)
+            return ' '.join(map(str, self.args))
 
         return self.message
 
