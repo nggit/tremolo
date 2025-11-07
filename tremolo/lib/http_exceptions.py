@@ -136,7 +136,7 @@ class ServiceUnavailable(HTTPException):
     message = 'Service Unavailable'
 
 
-class WebSocketException(InternalServerError):
+class WebSocketException(HTTPException):
     code = 1011
 
     def __new__(cls, *args, **kwargs):

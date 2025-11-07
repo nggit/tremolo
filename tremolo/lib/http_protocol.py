@@ -199,7 +199,7 @@ class HTTPProtocol(asyncio.Protocol):
 
         if isinstance(exc, HTTPException) and exc.code < 500:
             self.logger.info(msg, exc_info=self.options['debug'] and exc)
-        else:
+        elif not isinstance(exc, asyncio.CancelledError):
             self.logger.error(msg, exc_info=self.options['debug'] and exc)
 
     def send_continue(self):
