@@ -405,16 +405,18 @@ class Tremolo:
         paths = [path for path in sys.path
                  if not self.context.options['app_dir'].startswith(path)]
         modules = {}
+        set_threshold = getattr(gc, 'set_threshold', None)
 
         while True:
             await asyncio.sleep(1)
 
-            gc.set_threshold(0, int(len(self.context.tasks) ** 0.5) + 10)
+            if set_threshold:
+                set_threshold(0, int(len(self.context.tasks) ** 0.5) + 10)
 
-            if gc.get_count()[1] < gc.get_threshold()[1]:
-                gc.collect(0)
-            else:
-                gc.collect()
+                if gc.get_count()[1] < gc.get_threshold()[1]:
+                    gc.collect(0)
+                else:
+                    gc.collect()
 
             # update server date
             self.context.info['server_date'] = server_date()
