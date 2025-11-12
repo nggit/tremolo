@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Anggit Arfanto
 
 import asyncio
+import gc
 import logging
 import multiprocessing as mp
 import os
@@ -407,6 +408,13 @@ class Tremolo:
 
         while True:
             await asyncio.sleep(1)
+
+            gc.set_threshold(0, int(len(self.context.tasks) ** 0.5) + 10)
+
+            if gc.get_count()[1] < gc.get_threshold()[1]:
+                gc.collect(0)
+            else:
+                gc.collect()
 
             # update server date
             self.context.info['server_date'] = server_date()
