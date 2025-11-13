@@ -416,7 +416,10 @@ class Tremolo:
                 if gc.get_count()[1] < gc.get_threshold()[1]:
                     gc.collect(0)
                 else:
-                    gc.collect()
+                    n = gc.collect()
+
+                    if n:
+                        self.logger.info('collected %d unreachable objects', n)
 
             # update server date
             self.context.info['server_date'] = server_date()
