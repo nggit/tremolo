@@ -17,7 +17,8 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('queue', 'events', 'handlers', '_recv_buf', '_watermarks')
+    __slots__ = ('server', 'queue', 'events', 'handlers', '_recv_buf',
+                 '_watermarks')
 
     def __init__(self, app, **kwargs):
         self.app = app
@@ -30,14 +31,11 @@ class HTTPProtocol(asyncio.Protocol):
         self.fileno = -1
         self.request = None  # current request object
 
+        self.server = self.__dict__.copy()  # all the unslotted objects above
         self.queue = [Queue(), Queue()]  # IN, OUT
         self.events = {}
         self.handlers = set()
         self._recv_buf = bytearray()
-
-    @property
-    def server(self):  # all properties except those that are slotted
-        return self.__dict__
 
     @property
     def options(self):
@@ -443,6 +441,8 @@ class HTTPProtocol(asyncio.Protocol):
         # a fresh http request (not a continuation data)
         self.request.clear()
         self.request = None
+        self.server.clear()
+        self.server.update(self.__dict__)
         self.queue[1].queue.clear()
 
         if self._recv_buf:
@@ -468,6 +468,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.request = None
 
         self.context.clear()
+        self.server.clear()
         self.events.clear()
 
         self.set_handler_timeout(self.options['app_close_timeout'])

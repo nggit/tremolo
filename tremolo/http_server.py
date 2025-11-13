@@ -239,6 +239,7 @@ class HTTPServer(HTTPProtocol):
         response.close(keepalive=True)
 
     async def request_received(self, request, response):
+        self.server['request'] = request
         self.server['response'] = response
         self.server['next'] = 0
 
@@ -312,18 +313,11 @@ class HTTPServer(HTTPProtocol):
 
                             matches['self'] = kwargs['self'](**options)
 
-                        for k in list(matches):
-                            if k in self.server:
-                                del matches[k]
-                            else:
-                                self.server[k] = matches[k]
+                        for k in matches:
+                            self.server.setdefault(k, matches[k])
 
-                        try:
-                            await self._handle_response(func, kwargs)
-                            return
-                        finally:
-                            for k in matches:
-                                del self.server[k]
+                        await self._handle_response(func, kwargs)
+                        return
 
             if methods or key == -1:
                 break
