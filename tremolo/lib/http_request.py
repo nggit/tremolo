@@ -295,7 +295,7 @@ class HTTPRequest(Request):
     async def form(self, max_fields=100, *, max_size=8 * 1048576):
         try:
             return self.params['post']
-        except KeyError as exc:
+        except KeyError:
             content_type = self.headers.getlist(b'content-type', b';')
             self.params['post'] = {}
             self.params['files'] = {}
@@ -305,7 +305,7 @@ class HTTPRequest(Request):
                     self._body.extend(data)
 
                     if self.body_size > max_size:
-                        raise ValueError('form size limit reached') from exc
+                        raise ValueError('form size limit reached') from None
 
                 if 2 < self.body_size <= max_size:
                     self.params['post'] = parse_qs(
@@ -323,7 +323,7 @@ class HTTPRequest(Request):
                         raise ValueError(
                             'fragmented file. consider increasing the '
                             'max_size limit or stream using request.files()'
-                        ) from exc
+                        ) from None
 
                     name = part.pop('name', '')
 
@@ -345,7 +345,7 @@ class HTTPRequest(Request):
 
                 return self.params['post']
 
-            raise BadRequest('invalid Content-Type') from exc
+            raise BadRequest('invalid Content-Type') from None
 
     async def files(self, max_files=1024, *, max_file_size=100 * 1048576):
         if self.eof():
