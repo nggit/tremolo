@@ -41,13 +41,13 @@ class Queue:
 
             try:
                 return await fut
-            except asyncio.CancelledError:
+            except asyncio.CancelledError as exc:
                 try:
                     self._getters.remove(fut)
                 except ValueError:
                     pass
 
-                raise
+                raise exc from None
             finally:
                 if timeout is not None:
                     timer.cancel()
