@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Anggit Arfanto
 
 import asyncio
+import gc
 import logging
 import multiprocessing as mp
 import os
@@ -404,9 +405,21 @@ class Tremolo:
         paths = [path for path in sys.path
                  if not self.context.options['app_dir'].startswith(path)]
         modules = {}
+        set_threshold = getattr(gc, 'set_threshold', None)
 
         while True:
             await asyncio.sleep(1)
+
+            if set_threshold:
+                set_threshold(0, int(len(self.context.tasks) ** 0.5) + 10)
+
+                if gc.get_count()[1] < gc.get_threshold()[1]:
+                    gc.collect(0)
+                else:
+                    n = gc.collect()
+
+                    if n:
+                        self.logger.info('collected %d unreachable objects', n)
 
             # update server date
             self.context.info['server_date'] = server_date()
