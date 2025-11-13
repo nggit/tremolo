@@ -295,7 +295,7 @@ class HTTPRequest(Request):
     async def form(self, max_fields=100, *, max_size=8 * 1048576):
         try:
             return self.params['post']
-        except KeyError as exc:
+        except KeyError:
             content_type = self.headers.getlist(b'content-type', b';')
             self.params['post'] = {}
             self.params['files'] = {}
