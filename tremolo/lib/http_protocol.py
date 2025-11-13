@@ -17,8 +17,7 @@ from .queue import Queue
 
 
 class HTTPProtocol(asyncio.Protocol):
-    __slots__ = ('server', 'queue', 'events', 'handlers', '_recv_buf',
-                 '_watermarks')
+    __slots__ = ('server', 'queue', 'events', 'handlers', '_recv_buf')
 
     def __init__(self, app, **kwargs):
         self.app = app
