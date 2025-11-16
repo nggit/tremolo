@@ -152,6 +152,7 @@ class HTTPResponse(Response):
         if b'\r' in content_type or b'\n' in content_type:
             raise InternalServerError
 
+        self.headers.pop(b'content-type', None)
         self.content_type = content_type
 
     def close(self, keepalive=False):
