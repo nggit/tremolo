@@ -18,7 +18,7 @@ from tests.netizen import HTTPClient  # noqa: E402
 from tests.utils import create_dummy_body  # noqa: E402
 
 
-class TestASGIServer(unittest.TestCase):
+class TestASGI(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
@@ -233,10 +233,11 @@ if __name__ == '__main__':
     p.start()
 
     try:
-        unittest.main()
+        suite = unittest.TestLoader().discover(
+            'tests', pattern='test_asgi*.py'
+        )
+        unittest.TextTestRunner().run(suite)
     finally:
         if p.is_alive():
             os.kill(p.pid, signal.SIGINT)
             p.join()
-
-# END
