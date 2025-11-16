@@ -11,11 +11,19 @@ from .http_response import HTTPResponse
 __version__ = '0.0.2'
 
 
+def capitalize(name):
+    return b'-'.join(part.capitalize() for part in name.split(b'-'))
+
+
 def getfamily(host, port=None):
     if port is None:
         return socket.AF_UNIX, host
 
     family = socket.AF_INET6 if ':' in host else socket.AF_INET
+
+    if host in ('0.0.0.0', '::'):
+        host = 'localhost'
+
     return family, (host, port)
 
 
@@ -124,30 +132,15 @@ class HTTPClient(Client):
         super().__init__(host, port, **kwargs)
 
         if port is None:
-            host = b'localhost'
+            host = 'localhost'
         else:
-            host = b'%s:%d' % (host.encode('latin-1'), port)
+            host = '%s:%d' % self.address
 
         self.headers = [
-            b'Host: ' + host,
+            b'Host: ' + host.encode('latin-1'),
             b'User-Agent: netizen/' + __version__.encode('latin-1'),
             b'Accept: */*'
         ]
-
-    def remove_header(self, name):
-        i = len(self.headers)
-
-        while i > 0:
-            i -= 1
-
-            if self.headers[i].startswith(b'%s:' % name):
-                del self.headers[i]
-
-    def update_header(self, value):
-        name, _ = value.split(b':', 1)
-
-        self.remove_header(name)
-        self.headers.append(value)
 
     def update_cookie(self, value):
         name, _ = value.split(b'=', 1)
@@ -160,13 +153,24 @@ class HTTPClient(Client):
             self.headers.append(b'Cookie: %s' % value)
 
     def send(self, line, *args, body=b''):
-        headers = list(args)
+        headers = self.headers.copy()
 
-        if body and not headers:
+        for arg in args:
+            name, value = arg.split(b':', 1)
+            name = capitalize(name)
+
+            if name == b'Host':
+                headers[0] = b'Host: ' + value.strip(b' \t')
+            elif name == b'User-Agent':
+                headers[1] = b'User-Agent: ' + value.strip(b' \t')
+            else:
+                headers.append(name + b': ' + value.strip(b' \t'))
+
+        if body and not args:
             headers.append(b'Content-Type: application/x-www-form-urlencoded')
             headers.append(b'Content-Length: %d' % len(body))
 
-        header = b'\r\n'.join(self.headers + headers)
+        header = b'\r\n'.join(headers)
         defer = body == b'' and (b'\r\nContent-Length:' in header or
                                  b'\r\nTransfer-Encoding:' in header)
 

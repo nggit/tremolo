@@ -106,10 +106,13 @@ class TestHTTPServer(unittest.TestCase):
 
     def test_get_doublehost_11(self):
         with self.client:
-            response = self.client.send(
-                b'GET /gethost HTTP/1.1',
-                b'Host: host.local'
+            self.client.sendall(
+                b'GET /gethost HTTP/1.1\r\n'
+                b'Host: localhost\r\n'
+                b'Host: host.local\r\n\r\n'
             )
+
+            response = self.client.end()
 
             self.assertEqual(response.status, 400)
             self.assertEqual(response.message, b'Bad Request')
@@ -585,7 +588,7 @@ class TestHTTPServer(unittest.TestCase):
         with self.client:
             response = self.client.send(
                 b'GET / HTTP/1.1',
-                b'\x00' * 8192
+                b'Host: ' + b'\x00' * 8192
             )
 
             self.assertEqual(response.status, 400)
@@ -874,35 +877,159 @@ class TestHTTPServer(unittest.TestCase):
             self.assertEqual(response.message, b'Range Not Satisfiable')
             self.assertEqual(response.body(), b'Range Not Satisfiable')
 
-    def test_websocket(self):
-        for query, data_in, data_out, opcode, in (
-                (b'receive', 'Hello, world!', b'\x81\rHello, world!', None),
-                (b'receive', b'i' * 127, b'\x82~\x00\x7fiiii', 2),
-                (b'receive', b'i' * 65536, b'\x82\x7f\x00\x00\x00\x00\x00', 2),
-                (b'receive', b'i' * 81920, b'\x88\x02\x03\xf1', 2),
-                (b'ping', b'', b'\x8a\x00', 9),
-                (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8),
-                (b'', b'\x03\xe8CLOSE_NORMAL', b'\x88\x02\x03\xe8', 8),
-                (b'', b'', b'\x88\x02\x03\xf0', 0xc)):
-            with self.client:
-                response = self.client.send(
-                    b'GET /ws?%s HTTP/1.1' % query,
-                    b'Upgrade: WebSocket',
-                    b'Connection: Upgrade',
-                    b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
-                    b'Sec-WebSocket-Version: 13'
-                )
+    def test_websocket_receive_text_short(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?receive HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
 
-                self.assertEqual(response.status, 101)
-                self.assertEqual(response.message, b'Switching Protocols')
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
 
-                self.client.sendall(
-                    WebSocket.create_frame(data_in,
-                                           mask=(opcode != 8),
-                                           opcode=opcode)
-                )
+            self.client.sendall(
+                WebSocket.create_frame('Hello, World!', mask=True)
+            )
 
-                self.assertEqual(self.client.recv(7), data_out[:7])
+            self.assertEqual(self.client.recv(15), b'\x81\rHello, World!')
+
+    def test_websocket_receive_binary_127(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?receive HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'i' * 127, mask=True, opcode=2)
+            )
+
+            self.assertEqual(self.client.recv(8), b'\x82~\x00\x7fiiii')
+
+    def test_websocket_receive_binary_65536(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?receive HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'i' * 65536, mask=True, opcode=2)
+            )
+
+            self.assertEqual(
+                self.client.recv(7), b'\x82\x7f\x00\x00\x00\x00\x00'
+            )
+
+    def test_websocket_receive_too_large(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?receive HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'i' * 81920, mask=True, opcode=2)
+            )
+
+            self.assertEqual(self.client.recv(4), b'\x88\x02\x03\xf1')
+
+    def test_websocket_ping(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?ping HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'', mask=True, opcode=9)
+            )
+
+            self.assertEqual(self.client.recv(2), b'\x8a\x00')
+
+    def test_websocket_close_code_only(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws?close HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'\x03\xe8', opcode=8)
+            )
+
+            self.assertEqual(self.client.recv(4), b'\x88\x02\x03\xe8')
+
+    def test_websocket_close_reason(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'\x03\xe8CLOSE_NORMAL', opcode=8)
+            )
+
+            self.assertEqual(self.client.recv(4), b'\x88\x02\x03\xe8')
+
+    def test_websocket_close_invalid_frame(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(
+                WebSocket.create_frame(b'', mask=True, opcode=0x0c)
+            )
+
+            self.assertEqual(self.client.recv(4), b'\x88\x02\x03\xf0')
 
     def test_websocket_continuation(self):
         payload = (WebSocket.create_frame(b'Hello', fin=0) +
