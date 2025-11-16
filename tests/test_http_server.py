@@ -18,11 +18,8 @@ from tests.http_server import (  # noqa: E402
     TEST_FILE,
     LIMIT_MEMORY
 )
+from tests.netizen import HTTPClient  # noqa: E402
 from tests.utils import (  # noqa: E402
-    getcontents,
-    chunked_detected,
-    read_chunked,
-    valid_chunked,
     create_dummy_data,
     create_chunked_body,
     create_dummy_body,
@@ -34,879 +31,848 @@ class TestHTTPServer(unittest.TestCase):
     def setUp(self):
         print('\r\n[', self.id(), ']')
 
-    def test_get_middleware_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='FOO',
-                                   url='/',
-                                   version='1.1')
+        self.client = HTTPClient(HTTP_HOST, HTTP_PORT, timeout=10, retries=10)
+        self.client1 = HTTPClient(HTTP_HOST, HTTP_PORT + 1,
+                                  timeout=10, retries=10)
+        self.client2 = HTTPClient(HTTP_HOST, HTTP_PORT + 2,
+                                  timeout=10, retries=10)
 
-        self.assertEqual(
-            header[:header.find(b'\r\n')],
-            b'HTTP/1.1 405 Method Not Allowed'
-        )
+    def test_get_middleware_11(self):
+        with self.client:
+            response = self.client.send(b'FOO / HTTP/1.1')
+
+            self.assertEqual(response.header.version, b'HTTP/1.1')
+            self.assertEqual(response.status, 405)
+            self.assertEqual(response.message, b'Method Not Allowed')
 
     def test_get_ok_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'GET / HTTP/1.0')
 
-        self.assertEqual(
-            header[:header.find(b'\r\n')],
-            b'HTTP/1.0 503 Service Unavailable'
-        )
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertFalse(chunked_detected(header))
-        self.assertEqual(body, b'Under Maintenance')
+            self.assertEqual(response.header.version, b'HTTP/1.0')
+            self.assertEqual(response.status, 503)
+            self.assertEqual(response.message, b'Service Unavailable')
+            self.assertEqual(response.body(), b'Under Maintenance')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
 
-        # these values are set by the request and response middleware
-        self.assertTrue(b'\r\nX-Foo: baz' in header and
-                        b'Set-Cookie: sess=www' in header)
+            # these values are set by the request and response middleware
+            self.assertEqual(response.headers[b'x-foo'], [b'baz'])
+            self.assertEqual(
+                response.headers[b'set-cookie'][0][:8], b'sess=www'
+            )
 
     def test_get_ip_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getip',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /getip HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body)[-9:], b'127.0.0.1')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'127.0.0.1')
 
     def test_get_xip_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getip',
-                                   version='1.1',
-                                   headers=[
-                                       'X-Forwarded-For: 192.168.0.2, xxx',
-                                       'X-Forwarded-For: 192.168.0.20'
-                                   ])
+        with self.client:
+            response = self.client.send(
+                b'GET /getip HTTP/1.1',
+                b'X-Forwarded-For: 192.168.0.2, xxx',
+                b'X-Forwarded-For: 192.168.0.20'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'192.168.0.2')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'192.168.0.2')
 
     def test_get_xip_empty_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getip',
-                                   version='1.1',
-                                   headers=[
-                                       'X-Forwarded-For:  '
-                                   ])
+        with self.client:
+            response = self.client.send(
+                b'GET /getip HTTP/1.1',
+                b'X-Forwarded-For: ',
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body)[-9:], b'127.0.0.1')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'127.0.0.1')
 
     def test_get_headerline_11(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /getheaderline?foo HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(b'GET /getheaderline?foo HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body),
-                         b'GET /getheaderline?foo HTTP/1.1')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.body(), b'GET /getheaderline?foo HTTP/1.1'
+            )
 
     def test_get_doublehost_11(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /gethost HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Host: host.local\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(
+                b'GET /gethost HTTP/1.1',
+                b'Host: host.local'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'Bad Request')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'Bad Request')
 
     def test_get_query_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getquery?a=111&a=xyz&b=222',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(
+                b'GET /getquery?a=111&a=xyz&b=222 HTTP/1.1'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'a=111&b=222&')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'a=111&b=222&')
 
     def test_get_page_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/page/101',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /page/101 HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'101')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'101')
 
     def test_get_cookies_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getcookies',
-                                   version='1.1',
-                                   headers=[
-                                       'Cookie: a=123',
-                                       'Cookie: a=xxx, yyy'
-                                   ])
+        with self.client:
+            response = self.client.send(
+                b'GET /getcookies HTTP/1.1',
+                b'Cookie: a=123',
+                b'Cookie: a=xxx, yyy'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'a=123, yyy, a=xxx')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'a=123, yyy, a=xxx')
 
     def test_head_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='HEAD',
-                                   url='/',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'HEAD / HTTP/1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 503 Service Unavailable')
-        self.assertTrue(b'\r\nContent-Length: ' in header)
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertFalse(b'\r\nTransfer-Encoding: chunked\r\n' in header)
-        self.assertEqual(body, b'')
+            self.assertEqual(response.header.version, b'HTTP/1.0')
+            self.assertEqual(response.status, 503)
+            self.assertEqual(response.message, b'Service Unavailable')
+            self.assertEqual(response.body(), b'')
+
+            self.assertTrue(b'content-length' in response.headers)
+            self.assertFalse(b'transfer-encoding' in response.headers)
 
     def test_head_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='HEAD',
-                                   url='/invalid',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'HEAD /invalid HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 404 Not Found')
-        self.assertTrue(b'\r\nContent-Length: ' in header)
-        self.assertFalse(b'\r\nTransfer-Encoding: chunked\r\n' in header)
-        self.assertEqual(body, b'')
+            self.assertEqual(response.header.version, b'HTTP/1.1')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
+            self.assertEqual(response.body(), b'')
 
     def test_get_lock_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/getlock',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /getlock HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'Lock was acquired!')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'Lock was acquired!')
 
     def test_limit_memory(self):
-        _, body = getcontents(host=HTTP_HOST,
-                              port=HTTP_PORT,
-                              method='GET',
-                              url='/triggermemoryleak',
-                              version='1.0')
+        with self.client:
+            response = self.client.send(b'GET /triggermemoryleak HTTP/1.0')
 
-        self.assertEqual(body, b'')
+            self.assertEqual(response.body(), b'')
 
     def test_post_form_ok_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='POST',
-                                   url='/submitform',
-                                   version='1.1',
-                                   data='username=myuser&password=mypass')
+        with self.client:
+            response = self.client.send(
+                b'POST /submitform HTTP/1.1',
+                body=b'username=myuser&password=mypass'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body),
-                         b'username=myuser&password=mypass')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.body(), b'username=myuser&password=mypass'
+            )
 
     def test_post_form_invalid_content_type(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'POST /submitform HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Type: application/json\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(
+                b'POST /submitform HTTP/1.1',
+                b'Content-Type: application/json'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'invalid Content-Type')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'invalid Content-Type')
 
     def test_post_form_limit(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='POST',
-                                   url='/submitform',
-                                   version='1.1',
-                                   data='d' * 8193)
+        with self.client:
+            response = self.client.send(
+                b'POST /submitform HTTP/1.1',
+                body=b'd' * 8193
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 500 Internal Server Error')
-        self.assertEqual(body, b'form size limit reached')
+            self.assertEqual(response.status, 500)
+            self.assertEqual(response.message, b'Internal Server Error')
+            self.assertEqual(response.body(), b'form size limit reached')
 
     def test_post_upload_ok_10(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload?size=-1 HTTP/1.0\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 8192\r\n\r\n%sX' % (
-                    HTTP_PORT, create_dummy_body(8192))
-        )
+        with self.client2:
+            body = create_dummy_body(8192)
+            response = self.client2.send(
+                b'POST /upload?size=-1 HTTP/1.0',
+                b'Content-Length: %d' % len(body)
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertFalse(chunked_detected(header))
-        self.assertEqual(body, create_dummy_body(8192))
+            self.client2.sendall(body)
+            self.client2.sendall(b'X')
+
+            self.assertEqual(response.body(), body)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'],
+                [b'application/octet-stream']
+            )
+            self.assertFalse(b'transfer-encoding' in response.headers)
 
     def test_post_upload2_ok_10(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload?size=10 HTTP/1.0\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 65536\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(65536))
-        )
+        with self.client2:
+            body = create_dummy_body(65536)
+            response = self.client2.send(
+                b'POST /upload?size=10 HTTP/1.0',
+                body=body
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertFalse(chunked_detected(header))
-        self.assertEqual(body, create_dummy_body(65536)[:10])
+            self.assertEqual(response.body(), body[:10])
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'],
+                [b'application/octet-stream']
+            )
 
     def test_post_upload_ok_11(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%sX' % (
-                    HTTP_PORT, create_dummy_body(8192, chunk_size=4096))
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertEqual(read_chunked(body), create_dummy_body(8192))
+            self.client2.sendall(create_dummy_body(8192, chunk_size=4096))
+            self.client2.sendall(b'X')
+
+            self.assertEqual(response.body(), create_dummy_body(8192))
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'],
+                [b'application/octet-stream']
+            )
 
     def test_post_upload2_ok_11(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(65536, chunk_size=4096))
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertEqual(read_chunked(body), create_dummy_body(65536))
+            self.client2.sendall(create_dummy_body(65536, chunk_size=4096))
+
+            self.assertEqual(response.body(), create_dummy_body(65536))
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'],
+                [b'application/octet-stream']
+            )
 
     def test_post_bad_chunked_encoding(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n-1\r\n' % HTTP_PORT
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad chunked encoding')
+            self.client2.sendall(b'-1\r\n')
+
+            self.assertEqual(response.body(), b'bad chunked encoding')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_post_no_chunk_size(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' %
-                (HTTP_PORT, b'X' * 65)
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad chunked encoding: no chunk size')
+            self.client2.sendall(b'X' * 65)
+
+            self.assertEqual(
+                response.body(), b'bad chunked encoding: no chunk size'
+            )
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_post_invalid_chunk_terminator(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n1\r\nA\rX' % HTTP_PORT
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body,
-                         b'bad chunked encoding: invalid chunk terminator')
+            self.client2.sendall(b'1\r\nA\rX')
+
+            self.assertEqual(
+                response.body(),
+                b'bad chunked encoding: invalid chunk terminator'
+            )
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_post_invalid_chunk_end(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n0;\r\n\rX' % HTTP_PORT
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body,
-                         b'bad chunked encoding: invalid chunk terminator')
+            self.client2.sendall(b'0;\r\n\rX')
+
+            self.assertEqual(
+                response.body(),
+                b'bad chunked encoding: invalid chunk terminator'
+            )
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_post_upload_maxqueue(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload?maxqueue HTTP/1.0\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 8192\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(8192))
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload?maxqueue HTTP/1.0',
+                body=create_dummy_body(8192)
+            )
 
-        self.assertEqual(header, b'')
-        self.assertEqual(body, b'')
+            self.assertEqual(response.body(), b'')
 
     def test_post_upload_multipart_11(self):
-        boundary = b'----MultipartBoundary'
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload/multipart HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Type: multipart/form-data; boundary=%s\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT,
-                    boundary,
-                    create_chunked_body(create_multipart_body(
-                        boundary,
-                        file1=create_dummy_data(4096),
-                        file2=create_dummy_data(524288))))
-        )
+        with self.client2:
+            boundary = b'----MultipartBoundary'
+            response = self.client2.send(
+                b'POST /upload/multipart HTTP/1.1',
+                b'Transfer-Encoding: chunked',
+                b'Content-Type: multipart/form-data; boundary=%s' % boundary
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(b'\r\nContent-Type: text/csv' in header)
-        self.assertEqual(
-            read_chunked(body) if chunked_detected(header) else body,
-            b'name,type,data\r\n'
-            b'file1,application/octet-stream,BEGINEND\r\n'
-            b'file2,application/octet-stream,BEGIN---\r\n'
-            b'file2,application/octet-stream,-----END\r\n'
-        )
+            self.client2.sendall(
+                create_chunked_body(create_multipart_body(
+                                    boundary,
+                                    file1=create_dummy_data(4096),
+                                    file2=create_dummy_data(524288)))
+            )
+
+            self.assertEqual(
+                response.body(),
+                b'name,type,data\r\n'
+                b'file1,application/octet-stream,BEGINEND\r\n'
+                b'file2,application/octet-stream,BEGIN---\r\n'
+                b'file2,application/octet-stream,-----END\r\n'
+            )
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.headers[b'content-type'], [b'text/csv'])
 
     def test_post_upload_multipart_form(self):
-        boundary = b'----MultipartBoundary'
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload/multipart/form HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n'
-                b'Content-Type: multipart/form-data; boundary=%s\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT,
-                    boundary,
-                    create_chunked_body(create_multipart_body(
-                        boundary,
-                        text=b'Hello, World!',
-                        file=create_dummy_data(262144))))
-        )
+        with self.client2:
+            boundary = b'----MultipartBoundary'
+            response = self.client2.send(
+                b'POST /upload/multipart/form HTTP/1.1',
+                b'Transfer-Encoding: chunked',
+                b'Content-Type: multipart/form-data; boundary=%s' % boundary
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'BEGINHello, World!END')
+            self.client2.sendall(
+                create_chunked_body(create_multipart_body(
+                                    boundary,
+                                    text=b'Hello, World!',
+                                    file=create_dummy_data(262144)))
+            )
+
+            self.assertEqual(response.body(), b'BEGINHello, World!END')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
 
     def test_post_upload_multipart_form_fragmented(self):
-        boundary = b'----MultipartBoundary'
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload/multipart/form HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n'
-                b'Content-Type: multipart/form-data; boundary=%s\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT,
-                    boundary,
-                    create_chunked_body(create_multipart_body(
-                        boundary,
-                        text=b'Hello, World!',
-                        file=create_dummy_data(524288))))
-        )
+        with self.client2:
+            boundary = b'----MultipartBoundary'
+            self.client2.send(
+                b'POST /upload/multipart/form HTTP/1.1',
+                b'Transfer-Encoding: chunked',
+                b'Content-Type: multipart/form-data; boundary=%s' % boundary
+            )
+            self.client2.sendall(
+                create_chunked_body(create_multipart_body(
+                                    boundary,
+                                    text=b'Hello, World!',
+                                    file=create_dummy_data(524288)))
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 500 Internal Server Error')
+            response = self.client2.end()
+
+            self.assertEqual(response.status, 500)
+            self.assertEqual(response.message, b'Internal Server Error')
 
     def test_post_chunked_payloadtoolarge(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n%s' % (
-                    HTTP_PORT, create_dummy_body(1048576 + 8192,
-                                                 chunk_size=16384))
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 400 Bad Request')
-        self.assertEqual(body, b'payload too large')
+            self.client2.sendall(
+                create_dummy_body(1048576 + 8192, chunk_size=16384)
+            )
+
+            self.assertEqual(response.body(), b'payload too large')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_payloadtoolarge(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: %d\r\n\r\n\x00' % (
-                    HTTP_PORT, 1048576 + 8192)
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Content-Length: %d' % (1048576 + 8192)
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 413 Payload Too Large')
-        self.assertFalse(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertTrue(b'Payload Too Large' in body)
+            self.client2.sendall(b'\x00')
+
+            self.assertEqual(response.body(), b'Payload Too Large')
+            self.assertEqual(response.status, 413)
+            self.assertEqual(response.message, b'Payload Too Large')
+            self.assertFalse(
+                b'application/octet-stream' in
+                response.headers[b'content-type']
+            )
 
     def test_continue(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 2,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n%s' % (
-                    HTTP_PORT, 65536, create_dummy_body(65536))
-        )
+        with self.client2:
+            body = create_dummy_body(65536)
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Content-Length: %d' % len(body),
+                b'Expect: 100-continue'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertEqual(read_chunked(body), create_dummy_body(65536))
+            self.assertEqual(response.body(), b'')
+            self.assertEqual(response.status, 100)
+            self.assertEqual(response.message, b'Continue')
+
+            self.client2.sendall(body)
+
+            self.assertEqual(response.body(), body)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertTrue(
+                b'application/octet-stream' in
+                response.headers[b'content-type']
+            )
 
     def test_expectationfailed(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Expect: 100-continue\r\nContent-Length: %d\r\n\r\n\x00' % (
-                    HTTP_PORT, 2 * 1048576 + 16384)
-        )
+        with self.client2:
+            response = self.client2.send(
+                b'POST /upload HTTP/1.1',
+                b'Content-Length: %d' % (2 * 1048576 + 16384),
+                b'Expect: 100-continue'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 417 Expectation Failed')
-        self.assertFalse(
-            b'\r\nContent-Type: application/octet-stream' in header
-        )
-        self.assertTrue(b'Expectation Failed' in body)
+            self.client2.sendall(b'\x00')
+
+            self.assertEqual(response.body(), b'Expectation Failed')
+            self.assertEqual(response.status, 417)
+            self.assertEqual(response.message, b'Expectation Failed')
+            self.assertFalse(
+                b'application/octet-stream' in
+                response.headers[b'content-type']
+            )
 
     def test_get_notfound_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'GET /invalid HTTP/1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 404 Not Found')
-        self.assertFalse(chunked_detected(header))
+            self.assertEqual(response.header.version, b'HTTP/1.0')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_notfound_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /invalid HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 404 Not Found')
+            self.assertEqual(response.header.version, b'HTTP/1.1')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_notfound_close_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.0',
-                                   headers=['Connection: close'])
+        with self.client:
+            response = self.client.send(
+                b'GET /invalid HTTP/1.0',
+                b'Connection: close'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 404 Not Found')
-        self.assertFalse(chunked_detected(header))
+            self.assertEqual(response.header.version, b'HTTP/1.0')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_notfound_keepalive_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.0',
-                                   headers=['Connection: keep-alive'])
+        with self.client:
+            response = self.client.send(
+                b'GET /invalid HTTP/1.0',
+                b'Connection: keep-alive'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 404 Not Found')
-        self.assertFalse(chunked_detected(header))
+            self.assertEqual(response.header.version, b'HTTP/1.0')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_notfound_close_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.1',
-                                   headers=['Connection: close'])
+        with self.client:
+            response = self.client.send(
+                b'GET /invalid HTTP/1.1',
+                b'Connection: close'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 404 Not Found')
+            self.assertEqual(response.header.version, b'HTTP/1.1')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_notfound_keepalive_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/invalid',
-                                   version='1.1',
-                                   headers=['Connection: keep-alive'])
+        with self.client:
+            response = self.client.send(
+                b'GET /invalid HTTP/1.1',
+                b'Connection: keep-alive'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 404 Not Found')
+            self.assertEqual(response.header.version, b'HTTP/1.1')
+            self.assertEqual(response.status, 404)
+            self.assertEqual(response.message, b'Not Found')
 
     def test_get_badrequest(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET HTTP/\r\nHost: localhost:%d\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(b'GET HTTP/')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 400 Bad Request')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_badrequest_notarequest(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b' HTTP/\r\nHost: localhost:%d\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(b' HTTP/')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 400 Bad Request')
-        self.assertEqual(body, b'bad request: not a request')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'bad request: not a request')
 
     def test_badrequest(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET / HTTP/1.1\r\nHost: localhost:%d\r\n%s' % (
-                    HTTP_PORT, b'\x00' * 8192)
-        )
+        with self.client:
+            self.client.sendall(b'GET / HTTP/1.1\r\nHost: localhost\r\n')
+            self.client.sendall(b'\x00' * 8192)
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 400 Bad Request')
-        self.assertEqual(body, b'bad request')
+            response = self.client.end()
+
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'bad request')
 
     def test_headertoolarge(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET / HTTP/1.1\r\nHost: localhost:%d\r\n%s\r\n\r\n' % (
-                    HTTP_PORT, b'\x00' * 8192)
-        )
+        with self.client:
+            response = self.client.send(
+                b'GET / HTTP/1.1',
+                b'\x00' * 8192
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 400 Bad Request')
-        self.assertEqual(body, b'request header too large')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'request header too large')
 
     def test_sec_content_length_and_transfer_encoding(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 5r\n'
-                b'Transfer-Encoding: chunked\r\n\r\n0\r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(
+                b'GET /upload HTTP/1.1',
+                b'Content-Length: 5',
+                b'Transfer-Encoding: chunked'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'Bad Request')
+            self.client.sendall(b'0\r\n\r\n')
+
+            self.assertEqual(response.body(), b'ambiguous Content-Length')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_sec_double_content_length(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: 1\r\nContent-Length: 2\r\n\r\nAB' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(
+                b'GET /upload HTTP/1.1',
+                b'Content-Length: 1',
+                b'Content-Length: 2'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'ambiguous Content-Length')
+            self.client.sendall(b'AB')
+
+            self.assertEqual(response.body(), b'ambiguous Content-Length')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_sec_empty_content_length(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'POST /upload HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Content-Length: \r\n\r\n' % HTTP_PORT
-        )
+        with self.client:
+            response = self.client.send(
+                b'GET /upload HTTP/1.1',
+                b'Content-Length: '
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertEqual(body, b'bad Content-Length')
+            self.assertEqual(response.body(), b'bad Content-Length')
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
 
     def test_requesttimeout(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 1,
-            raw=b'GET / HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n' % (HTTP_PORT + 1)
-        )
+        with self.client1:
+            self.client1.sendall(b'GET / HTTP/1.1\r\nHost: localhost\r\n')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 408 Request Timeout')
-        self.assertEqual(body, b'request timeout after 1s')
+            response = self.client1.end()
+
+            self.assertEqual(response.body(), b'request timeout after 1s')
+            self.assertEqual(response.status, 408)
+            self.assertEqual(response.message, b'Request Timeout')
 
     def test_recv_timeout(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 1,
-            raw=b'GET /timeouts?recv HTTP/1.1\r\nHost: localhost:%d\r\n\r\n' %
-                (HTTP_PORT + 1)
-        )
+        with self.client1:
+            response = self.client1.send(b'GET /timeouts?recv HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 408 Request Timeout')
-        self.assertEqual(body, b'recv timeout')
+            self.assertEqual(response.body(), b'recv timeout')
+            self.assertEqual(response.status, 408)
+            self.assertEqual(response.message, b'Request Timeout')
 
     def test_handler_timeout(self):
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 1,
-            raw=b'GET /timeouts?handler HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 1)
-        )
+        with self.client1:
+            response = self.client1.send(b'GET /timeouts?handler HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 500 Internal Server Error')
-        self.assertEqual(body, b'Internal Server Error')
+            self.assertEqual(response.body(), b'Internal Server Error')
+            self.assertEqual(response.status, 500)
+            self.assertEqual(response.message, b'Internal Server Error')
 
     def test_close_timeout(self):
-        data = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT + 1,
-            raw=b'GET /timeouts?close HTTP/1.1\r\n'
-                b'Host: localhost:%d\r\n\r\n' % (HTTP_PORT + 1)
-        )
+        with self.client1:
+            response = self.client1.send(b'GET /timeouts?close HTTP/1.1')
 
-        self.assertEqual(data, (b'', b''))
+            self.assertEqual(response.body(), b'')
 
     def test_download_10(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'GET /download HTTP/1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.0 200 OK')
-        self.assertFalse(b'\r\nAccept-Ranges:' in header)
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(
-            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
-        )
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(
+                response.headers[b'content-length'],
+                [b'%d' % os.stat(TEST_FILE).st_size]
+            )
+            self.assertFalse(b'accept-ranges' in response.headers)
 
     def test_download_11(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download?executor',
-                                   version='1.1')
+        with self.client2:
+            response = self.client2.send(b'GET /download?executor HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(b'\r\nAccept-Ranges: bytes' in header)
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(
-            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
-        )
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(
+                response.headers[b'content-length'],
+                [b'%d' % os.stat(TEST_FILE).st_size]
+            )
+            self.assertEqual(response.headers[b'accept-ranges'], [b'bytes'])
 
     def test_notmodified(self):
         mtime = os.path.getmtime(TEST_FILE)
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime))
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['If-Modified-Since: %s' % mdate])
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 304 Not Modified')
-        self.assertFalse(b'\r\nAccept-Ranges:' in header)
-        self.assertFalse(b'\r\nContent-Type:' in header)
-        self.assertFalse(b'\r\nContent-Length:' in header)
+        with self.client:
+            response = self.client.send(
+                b'GET /download HTTP/1.1',
+                b'If-Modified-Since: %s' % mdate.encode('latin-1')
+            )
+
+            self.assertEqual(response.status, 304)
+            self.assertEqual(response.message, b'Not Modified')
+            self.assertFalse(b'content-type' in response.headers)
+            self.assertFalse(b'content-length' in response.headers)
+            self.assertFalse(b'accept-ranges' in response.headers)
 
     def test_range_ok(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=[
-                                       'If-Range: xxx',
-                                       'Range: bytes=15-21'
-                                   ])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'If-Range: xxx',
+                b'Range: bytes=15-21'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(b'\r\nAccept-Ranges: bytes' in header)
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(
-            (b'\r\nContent-Length: %d' % os.stat(TEST_FILE).st_size) in header
-        )
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(
+                response.headers[b'content-length'],
+                [b'%d' % os.stat(TEST_FILE).st_size]
+            )
+            self.assertEqual(response.headers[b'accept-ranges'], [b'bytes'])
 
     def test_download_range(self):
         mtime = os.path.getmtime(TEST_FILE)
         mdate = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(mtime))
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=[
-                                       'If-Range: %s' % mdate,
-                                       'Range: bytes=15-21'
-                                   ])
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 206 Partial Content')
-        self.assertEqual(body, b'python3')
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(b'\r\nContent-Length: 7' in header)
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'If-Range: %s' % mdate.encode('latin-1'),
+                b'Range: bytes=15-21'
+            )
+
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.message, b'Partial Content')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(response.headers[b'content-length'], [b'7'])
+            self.assertEqual(response.body(), b'python3')
 
     def test_download_range_start(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=[
-                                       'Range: bytes=%d-' % (os.stat(
-                                           TEST_FILE).st_size - 5)
-                                   ])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=%d-' % (os.stat(TEST_FILE).st_size - 5)
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 206 Partial Content')
-        self.assertEqual(body.strip(b'# \r\n'), b'END')
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(b'\r\nContent-Length: 5' in header)
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.message, b'Partial Content')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(response.headers[b'content-length'], [b'5'])
+            self.assertEqual(response.body().strip(b'# \r\n'), b'END')
 
     def test_download_range_end(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=-5'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=-5'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 206 Partial Content')
-        self.assertEqual(body.strip(b'# \r\n'), b'END')
-        self.assertTrue(b'\r\nContent-Type: text/plain' in header)
-        self.assertTrue(b'\r\nContent-Length: 5' in header)
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.message, b'Partial Content')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/plain']
+            )
+            self.assertEqual(response.headers[b'content-length'], [b'5'])
+            self.assertEqual(response.body().strip(b'# \r\n'), b'END')
 
     def test_download_range_multipart(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=2-0, 2-2'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=2-0, 2-2'
+            )
+            body = response.body()
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 206 Partial Content')
-        self.assertFalse(b'\r\nContent-Length:' in header)
-        self.assertEqual(body.count(b'\r\nContent-Range: bytes 2-2/'), 2)
-        self.assertEqual(body.count(b'\r\n------Boundary'), 3)
-        self.assertEqual(body[-11:], b'--\r\n\r\n0\r\n\r\n')
-        self.assertTrue(
-            (b'\r\nContent-Type: multipart/byteranges; '
-             b'boundary=----Boundary') in header
-        )
-        self.assertTrue(valid_chunked(body))
+            self.assertEqual(response.status, 206)
+            self.assertEqual(response.message, b'Partial Content')
+            self.assertEqual(body.count(b'\r\nContent-Range: bytes 2-2/'), 2)
+            self.assertEqual(body.count(b'------Boundary'), 3)
+            self.assertEqual(body[-4:], b'--\r\n')
+            self.assertEqual(
+                response.headers[b'content-type'][0][:43],
+                b'multipart/byteranges; boundary=----Boundary'
+            )
+            self.assertFalse(b'content-length' in response.headers)
 
     def test_badrange(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=2-2, 3'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=2-2, 3'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertTrue(b'bad range' in body)
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'bad range')
 
     def test_badrange1(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=[
-                                       'Range: bytes=0-1',
-                                       'Range: bits=2-1'
-                                   ])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=0-1',
+                b'Range: bits=2-1'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertTrue(b'bad range' in body)
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'bad range')
 
     def test_badrange2(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bits=2-1'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bits=2-1'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 400 Bad Request')
-        self.assertTrue(b'bad range' in body)
+            self.assertEqual(response.status, 400)
+            self.assertEqual(response.message, b'Bad Request')
+            self.assertEqual(response.body(), b'bad range')
 
     def test_rangenotsatisfiable(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=-10000000'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=-10000000'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertTrue(b'Range Not Satisfiable' in body)
+            self.assertEqual(response.status, 416)
+            self.assertEqual(response.message, b'Range Not Satisfiable')
+            self.assertEqual(response.body(), b'Range Not Satisfiable')
 
     def test_rangenotsatisfiable1(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=10000000-'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=10000000-'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertTrue(b'Range Not Satisfiable' in body)
+            self.assertEqual(response.status, 416)
+            self.assertEqual(response.message, b'Range Not Satisfiable')
+            self.assertEqual(response.body(), b'Range Not Satisfiable')
 
     def test_rangenotsatisfiable2(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=2-1'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=2-1'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertTrue(b'Range Not Satisfiable' in body)
+            self.assertEqual(response.status, 416)
+            self.assertEqual(response.message, b'Range Not Satisfiable')
+            self.assertEqual(response.body(), b'Range Not Satisfiable')
 
     def test_rangenotsatisfiable3(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT + 2,
-                                   method='GET',
-                                   url='/download',
-                                   version='1.1',
-                                   headers=['Range: bytes=2-10000000'])
+        with self.client2:
+            response = self.client2.send(
+                b'GET /download HTTP/1.1',
+                b'Range: bytes=2-10000000'
+            )
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 416 Range Not Satisfiable')
-        self.assertTrue(b'Range Not Satisfiable' in body)
+            self.assertEqual(response.status, 416)
+            self.assertEqual(response.message, b'Range Not Satisfiable')
+            self.assertEqual(response.body(), b'Range Not Satisfiable')
 
     def test_websocket(self):
         for query, data_in, data_out, opcode, in (
@@ -918,207 +884,216 @@ class TestHTTPServer(unittest.TestCase):
                 (b'close', b'\x03\xe8', b'\x88\x02\x03\xe8', 8),
                 (b'', b'\x03\xe8CLOSE_NORMAL', b'\x88\x02\x03\xe8', 8),
                 (b'', b'', b'\x88\x02\x03\xf0', 0xc)):
-            header, body = getcontents(
-                host=HTTP_HOST,
-                port=HTTP_PORT,
-                raw=b'GET /ws?%s HTTP/1.1\r\nHost: localhost:%d\r\n'
-                    b'Upgrade: websocket\r\n'
-                    b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                    b'Connection: upgrade\r\n\r\n%s' % (
-                        query,
-                        HTTP_PORT,
-                        WebSocket.create_frame(data_in,
-                                               mask=(opcode != 8),
-                                               opcode=opcode))
-            )
+            with self.client:
+                response = self.client.send(
+                    b'GET /ws?%s HTTP/1.1' % query,
+                    b'Upgrade: WebSocket',
+                    b'Connection: Upgrade',
+                    b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                    b'Sec-WebSocket-Version: 13'
+                )
 
-            self.assertEqual(body[:7], data_out[:7])
+                self.assertEqual(response.status, 101)
+                self.assertEqual(response.message, b'Switching Protocols')
+
+                self.client.sendall(
+                    WebSocket.create_frame(data_in,
+                                           mask=(opcode != 8),
+                                           opcode=opcode)
+                )
+
+                self.assertEqual(self.client.recv(7), data_out[:7])
 
     def test_websocket_continuation(self):
         payload = (WebSocket.create_frame(b'Hello', fin=0) +
                    WebSocket.create_frame(b', ', fin=0, opcode=0) +
                    WebSocket.create_frame(b'World', fin=0, opcode=0) +
                    WebSocket.create_frame(b'!', fin=1, opcode=0))
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Upgrade: websocket\r\n'
-                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
-        )
 
-        self.assertEqual(body, b'\x82\rHello, World!')
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(payload)
+
+            self.assertEqual(self.client.recv(15), b'\x82\rHello, World!')
 
     def test_websocket_unexpected_start(self):
         payload = (WebSocket.create_frame(b'Hello', fin=0) +
                    WebSocket.create_frame(b'Hello', fin=0))
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Upgrade: websocket\r\n'
-                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
-        )
 
-        self.assertEqual(body, b'\x88\x02\x03\xea')
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(payload)
+
+            self.assertEqual(self.client.recv(4096), b'\x88\x02\x03\xea')
 
     def test_websocket_unexpected_continuation(self):
         payload = WebSocket.create_frame(b'World', fin=0, opcode=0)
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Upgrade: websocket\r\n'
-                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
-        )
 
-        self.assertEqual(body, b'\x88\x02\x03\xea')
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(payload)
+
+            self.assertEqual(self.client.recv(4096), b'\x88\x02\x03\xea')
 
     def test_websocket_max_payload(self):
         payload = (WebSocket.create_frame(b'Hello, World', fin=0) +
                    WebSocket.create_frame(b'!' * 65536, fin=0, opcode=0) +
                    WebSocket.create_frame(b'!' * 65536, fin=1, opcode=0))
-        header, body = getcontents(
-            host=HTTP_HOST,
-            port=HTTP_PORT,
-            raw=b'GET /ws HTTP/1.1\r\nHost: localhost:%d\r\n'
-                b'Upgrade: websocket\r\n'
-                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n'
-                b'Connection: upgrade\r\n\r\n%s' % (HTTP_PORT, payload)
-        )
 
-        self.assertEqual(body, b'\x88\x02\x03\xf1')
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(payload)
+
+            self.assertEqual(self.client.recv(4096), b'\x88\x02\x03\xf1')
 
     def test_sse(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/sse',
-                                   version='1.1')
-        body = read_chunked(body)
+        with self.client:
+            response = self.client.send(b'GET /sse HTTP/1.1')
+            body = response.body()
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertTrue(b'\r\nContent-Type: text/event-stream' in header)
-        self.assertTrue(b'\r\nCache-Control: no-cache' in header)
-        self.assertTrue(b'data: Hel\ndata: lo\nevent: hello\n\n' in body)
-        self.assertTrue(b'data: Wor\nid: foo\n\n' in body)
-        self.assertTrue(b'data: ld!\nretry: 10000\n\n' in body)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(
+                response.headers[b'content-type'], [b'text/event-stream']
+            )
+            self.assertEqual(
+                response.headers[b'cache-control'],
+                [b'no-cache, must-revalidate']
+            )
+            self.assertTrue(b'data: Hel\ndata: lo\nevent: hello\n\n' in body)
+            self.assertTrue(b'data: Wor\nid: foo\n\n' in body)
+            self.assertTrue(b'data: ld!\nretry: 10000\n\n' in body)
 
     def test_sse_error(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/sse?error',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /sse?error HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 500 Internal Server Error')
+            self.assertEqual(response.status, 500)
+            self.assertEqual(response.message, b'Internal Server Error')
 
     def test_reload(self):
         if sys.platform != 'linux':
             return
 
-        header, body1 = getcontents(host=HTTP_HOST,
-                                    port=HTTP_PORT,
-                                    method='GET',
-                                    url='/reload?%f' % time.time(),
-                                    version='1.0')
+        with self.client:
+            response = self.client.send(
+                b'GET /reload?%f HTTP/1.0' % time.time()
+            )
+            body1 = response.body()
 
-        self.assertFalse(body1 == b'')
-        body2 = body1
+            self.assertFalse(body1 == b'')
+            body2 = body1
 
-        for _ in range(10):
-            time.sleep(1)
+            for _ in range(10):
+                time.sleep(1)
 
-            header, body2 = getcontents(host=HTTP_HOST,
-                                        port=HTTP_PORT,
-                                        method='GET',
-                                        url='/reload',
-                                        version='1.0')
+                with self.client:
+                    response = self.client.send(b'GET /reload HTTP/1.1')
+                    body2 = response.body()
 
-            self.assertFalse(body2 == b'')
+                    self.assertFalse(body2 == b'')
 
-            if body2 != body1:
-                break
+                    if body2 != body1:
+                        break
 
-        self.assertFalse(body2 == body1)
+            self.assertFalse(body2 == body1)
 
     def test_mount_subsub_with_middleware(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/sub/subsub/mount/',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /sub/subsub/mount/ HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'/sub/subsub')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'/sub/subsub')
 
     def test_mount_sub_no_middleware(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/sub/whatevermount',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /sub/whatevermount HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'/')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'/')
 
     def test_class_get(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/resource',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'GET /resource HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')], b'HTTP/1.1 200 OK')
-        self.assertEqual(read_chunked(body), b'Hello, World!')
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.message, b'OK')
+            self.assertEqual(response.body(), b'Hello, World!')
 
     def test_class_post_methodnotallowed(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='PUT',
-                                   url='/resource',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'PUT /resource HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 405 Method Not Allowed')
-        self.assertTrue(b'\r\nallow: GET' in header)
+            self.assertEqual(response.status, 405)
+            self.assertEqual(response.message, b'Method Not Allowed')
+            self.assertEqual(response.body(), b'Method Not Allowed')
+            self.assertEqual(response.headers[b'allow'], [b'GET'])
 
     def test_redirect(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/redirect?303',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'PUT /redirect?303 HTTP/1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 302 Found')
-        self.assertTrue(b'\r\nlocation: /new' in header)
+            self.assertEqual(response.status, 302)
+            self.assertEqual(response.message, b'Found')
+            self.assertEqual(response.url, b'/new')
 
     def test_redirect_301(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/redirect?301',
-                                   version='1.0')
+        with self.client:
+            response = self.client.send(b'PUT /redirect?301 HTTP/1.0')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.0 301 Moved Permanently')
-        self.assertTrue(b'\r\nlocation: /new' in header)
+            self.assertEqual(response.status, 301)
+            self.assertEqual(response.message, b'Moved Permanently')
+            self.assertEqual(response.url, b'/new')
 
     def test_redirect_303(self):
-        header, body = getcontents(host=HTTP_HOST,
-                                   port=HTTP_PORT,
-                                   method='GET',
-                                   url='/redirect?303',
-                                   version='1.1')
+        with self.client:
+            response = self.client.send(b'PUT /redirect?303 HTTP/1.1')
 
-        self.assertEqual(header[:header.find(b'\r\n')],
-                         b'HTTP/1.1 303 See Other')
-        self.assertTrue(b'\r\nlocation: /new' in header)
+            self.assertEqual(response.status, 303)
+            self.assertEqual(response.message, b'See Other')
+            self.assertEqual(response.url, b'/new')
 
 
 if __name__ == '__main__':
