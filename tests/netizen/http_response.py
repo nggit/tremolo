@@ -246,13 +246,13 @@ class HTTPResponse:
         if self.content_length == 0:
             raise StopIteration
 
-        bufsize = 16384 if self.content_length <= -2 else self.content_length
-
         if self._buf:
             data = bytes(self._buf)
             del self._buf[:]
         else:
-            data = self.client.sock.recv(bufsize)
+            data = self.client.sock.recv(
+                16384 if self.content_length <= -2 else self.content_length
+            )
 
         if data == b'':
             raise StopIteration
@@ -303,13 +303,14 @@ class HTTPResponse:
         if self.content_length == 0:
             raise StopAsyncIteration
 
-        bufsize = 16384 if self.content_length <= -2 else self.content_length
-
         if self._buf:
             data = bytes(self._buf)
             del self._buf[:]
         else:
-            data = await self.client.loop.sock_recv(self.client.sock, bufsize)
+            data = await self.client.loop.sock_recv(
+                self.client.sock,
+                16384 if self.content_length <= -2 else self.content_length
+            )
 
         if data == b'':
             raise StopAsyncIteration
