@@ -404,7 +404,7 @@ async def redirect(request, response):
 
 
 @app.route('/reload')
-async def reload(request, **server):
+async def reload(request, loop, **server):
     assert server != {}
     assert 'request' not in server
     assert 'response' in server
@@ -415,7 +415,7 @@ async def reload(request, **server):
         mtime = float(request.query_string)
 
         # simulate a code change
-        os.utime(TEST_FILE, (mtime, mtime))
+        loop.call_later(2, os.utime, TEST_FILE, (mtime, mtime))
 
 
 @app.route('/resource')
@@ -461,4 +461,5 @@ if __name__ == '__main__':
             debug=True, reload=True,
             client_max_body_size=1048576, ws_max_payload_size=73728)
 
+# don't remove this; needed by test_http_range.py
 # END

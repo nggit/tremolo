@@ -90,12 +90,11 @@ class ASGIAppWrapper:
         self.protocol = protocol
         self.app = app
         self.scope = scope
-        self.request = response.request
-        self.response = response
         self.loop = protocol.loop
         self.logger = protocol.logger
-
-        self._websocket = None
+        self.request = response.request
+        self.response = response
+        self.websocket = None
 
     def __await__(self):
         return self.app(self.scope, self.receive, self.send).__await__()
@@ -106,13 +105,13 @@ class ASGIAppWrapper:
             # it will become True later
             # after the response status is set to 101:
             # Response.set_status(101) in WebSocket.accept()
-            if not self.request.upgraded and self._websocket is None:
-                self._websocket = WebSocket(self.request, self.response)
+            if not self.request.upgraded and self.websocket is None:
+                self.websocket = WebSocket(self.request, self.response)
 
                 return {'type': 'websocket.connect'}
 
             try:
-                payload = await self._websocket.receive()
+                payload = await self.websocket.receive()
 
                 if isinstance(payload, str):
                     return {
@@ -127,7 +126,7 @@ class ASGIAppWrapper:
             except Exception as exc:
                 code = 1005
 
-                if self._websocket is None or self.protocol.is_closing():
+                if self.websocket is None or self.protocol.is_closing():
                     self.logger.info(
                         'calling receive() after the connection is closed'
                     )
@@ -138,12 +137,12 @@ class ASGIAppWrapper:
                         self.protocol.print_exception(exc, 'receive')
 
                     if isinstance(exc, WebSocketServerClosed):
-                        await self._websocket.close(exc.code)
+                        await self.websocket.close(exc.code)
                     else:
-                        await self._websocket.close(1011 if code == 1005
-                                                    else 1000)
+                        await self.websocket.close(1011 if code == 1005
+                                                   else 1000)
 
-                    self._websocket = None
+                    self.websocket = None
                     self.response = None
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
@@ -190,6 +189,8 @@ class ASGIAppWrapper:
                 else:
                     await self.response.handle_exception(exc, 'receive')
                     self.response = None
+
+                    # break the while loop (if any)
                     raise asyncio.CancelledError from None
 
                 self.protocol.set_handler_timeout(
@@ -242,13 +243,12 @@ class ASGIAppWrapper:
                     )
             elif self.response.line is None:
                 if data['type'] == 'websocket.close':
-                    self._websocket = None
+                    self.websocket = None
                     raise Forbidden('connection rejected')
 
                 raise InternalServerError('has not been started or accepted')
 
-            if (data['type'] == 'http.response.body' and
-                    self._websocket is None):
+            if data['type'] == 'http.response.body' and self.websocket is None:
                 if 'body' in data and data['body'] != b'':
                     await self.response.write(
                         data['body'],
@@ -262,16 +262,16 @@ class ASGIAppWrapper:
                     self.request = None  # disallows further receive()
                     self.response = None
                     self.protocol.events['close'].cancel()  # wake up receive()
-            elif data['type'] == 'websocket.send':
+            elif data['type'] == 'websocket.send' and self.websocket:
                 if 'bytes' in data and data['bytes']:
-                    await self._websocket.send(data['bytes'])
+                    await self.websocket.send(data['bytes'])
                 elif 'text' in data and data['text']:
-                    await self._websocket.send(data['text'], opcode=1)
-            elif data['type'] == 'websocket.accept':
-                await self._websocket.accept()
-            elif data['type'] == 'websocket.close':
-                await self._websocket.close(data.get('code', 1000))
-                self._websocket = None
+                    await self.websocket.send(data['text'], opcode=1)
+            elif data['type'] == 'websocket.accept' and self.websocket:
+                await self.websocket.accept()
+            elif data['type'] == 'websocket.close' and self.websocket:
+                await self.websocket.close(data.get('code', 1000))
+                self.websocket = None
                 self.response = None
             elif data['type'] != 'http.response.start':
                 raise InternalServerError('unexpected ASGI message type')
