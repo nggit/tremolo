@@ -4,7 +4,6 @@ import multiprocessing as mp
 import os
 import signal
 import sys
-import threading
 import unittest
 
 # makes imports relative from the repo directory
@@ -136,15 +135,8 @@ class TestHTTPWebSocket(unittest.TestCase):
             self.assertEqual(response.status, 101)
             self.assertEqual(response.message, b'Switching Protocols')
 
-            t = threading.Timer(
-                1, self.client.sendall,
-                args=(WebSocket.create_frame(b'\x03\xe8', opcode=8),)
-            )
-            t.start()
-
             self.assertEqual(self.client.recv(4), b'\x88\x02\x03\xe8')
-
-            t.join()
+            self.client.sendall(WebSocket.create_frame(b'\x03\xe8', opcode=8))
 
     def test_websocket_close_reason(self):
         with self.client:

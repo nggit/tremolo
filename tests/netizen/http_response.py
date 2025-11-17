@@ -33,7 +33,7 @@ class ChunkedDecoder:
                                      'invalid chunk terminator')
 
                 if self._chunk_size == 0:
-                    del buf[:]
+                    del buf[:2]
                     yield None
 
             i = buf.find(b'\r\n', self._bytes_unread)
@@ -179,20 +179,19 @@ class HTTPResponse:
 
     def _handle_response(self, data):
         self._buf.extend(data)
-        header_size = self._buf.find(b'\r\n\r\n') + 2
 
-        if header_size == 1:
+        if not self._buf.endswith(b'\r\n\r\n'):
             if len(self._buf) > 65536:
                 raise ValueError('response header too large')
 
             return
 
         # -- HEADER --
-        self.header = HTTPHeader().parse(self._buf, header_size)
+        self.header = HTTPHeader().parse(self._buf, len(self._buf) - 2)
         self.status = self.header.status
         self.message = self.header.message
 
-        del self._buf[:header_size + 2]
+        del self._buf[:]
 
         if b'chunked' in self.header.headers.getlist(b'transfer-encoding'):
             self.content_length = -1
@@ -211,7 +210,9 @@ class HTTPResponse:
 
     def __next__(self):
         if self.header is None:
-            data = self.client.sock.recv(8192)
+            data = self.client.sock.recv(
+                1 if self._buf.endswith((b'\r', b'\n')) else 4
+            )
 
             if data == b'':
                 raise StopIteration
@@ -264,7 +265,10 @@ class HTTPResponse:
 
     async def __anext__(self):
         if self.header is None:
-            data = await self.client.loop.sock_recv(self.client.sock, 8192)
+            data = await self.client.loop.sock_recv(
+                self.client.sock,
+                1 if self._buf.endswith((b'\r', b'\n')) else 4
+            )
 
             if data == b'':
                 raise StopAsyncIteration
