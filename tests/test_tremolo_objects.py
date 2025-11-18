@@ -101,16 +101,22 @@ class TestTremoloObjects(unittest.TestCase):
         self.assertEqual(func(), b'My Page!')
         self.assertEqual(options, {})
 
-    def test_route_error(self):
+    def test_register_error_handler(self):
         app.error(404)(handlers.error_404)
+        code, func, options, _ = app.routes[0][4]
 
-        for code, func, options, _ in app.routes[0]:
-            if code == 404:
-                self.assertEqual(func(), b'Not Found!!!')
-                self.assertEqual(options, {})
-                break
-        else:
-            self.fail('route does not exist!')
+        self.assertEqual(func(), b'Not Found!!!')
+        self.assertEqual(options, {})
+
+        app.error(511, handlers.hello)
+        code, func, options, _ = app.routes[0][111]
+
+        self.assertEqual(func(), b'Hello!')
+        self.assertEqual(options, {})
+
+    def test_register_error_handler_invalid(self):
+        with self.assertRaises(ValueError):
+            app.error(512)
 
     def test_middleware(self):
         for attr_name in dir(middlewares):

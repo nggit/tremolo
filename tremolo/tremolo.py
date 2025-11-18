@@ -69,14 +69,18 @@ class Tremolo:
 
         return decorator
 
-    def error(self, code):
+    def error(self, code, func=None):
+        i = code - 400
+
+        if not 0 <= i < len(self.routes[0]):
+            raise ValueError(f'{code} is not in the supported range: 400-511')
+
         def decorator(func):
-            i = code - 400
-
-            if 0 <= i < len(self.routes[0]):
-                self.routes[0][i] = (code, func, getoptions(func), {})
-
+            self.routes[0][i] = (code, func, getoptions(func), {})
             return func
+
+        if callable(func):
+            return decorator(func)
 
         return decorator
 
