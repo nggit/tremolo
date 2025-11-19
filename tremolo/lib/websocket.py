@@ -138,7 +138,7 @@ class WebSocket:
             try:
                 frame = await self.recv(timeout)
             except TimeoutError as exc:
-                raise WebSocketServerClosed('receive timeout',
+                raise WebSocketServerClosed(0, 'receive timeout',
                                             code=1000) from exc
             finally:
                 timer.cancel()

@@ -496,7 +496,7 @@ class TestHTTP(unittest.TestCase):
         with self.client1:
             response = self.client1.send(b'GET /timeouts?recv HTTP/1.1')
 
-            self.assertEqual(response.body(), b'recv timeout')
+            self.assertEqual(response.body(), b'0: recv timeout')
             self.assertEqual(response.status, 408)
             self.assertEqual(response.message, b'Request Timeout')
 
