@@ -116,7 +116,17 @@ class Client:
 
     def recv(self, n):
         if self.sock.getblocking():
-            return self.sock.recv(n)
+            buf = bytearray()
+
+            while len(buf) < n:
+                data = self.sock.recv(n - len(buf))
+
+                if data == b'':
+                    break
+
+                buf.extend(data)
+
+            return bytes(buf)
 
         return self.loop.sock_recv(self.sock, n)
 
