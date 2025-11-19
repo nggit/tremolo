@@ -192,9 +192,10 @@ class HTTPProtocol(asyncio.Protocol):
             )
 
     def print_exception(self, exc, *args):
+        code = exc.args[0] if exc.args and isinstance(exc.args[0], int) else -1
         msg = ': '.join((*args, exc.__class__.__name__, str(exc)))
 
-        if isinstance(exc, HTTPException) and exc.code < 500:
+        if isinstance(exc, HTTPException) and exc.code < 500 or code == 0:
             self.logger.info(msg, exc_info=self.options['debug'] and exc)
         elif not isinstance(exc, asyncio.CancelledError):
             self.logger.error(msg, exc_info=self.options['debug'] and exc)
