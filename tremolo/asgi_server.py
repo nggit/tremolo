@@ -7,6 +7,7 @@ from http import HTTPStatus
 from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
+    ASGIConnectionError,
     BadRequest,
     Forbidden,
     WebSocketClientClosed,
@@ -275,8 +276,8 @@ class ASGIAppWrapper:
                 raise RuntimeError('unexpected ASGI message type')
         except Exception as exc:
             if self.response is None or self.protocol.is_closing():
-                raise OSError(
-                    0, 'calling send() after the connection is closed'
+                raise ASGIConnectionError(
+                    'calling send() after the connection is closed'
                 ) from None
 
             self.protocol.events['close'].set_result(exc)  # backup
