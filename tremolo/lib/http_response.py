@@ -16,7 +16,6 @@ from .http_exceptions import (
     BadRequest,
     InternalServerError,
     RangeNotSatisfiable,
-    WebSocketException,
     WebSocketServerClosed
 )
 from .response import Response
@@ -455,7 +454,7 @@ class HTTPResponse(Response):
             )
 
         # WebSocket
-        if isinstance(exc, WebSocketException):
+        if self.request.upgraded:
             if isinstance(exc, WebSocketServerClosed):
                 data = WebSocket.create_frame(
                     exc.code.to_bytes(2, byteorder='big'), opcode=8
