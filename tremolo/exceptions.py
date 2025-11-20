@@ -24,6 +24,10 @@ from .lib.http_exceptions import (  # noqa: F401
 )
 
 
+class ASGIConnectionError(OSError):
+    errno = 0
+
+
 class ASGIException(TremoloException):
     message = 'ASGIException'
 

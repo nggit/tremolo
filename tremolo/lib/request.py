@@ -56,7 +56,7 @@ class Request:
             try:
                 data = await self.server.queue[0].get(self.timeout)
             except asyncio.CancelledError as exc:
-                raise TimeoutError('recv timeout') from exc
+                raise TimeoutError(0, 'recv timeout') from exc
 
             if data is None:  # only occurs on a request with Content-Length
                 break

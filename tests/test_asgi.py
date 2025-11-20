@@ -221,13 +221,31 @@ class TestASGI(unittest.TestCase):
 
             self.assertEqual(self.client.recv(4096), b'\x88\x02\x03\xf0')
 
+    def test_websocket_receive_timeout(self):
+        with self.client:
+            response = self.client.send(
+                b'GET /ws HTTP/1.1',
+                b'Upgrade: WebSocket',
+                b'Connection: Upgrade',
+                b'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==',
+                b'Sec-WebSocket-Version: 13'
+            )
+
+            self.assertEqual(response.status, 101)
+            self.assertEqual(response.message, b'Switching Protocols')
+
+            self.client.sendall(b'\x81\x0dHello, ')
+
+            self.assertEqual(self.client.recv(6), b'\x89\x00\x88\x02\x03\xe8')
+
 
 if __name__ == '__main__':
     mp.set_start_method('spawn', force=True)
 
     p = mp.Process(
         target=tremolo.run,
-        kwargs=dict(app=app, host=ASGI_HOST, port=ASGI_PORT, debug=False)
+        kwargs=dict(app=app, host=ASGI_HOST, port=ASGI_PORT, debug=False,
+                    keepalive_timeout=2)
     )
 
     p.start()

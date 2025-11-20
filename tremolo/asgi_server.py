@@ -7,9 +7,9 @@ from http import HTTPStatus
 from urllib.parse import unquote_to_bytes
 
 from .exceptions import (
+    ASGIConnectionError,
     BadRequest,
     Forbidden,
-    InternalServerError,
     WebSocketClientClosed,
     WebSocketServerClosed
 )
@@ -25,7 +25,7 @@ class ASGIServer(HTTPProtocol):
 
     def connection_lost(self, exc):
         if not self.events['close'].done():
-            self.events['close'].set_result(None)
+            self.events['close'].set_result(exc)
 
         super().connection_lost(exc)
 
@@ -34,7 +34,7 @@ class ASGIServer(HTTPProtocol):
             raise BadRequest
 
         scope = {
-            'asgi': {'version': '3.0', 'spec_version': '2.3'},
+            'asgi': {'version': '3.0', 'spec_version': '2.4'},
             'root_path': self.options['root_path'],
             'server': self.globals.info['server'],
             'client': request.client,
@@ -69,18 +69,16 @@ class ASGIServer(HTTPProtocol):
         try:
             await app
 
-            if 'close' in self.events and not self.events['close'].done():
-                self.logger.info('handler exited early (no close?)')
-                await self.events['close']
-        except (asyncio.CancelledError, Exception) as exc:
-            if app.response is None:  # already sent
-                self.print_exception(exc, 'app')
-            else:
-                if scope['type'] == 'websocket' and request.upgraded:
-                    exc = WebSocketServerClosed(cause=exc)
+            if 'close' in self.events and not self.events['close'].cancelled():
+                if not self.events['close'].done():
+                    self.logger.info('handler exited early (no close?)')
 
-                await response.handle_exception(exc, 'app')
-                app.response = None
+                raise await self.events['close']
+        except (asyncio.CancelledError, Exception) as exc:
+            if scope['type'] == 'websocket' and request.upgraded:
+                exc = WebSocketServerClosed(cause=exc)
+
+            await response.handle_exception(exc, 'app')
         finally:
             scope.clear()
 
@@ -144,6 +142,7 @@ class ASGIAppWrapper:
 
                     self.websocket = None
                     self.response = None
+
                     self.protocol.request = None  # force handler timeout
                     self.protocol.set_handler_timeout(
                         self.protocol.options['app_close_timeout']
@@ -203,7 +202,7 @@ class ASGIAppWrapper:
         try:
             if data['type'] in ('http.response.start', 'websocket.accept'):
                 if self.response.line is not None:
-                    raise InternalServerError('already started or accepted')
+                    raise RuntimeError('already started or accepted')
 
                 # websocket doesn't have this
                 if 'status' in data:
@@ -246,7 +245,7 @@ class ASGIAppWrapper:
                     self.websocket = None
                     raise Forbidden('connection rejected')
 
-                raise InternalServerError('has not been started or accepted')
+                raise RuntimeError('has not been started or accepted')
 
             if data['type'] == 'http.response.body' and self.websocket is None:
                 if 'body' in data and data['body'] != b'':
@@ -260,7 +259,7 @@ class ASGIAppWrapper:
                     await self.response.write(b'')
                     self.response.close(keepalive=True)
                     self.request = None  # disallows further receive()
-                    self.response = None
+                    self.response = None  # disallows further send()
                     self.protocol.events['close'].cancel()  # wake up receive()
             elif data['type'] == 'websocket.send' and self.websocket:
                 if 'bytes' in data and data['bytes']:
@@ -274,15 +273,13 @@ class ASGIAppWrapper:
                 self.websocket = None
                 self.response = None
             elif data['type'] != 'http.response.start':
-                raise InternalServerError('unexpected ASGI message type')
-        except (asyncio.CancelledError, Exception) as exc:
+                raise RuntimeError('unexpected ASGI message type')
+        except Exception as exc:
             if self.response is None or self.protocol.is_closing():
-                self.logger.info(
+                raise ASGIConnectionError(
                     'calling send() after the connection is closed'
-                )
-            else:
-                if self.scope['type'] == 'websocket' and self.request.upgraded:
-                    exc = WebSocketServerClosed(cause=exc)
+                ) from None
 
-                await self.response.handle_exception(exc, 'send')
-                self.response = None  # disallows further send()
+            self.protocol.events['close'].set_result(exc)  # backup
+            self.response = None
+            raise  # this may be swallowed by the app, so we have a backup

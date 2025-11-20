@@ -12,6 +12,11 @@ class TremoloException(Exception):
 
     def __str__(self):
         if self.args:
+            errno, *msg = self.args
+
+            if msg and isinstance(errno, int):
+                return '%d: %s' % (errno, ' '.join(map(str, msg)))
+
             return ' '.join(map(str, self.args))
 
         return self.message

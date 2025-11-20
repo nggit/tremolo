@@ -30,7 +30,8 @@ def main():
     )
     processes.append(mp.Process(
         target=tremolo.run,
-        kwargs=dict(app=asgi_app, host=ASGI_HOST, port=ASGI_PORT, debug=False))
+        kwargs=dict(app=asgi_app, host=ASGI_HOST, port=ASGI_PORT, debug=False,
+                    keepalive_timeout=2))
     )
 
     for p in processes:
