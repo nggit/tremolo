@@ -11,7 +11,7 @@ import socket
 import ssl
 import sys
 
-from importlib import import_module, reload as reload_module
+from importlib import import_module
 from io import TextIOWrapper
 from shutil import get_terminal_size
 
@@ -616,7 +616,7 @@ class Tremolo:
                             not module.__name__.startswith('tremolo.') and
                             module_file.startswith(kwargs['app_dir']) and
                             os.path.exists(module_file)):
-                        reload_module(module)
+                        del sys.modules[module.__name__]
 
                 module = import_module(kwargs['module_name'])
 
