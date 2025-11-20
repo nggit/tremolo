@@ -24,7 +24,7 @@ class ThreadExecutor(Thread):
         super().__init__(**kwargs)
 
         self.context = context
-        self.queue = queue.SimpleQueue()
+        self.queue = getattr(queue, 'SimpleQueue', queue.Queue)()
         self.loop = loop or asyncio.get_event_loop()
         self._shutdown = None
 
