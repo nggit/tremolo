@@ -16,7 +16,7 @@ class KeepAliveConnections(dict):
         return self.keys().__repr__()
 
     def __setitem__(self, key, value):
-        super().__setitem__(key, value)
+        dict.__setitem__(self, key, value)
 
         if self.__len__() > self._maxlen:
             del self[self.__iter__().__next__()]

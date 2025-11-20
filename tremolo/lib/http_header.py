@@ -93,17 +93,17 @@ class HTTPHeader:
 
                 colon_pos = line.find(b':', 1)
 
-                if colon_pos > 0 and line[colon_pos - 1] != 32:
-                    name = line[:colon_pos].lower()
-                    value = line[colon_pos + 1:].strip(b' \t')
-
-                    if name in self.headers:
-                        self.headers[name].append(value)
-                    else:
-                        self.headers[name] = [value]
-                else:
+                if colon_pos <= 0 or line[colon_pos - 1] == 32:
                     self.is_valid = False
                     break
+
+                name = line[:colon_pos].lower()
+                value = line[colon_pos + 1:].strip(b' \t')
+
+                if name in self.headers:
+                    self.headers[name].append(value)
+                else:
+                    self.headers[name] = [value]
             except StopIteration:
                 break
 
