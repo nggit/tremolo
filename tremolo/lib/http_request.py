@@ -182,7 +182,7 @@ class HTTPRequest(Request):
                 raise PayloadTooLarge
 
             async for data in super().recv(timeout):
-                yield data
+                yield bytes(data)
         elif b'chunked' in self.transfer_encoding:
             buf = bytearray()
             agen = super().recv(timeout)
