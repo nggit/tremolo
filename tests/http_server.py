@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import asyncio
-import concurrent.futures
 import os
 import sys
 
@@ -12,6 +11,14 @@ from tremolo import Application  # noqa: E402
 from tremolo.exceptions import BadRequest  # noqa: E402
 from tremolo.utils import memory_usage  # noqa: E402
 
+# sub-apps
+from tests.http_app_download import (  # noqa: E402
+    TEST_FILE,
+    app as app_download
+)
+from tests.http_app_upload import app as app_upload  # noqa: E402
+from tests.http_app_websocket import app as app_websocket  # noqa: E402
+
 if sys.implementation.name == 'cpython' and sys.platform == 'linux':
     LIMIT_MEMORY = 51200  # 50MiB
 else:
@@ -19,7 +26,6 @@ else:
 
 HTTP_HOST = '127.0.0.1'
 HTTP_PORT = 28000
-TEST_FILE = __file__
 
 app = Application()
 sub = Application()
@@ -242,129 +248,6 @@ async def trigger_memory_leak(**server):
     return b'OK'
 
 
-@app.route('/submitform')
-def post_form(**server):
-    request = server['request']
-
-    request.form(max_size=8192)
-
-    data = []
-
-    for name, value in request.params['post'].items():
-        data.append('%s=%s' % (name, value[0]))
-
-    # b'user=myuser&pass=mypass'
-    return '&'.join(data)
-
-
-@app.route('/upload')
-def upload(request, content_type=b'application/octet-stream', **server):
-    if request.query_string == b'maxqueue':
-        request.protocol.options['max_queue_size'] = 0
-
-    try:
-        size = int(request.query['size'][0])
-        yield request.read(0) + request.read(size)
-    except KeyError:
-        body = bytearray()
-
-        for data in request.stream():
-            body.extend(data)
-
-        yield body
-
-        for data in request.stream():
-            # should not raised
-            raise Exception('EOF!!!')
-
-
-@app.route('/upload/multipart')
-async def upload_multipart(request, response, stream=False, **server):
-    assert server != {}
-    assert 'request' not in server
-    assert 'response' not in server
-
-    response.set_content_type(b'text/csv')
-
-    # should be ignored
-    yield b''
-
-    yield b'name,type,data\r\n'
-
-    # should be ignored
-    yield b''
-
-    # stream multipart file upload then send it back as csv
-    async for part in request.files(max_files=1):
-        yield b'%s,%s,%s\r\n' % (part['name'].encode(),
-                                 part['type'].encode(),
-                                 (part['data'][:5] + part['data'][-3:]))
-
-    async for part in request.files(max_file_size=262144):
-        if part['eof']:
-            part['data'] = b'-----' + part['data'][-3:]
-        else:
-            part['data'] = part['data'][:5] + b'---'
-
-        yield b'%s,%s,%s\r\n' % (part['name'].encode(),
-                                 part['type'].encode(),
-                                 (part['data'][:5] + part['data'][-3:]))
-
-    async for part in request.files():
-        # should not raised
-        raise Exception('EOF!!!')
-
-
-@app.route('/upload/multipart/form')
-async def upload_multipart_form(request):
-    form_data = await request.form(max_size=262144)
-    files = request.params.files
-
-    yield files['file'][0]['data'][:5]  # b'BEGIN'
-    yield form_data['text'][0].encode()  # b'Hello, World!'
-    yield files['file'][0]['data'][-3:]  # b'END'
-
-
-@app.route('/download')
-async def download(request, response):
-    if request.query_string == b'executor':
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            await response.sendfile(
-                TEST_FILE, content_type='text/plain', executor=executor
-            )
-    else:
-        await response.sendfile(
-            TEST_FILE,
-            count=os.stat(TEST_FILE).st_size + 10, content_type=b'text/plain'
-        )
-
-
-@app.route('/ws')
-async def ws_handler(websocket=None):
-    if websocket.request.query_string == b'close':
-        await websocket.accept()
-
-        # test send close manually
-        await websocket.close()
-
-        # this suggests that you want to handle the disconnection manually
-        return True
-
-    if websocket.request.query_string == b'ping':
-        await websocket.accept()
-
-        # WebSocket.recv automatically sends pong
-        await websocket.recv()
-    else:
-        # await websocket.accept()
-        # while True: data = await websocket.receive()
-        #
-        # async iterator implicitly performs WebSocket.accept
-        async for data in websocket:
-            await websocket.send(data)
-            break
-
-
 @app.route('/sse')
 async def sse_handler(sse=None, **server):
     assert server != {}
@@ -448,6 +331,9 @@ sub.listen(HTTP_PORT + 2)
 sub.mount('/subsub', subsub)
 app.mount('/sub', sub)
 app.mount('/sub', sub)  # no-op
+app.mount('/', app_download)
+app.mount('/', app_upload)
+app.mount('/', app_websocket)
 
 assert (b'sub', b'subsub') in app.middlewares
 
@@ -460,6 +346,3 @@ if __name__ == '__main__':
     app.run(HTTP_HOST, port=HTTP_PORT, limit_memory=LIMIT_MEMORY,
             debug=True, reload=True,
             client_max_body_size=1048576, ws_max_payload_size=73728)
-
-# don't remove this; needed by test_http_range.py
-# END
