@@ -61,7 +61,7 @@ class JSONResponse(dict):
         self._body = response.body(max_size=max_size)
         self._kwargs = kwargs
 
-        if response.client.sock.getblocking():
+        if response.client.sock.gettimeout() != 0:
             try:
                 self.update(json.loads(self._body.decode(), **kwargs))
             finally:
@@ -91,7 +91,7 @@ class HTTPResponse:
         self._buf = bytearray()
         self._chunked = ChunkedDecoder()
 
-        if client.sock.getblocking():
+        if client.sock.gettimeout() != 0:
             for retries in range(client.retries, -1, -1):
                 try:
                     if retries != client.retries:
@@ -122,7 +122,7 @@ class HTTPResponse:
 
         body = bytearray()
 
-        if self.client.sock.getblocking():
+        if self.client.sock.gettimeout() != 0:
             for data in self:
                 body.extend(data)
 
