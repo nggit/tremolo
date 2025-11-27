@@ -231,57 +231,58 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[1].put_nowait(None)
 
     async def _handle_request(self):
+        request = self.request
         timer = self.set_handler_timeout(self.options['app_handler_timeout'])
 
         try:
-            response = self.request.create_response()
+            response = request.create_response()
 
-            if b'connection' in self.request.headers:
-                if b'close' not in self.request.headers.getlist(b'connection'):
+            if self.options['keepalive_timeout']:  # can be 0 on shutdown
+                if b'connection' in request.headers:
+                    if b'close' not in request.headers.getlist(b'connection'):
+                        self.globals.connections.add(self)
+                        request.http_keepalive = True
+                elif request.version == b'1.1':
                     self.globals.connections.add(self)
-                    self.request.http_keepalive = True
-            elif self.request.version == b'1.1':
-                self.globals.connections.add(self)
-                self.request.http_keepalive = True
+                    request.http_keepalive = True
 
-            if b'transfer-encoding' in self.request.headers:
-                if (self.request.version != b'1.1' or
-                        b'chunked' not in self.request.transfer_encoding):
+            if b'transfer-encoding' in request.headers:
+                if (request.version != b'1.1' or
+                        b'chunked' not in request.transfer_encoding):
                     raise BadRequest('unexpected Transfer-Encoding')
 
-                self.request.has_body = True
+                request.has_body = True
 
-            if b'content-length' in self.request.headers:
-                if (self.request.has_body or
-                        len(self.request.headers[b'content-length']) != 1):
+            if b'content-length' in request.headers:
+                if (request.has_body or
+                        len(request.headers[b'content-length']) != 1):
                     raise BadRequest('ambiguous Content-Length')
 
                 try:
-                    self.request.content_length = parse_int(
-                        self.request.headers[b'content-length'][0]
+                    request.content_length = parse_int(
+                        request.headers[b'content-length'][0]
                     )
                 except ValueError as exc:
                     raise BadRequest('bad Content-Length') from exc
 
-                self.request.has_body = self.request.content_length != 0
+                request.has_body = request.content_length != 0
 
-            if (self.request.has_body and b'expect' in self.request.headers and
-                    self.request.headers[b'expect'][0]
-                    .lower() == b'100-continue'):
+            if (request.has_body and b'expect' in request.headers and
+                    request.headers[b'expect'][0].lower() == b'100-continue'):
                 # we can handle continue later after the route is found
                 # by checking this state
-                self.request.http_continue = True
+                request.http_continue = True
 
             # successfully got header,
             # clear either the request or keepalive timeout
             if not self.events['request'].done():
                 self.events['request'].set_result(None)
 
-            await self.request_received(self.request, response)
+            await self.request_received(request, response)
         except (SystemExit, KeyboardInterrupt):
             raise
         except BaseException as exc:
-            if response.request.protocol is not None:
+            if request.protocol is not None:
                 data = None
 
                 try:
@@ -292,7 +293,7 @@ class HTTPProtocol(asyncio.Protocol):
                     await response.handle_exception(exc, data=data)
         finally:
             timer.cancel()
-            await response.request.handler_exit()
+            await request.handler_exit()
 
     async def _receive_data(self):
         if 'request' in self.events:
@@ -423,7 +424,7 @@ class HTTPProtocol(asyncio.Protocol):
 
                     await self.set_timeout(
                         self.events['send'],
-                        timeout=self.options['keepalive_timeout'],
+                        timeout=self.options['request_timeout'],
                         timeout_cb=self.send_timeout
                     )
 

@@ -78,7 +78,7 @@ class Client:
 
     async def __aenter__(self):
         if self.loop is None:
-            self.loop = asyncio.get_running_loop()
+            self.loop = asyncio.get_event_loop()
 
         if self.sock is not None:
             self.sock.close()
@@ -115,26 +115,26 @@ class Client:
         self.sock.close()
 
     def recv(self, n):
-        if self.sock.getblocking():
-            buf = bytearray()
+        if self.sock.gettimeout() == 0:
+            return self.loop.sock_recv(self.sock, n)
 
-            while len(buf) < n:
-                data = self.sock.recv(n - len(buf))
+        buf = bytearray()
 
-                if data == b'':
-                    break
+        while len(buf) < n:
+            data = self.sock.recv(n - len(buf))
 
-                buf.extend(data)
+            if data == b'':
+                break
 
-            return bytes(buf)
+            buf.extend(data)
 
-        return self.loop.sock_recv(self.sock, n)
+        return bytes(buf)
 
     def sendall(self, data):
-        if self.sock.getblocking():
-            return self.sock.sendall(data)
+        if self.sock.gettimeout() == 0:
+            return self.loop.sock_sendall(self.sock, data)
 
-        return self.loop.sock_sendall(self.sock, data)
+        return self.sock.sendall(data)
 
 
 class HTTPClient(Client):

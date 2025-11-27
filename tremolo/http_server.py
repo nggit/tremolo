@@ -3,7 +3,7 @@
 
 from .exceptions import BadRequest, MethodNotAllowed, NotFound
 from .lib.http_protocol import HTTPProtocol
-from .lib.http_response import KEEPALIVE_OR_CLOSE, UPGRADE_OR_KEEPALIVE
+from .lib.http_response import CONNECTIONS
 from .lib.sse import SSE
 from .lib.websocket import WebSocket
 
@@ -164,8 +164,7 @@ class HTTPServer(HTTPProtocol):
                     request.http_keepalive = False
 
                 response.set_header(
-                    b'Connection',
-                    UPGRADE_OR_KEEPALIVE[status[0] in (101, 426)]
+                    b'Connection', CONNECTIONS[(status[0] in (101, 426)) + 1]
                 )
             else:
                 response.set_header(b'Connection', b'close')
@@ -217,7 +216,7 @@ class HTTPServer(HTTPProtocol):
                 response.set_header(b'Content-Length', b'%d' % len(data))
 
             response.set_header(
-                b'Connection', KEEPALIVE_OR_CLOSE[request.http_keepalive]
+                b'Connection', CONNECTIONS[request.http_keepalive]
             )
 
             if await self.run_middlewares('response', reverse=True):

@@ -384,6 +384,11 @@ class Tremolo:
         except BaseException as exc:
             self.logger.info('Shutting down: %s', str(exc))
 
+            options['request_timeout'] = 1
+            options['keepalive_timeout'] = 0
+            options['app_handler_timeout'] = 1
+            options['app_close_timeout'] = 1
+
             while self.context.tasks:
                 _, pending = await asyncio.wait(
                     self.context.tasks, timeout=options['shutdown_timeout'] / 2

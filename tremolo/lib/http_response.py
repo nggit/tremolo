@@ -21,14 +21,7 @@ from .http_exceptions import (
 from .response import Response
 from .websocket import WebSocket
 
-KEEPALIVE_OR_CLOSE = {
-    False: b'close',
-    True: b'keep-alive'
-}
-UPGRADE_OR_KEEPALIVE = {
-    False: b'keep-alive',
-    True: b'upgrade'
-}
+CONNECTIONS = (b'close', b'keep-alive', b'upgrade')
 
 
 class HTTPResponse(Response):
@@ -185,7 +178,7 @@ class HTTPResponse(Response):
                  *status,
                  self.content_type,
                  content_length,
-                 KEEPALIVE_OR_CLOSE[keepalive and self.request.http_keepalive],
+                 CONNECTIONS[keepalive and self.request.http_keepalive],
                  b'\r\n'.join(b'\r\n'.join(v) for k, v in self.headers.items()
                               if k not in excludes),
                  data), **kwargs
@@ -234,7 +227,7 @@ class HTTPResponse(Response):
 
                     self.set_header(
                         b'Connection',
-                        UPGRADE_OR_KEEPALIVE[status[0] in (101, 426)]
+                        CONNECTIONS[(status[0] in (101, 426)) + 1]
                     )
                 else:
                     self.set_header(b'Connection', b'close')
