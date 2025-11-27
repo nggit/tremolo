@@ -245,7 +245,7 @@ if __name__ == '__main__':
     p = mp.Process(
         target=tremolo.run,
         kwargs=dict(app=app, host=ASGI_HOST, port=ASGI_PORT, debug=False,
-                    keepalive_timeout=2)
+                    request_timeout=2)
     )
 
     p.start()

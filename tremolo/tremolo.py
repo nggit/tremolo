@@ -25,7 +25,7 @@ from .lib.contexts import WorkerContext
 from .lib.executors import MultiThreadExecutor
 from .lib.locks import ServerLock
 
-__version__ = '0.4.16'
+__version__ = '0.4.17'
 
 
 class Tremolo:
@@ -171,11 +171,7 @@ class Tremolo:
             host = port
             port = None
 
-        if (host, port) in self.ports:
-            return False
-
-        self.ports[(host, port)] = options
-        return (host, port) in self.ports
+        return self.ports.setdefault((host, port), options) is options
 
     def mount(self, prefix, app):
         if not prefix.startswith('/') or len(prefix) > 255:
@@ -385,20 +381,24 @@ class Tremolo:
 
         try:
             await self._serve_forever()
-        except asyncio.CancelledError:
-            self.logger.info('Shutting down')
+        except BaseException as exc:
+            self.logger.info('Shutting down: %s', str(exc))
 
-            if self.context.tasks:
+            options['request_timeout'] = 1
+            options['keepalive_timeout'] = 0
+            options['app_handler_timeout'] = 1
+            options['app_close_timeout'] = 1
+
+            while self.context.tasks:
                 _, pending = await asyncio.wait(
                     self.context.tasks, timeout=options['shutdown_timeout'] / 2
                 )
                 for task in pending:
                     task.cancel()
+
+            raise
         finally:
             server.close()
-
-            while self.context.tasks:
-                await self.context.tasks.pop()
 
             await server.wait_closed()
             await self._worker_stop()
@@ -517,9 +517,7 @@ class Tremolo:
                 self.context.tasks.pop().cancel()
 
             task.cancel()
-
-            if not task.done():
-                loop.run_forever()
+            loop.run_forever()
 
             raise
         finally:

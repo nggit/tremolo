@@ -2,16 +2,12 @@ name: Build and Release
 
 on:
   push:
-    branches: ['build', 'release']
-  pull_request:
-    branches: ['main', 'master']
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
   build:
-    if: |
-      startsWith(github.ref_name, 'build') ||
-      startsWith(github.ref_name, 'release')
     name: Build sdist and wheels
     runs-on: ubuntu-latest
     steps:
@@ -39,9 +35,6 @@ jobs:
           path: dist/tremolo-*
 
   release:
-    if: |
-      startsWith(github.ref_name, 'build') ||
-      startsWith(github.ref_name, 'release')
     name: Upload release to PyPI
     needs: ['build']
     runs-on: ubuntu-latest
@@ -60,5 +53,4 @@ jobs:
           tree -L 2
 
       - name: Publish to PyPI
-        if: ${{ startsWith(github.ref_name, 'release') }}
         uses: pypa/gh-action-pypi-publish@release/v1
