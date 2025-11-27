@@ -120,16 +120,16 @@ class HTTPServer(HTTPProtocol):
             response.set_content_type(options['content_type'])
 
         try:
-            agen = func(func=func, kwargs=kwargs, **self.server)
+            coro = func(func=func, kwargs=kwargs, **self.server)
         except TypeError:  # doesn't accept extra **kwargs
-            agen = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
+            coro = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
 
-        next_data = getattr(agen, '__anext__', False)
+        next_data = getattr(coro, '__anext__', False)
 
         if next_data:
             data = await next_data()
         else:
-            data = await agen
+            data = await coro
 
             if data is None:
                 response.close(keepalive=response.headers_sent())
