@@ -171,11 +171,7 @@ class Tremolo:
             host = port
             port = None
 
-        if (host, port) in self.ports:
-            return False
-
-        self.ports[(host, port)] = options
-        return (host, port) in self.ports
+        return self.ports.setdefault((host, port), options) is options
 
     def mount(self, prefix, app):
         if not prefix.startswith('/') or len(prefix) > 255:
