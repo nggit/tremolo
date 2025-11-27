@@ -53,5 +53,4 @@ jobs:
           tree -L 2
 
       - name: Publish to PyPI
-        if: ${{ startsWith(github.ref_name, 'release') }}
         uses: pypa/gh-action-pypi-publish@release/v1
