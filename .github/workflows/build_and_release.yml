@@ -8,9 +8,6 @@ on:
 
 jobs:
   build:
-    if: |
-      startsWith(github.ref_name, 'build') ||
-      startsWith(github.ref_name, 'release')
     name: Build sdist and wheels
     runs-on: ubuntu-latest
     steps:
@@ -38,9 +35,6 @@ jobs:
           path: dist/tremolo-*
 
   release:
-    if: |
-      startsWith(github.ref_name, 'build') ||
-      startsWith(github.ref_name, 'release')
     name: Upload release to PyPI
     needs: ['build']
     runs-on: ubuntu-latest
