@@ -385,20 +385,19 @@ class Tremolo:
 
         try:
             await self._serve_forever()
-        except asyncio.CancelledError:
-            self.logger.info('Shutting down')
+        except BaseException as exc:
+            self.logger.info('Shutting down: %s', str(exc))
 
-            if self.context.tasks:
+            while self.context.tasks:
                 _, pending = await asyncio.wait(
                     self.context.tasks, timeout=options['shutdown_timeout'] / 2
                 )
                 for task in pending:
                     task.cancel()
+
+            raise
         finally:
             server.close()
-
-            while self.context.tasks:
-                await self.context.tasks.pop()
 
             await server.wait_closed()
             await self._worker_stop()
@@ -517,9 +516,7 @@ class Tremolo:
                 self.context.tasks.pop().cancel()
 
             task.cancel()
-
-            if not task.done():
-                loop.run_forever()
+            loop.run_forever()
 
             raise
         finally:
