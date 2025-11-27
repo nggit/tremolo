@@ -13,7 +13,7 @@ class Request:
         self.protocol = protocol
         self.context = RequestContext()
         self.body_size = 0
-        self.timeout = protocol.options['keepalive_timeout']
+        self.timeout = protocol.options['request_timeout']
 
     @property
     def server(self):

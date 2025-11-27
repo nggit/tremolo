@@ -15,7 +15,7 @@ class WebSocket:
         self.request = request
         self.response = response
         self.max_payload_size = request.server.options['ws_max_payload_size']
-        self.ping_interval = request.server.options['keepalive_timeout'] / 2
+        self.ping_interval = request.server.options['request_timeout'] / 2
 
         self.fin = 1
         self.opcode = 0
