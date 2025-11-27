@@ -388,12 +388,12 @@ class Tremolo:
         except asyncio.CancelledError:
             self.logger.info('Shutting down')
 
-            if self.context.tasks:
-                options['request_timeout'] = 1
-                options['keepalive_timeout'] = 0
-                options['app_handler_timeout'] = 1
-                options['app_close_timeout'] = 1
+            options['request_timeout'] = 1
+            options['keepalive_timeout'] = 0
+            options['app_handler_timeout'] = 1
+            options['app_close_timeout'] = 1
 
+            if self.context.tasks:
                 _, pending = await asyncio.wait(
                     self.context.tasks, timeout=options['shutdown_timeout'] / 2
                 )
