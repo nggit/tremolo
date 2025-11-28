@@ -1,6 +1,8 @@
 name: Mirror to Codeberg
 
 on:
+  pull_request:
+    types: [closed]
   push:
     tags: ['v*']
   delete:
@@ -11,7 +13,18 @@ on:
 jobs:
   mirror:
     runs-on: ubuntu-latest
-    if: github.event_name != 'delete' || github.event.ref != 'refs/heads/main'
+
+    # mirror on:
+    # - branch delete
+    # - tag push
+    # - tag delete
+    # - fork PR merge
+    if: |
+      github.event_name != 'pull_request' ||
+      (
+        github.event.pull_request.merged == true &&
+        github.event.pull_request.head.repo.full_name != github.repository
+      )
     permissions:
       contents: read
     steps:
