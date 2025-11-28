@@ -12,6 +12,8 @@ jobs:
   mirror:
     runs-on: ubuntu-latest
     if: github.event_name != 'delete' || github.event.ref != 'refs/heads/main'
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
