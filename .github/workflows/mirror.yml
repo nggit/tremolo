@@ -1,0 +1,27 @@
+name: Mirror to Codeberg
+
+on:
+  push:
+    tags: ['v*']
+  delete:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'delete' || github.event.ref != 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push mirror to Codeberg
+        run: |
+          git remote add codeberg \
+            https://$CODEBERG_USER:$CODEBERG_TOKEN@codeberg.org/$CODEBERG_USER/$(basename $GITHUB_REPOSITORY).git
+          git push --mirror codeberg
+        env:
+          CODEBERG_USER: 'nggit'
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
