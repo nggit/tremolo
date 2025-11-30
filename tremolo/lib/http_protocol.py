@@ -85,7 +85,7 @@ class HTTPProtocol(asyncio.Protocol):
             return
 
         if exc:
-            if isinstance(exc, HTTPException):
+            if isinstance(exc, HTTPException) and exc.code < 600:
                 self.transport.write(
                     b'HTTP/1.0 %d %s\r\nContent-Type: %s\r\n\r\n' %
                     (exc.code,
