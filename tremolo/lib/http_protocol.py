@@ -230,13 +230,11 @@ class HTTPProtocol(asyncio.Protocol):
         )
         self.queue[1].put_nowait(None)
 
-    async def _handle_request(self):
-        request = self.request
+    async def _handle_request(self, request):
+        response = request.create_response()
         timer = self.set_handler_timeout(self.options['app_handler_timeout'])
 
         try:
-            response = request.create_response()
-
             if self.options['keepalive_timeout']:  # can be 0 on shutdown
                 if b'connection' in request.headers:
                     if b'close' not in request.headers.getlist(b'connection'):
@@ -351,7 +349,9 @@ class HTTPProtocol(asyncio.Protocol):
 
                 if header.is_request:
                     self.request = HTTPRequest(self, header)
-                    task = self.app.create_task(self._handle_request())
+                    task = self.app.create_task(
+                        self._handle_request(self.request)
+                    )
 
                     self.handlers.add(task)
                     task.add_done_callback(self.handlers.discard)
