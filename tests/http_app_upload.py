@@ -97,6 +97,3 @@ async def upload_multipart_form(request):
 if __name__ == '__main__':
     app.run('127.0.0.1', port=28000, debug=True, reload=True,
             client_max_body_size=1048576, ws_max_payload_size=73728)
-
-# don't remove this; needed by test_http_range.py
-# END
