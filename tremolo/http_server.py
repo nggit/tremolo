@@ -123,6 +123,8 @@ class HTTPServer(HTTPProtocol):
             coro = func(func=func, kwargs=kwargs, **self.server)
         except TypeError:  # doesn't accept extra **kwargs
             coro = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
+        finally:
+            self.server.pop('self', None)  # avoid double self in middleware
 
         next_data = getattr(coro, '__anext__', False)
 
