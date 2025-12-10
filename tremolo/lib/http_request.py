@@ -108,12 +108,12 @@ class HTTPRequest(Request):
             port = self.client[1]  # 0 - 65535
 
         prefix = (
-            int(time.time() * 1e7).to_bytes(8, byteorder='big') +
+            int(time.time()).to_bytes(4, byteorder='big') +
             int.to_bytes((port << 16) | (os.getpid() & 0xffff),
                          4, byteorder='big')
-        )  # 12 Bytes
+        )[:length]  # 8 Bytes
 
-        return prefix + os.urandom(max(4, length - len(prefix)))
+        return prefix + os.urandom(length - len(prefix))
 
     def create_response(self):
         return HTTPResponse(self)
