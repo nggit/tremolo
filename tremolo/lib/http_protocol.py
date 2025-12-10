@@ -16,6 +16,7 @@ from .http_request import HTTPRequest
 from .queue import Queue
 
 
+# pylint: disable=E0237,E1101
 class HTTPProtocol(asyncio.Protocol):
     __slots__ = ('server', 'queue', 'events', 'handlers', '_recv_buf')
 
@@ -112,10 +113,10 @@ class HTTPProtocol(asyncio.Protocol):
         raise RequestTimeout('request timeout after %gs' % timeout)
 
     def keepalive_timeout(self, timeout):
-        self.logger.info('keepalive timeout after %gs', timeout)
+        self.logger.debug('keepalive timeout after %gs', timeout)
 
     def send_timeout(self, timeout):
-        self.logger.info('send timeout after %gs', timeout)
+        self.logger.debug('send timeout after %gs', timeout)
 
     async def set_timeout(self, waiter, timeout=30, timeout_cb=None):
         timer = self.loop.call_at(self.loop.time() + timeout, waiter.cancel)
@@ -415,7 +416,7 @@ class HTTPProtocol(asyncio.Protocol):
                 low, high = self.transport.get_write_buffer_limits()
 
                 if write_buffer_size > high:
-                    self.logger.info(
+                    self.logger.debug(
                         '%d exceeds the current watermark limits '
                         '(high=%d, low=%d)',
                         write_buffer_size, high, low

@@ -219,6 +219,9 @@ class Tremolo:
         options = self.context.options
         options.update(kwargs)
 
+        options.setdefault('debug', False)
+        options.setdefault('log_level',
+                           'DEBUG' if options['debug'] else 'INFO')
         options.setdefault('app', None)
         options.setdefault('app_dir', os.getcwd())
         options.setdefault('shutdown_timeout', 30)
@@ -227,15 +230,14 @@ class Tremolo:
         if self.logger is None:
             self.logger = logging.getLogger(mp.current_process().name)
 
-        self.logger.setLevel(
-            getattr(logging,
-                    options.get('log_level', 'DEBUG').upper(), logging.DEBUG)
-        )
+        self.logger.setLevel(options['log_level'].upper())
+
+        handler = logging.StreamHandler()
         formatter = logging.Formatter(
             options.get('log_fmt',
                         '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
         )
-        handler = logging.StreamHandler()
+
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
@@ -342,7 +344,6 @@ class Tremolo:
         self.context.info['server_name'] = options[
                                            'server_name'].encode('latin-1')
 
-        options.setdefault('debug', False)
         options.setdefault('experimental', False)
         options.setdefault('ws', True)
         options.setdefault('ws_max_payload_size', 2 * 1048576)
