@@ -101,14 +101,14 @@ class HTTPRequest(Request):
         self._body = None
         del self._read_buf[:]
 
-    def uid(self, length=32):
+    def uid(self, length=32, *, ts_offset=0):
         if self.client is None:
             port = self.socket.fileno()
         else:
             port = self.client[1]  # 0 - 65535
 
         prefix = (
-            int(time.time()).to_bytes(4, byteorder='big') +
+            int(time.time() + ts_offset).to_bytes(4, byteorder='big') +
             int.to_bytes((port << 16) | (os.getpid() & 0xffff),
                          4, byteorder='big')
         )[:length]  # 8 Bytes
