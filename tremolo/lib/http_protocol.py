@@ -275,7 +275,7 @@ class HTTPProtocol(asyncio.Protocol):
             # successfully got header,
             # clear either the request or keepalive timeout
             if not self.events['request'].done():
-                self.events['request'].set_result(None)
+                self.events['request'].set_result(request)
 
             await self.request_received(request, response)
         except (SystemExit, KeyboardInterrupt):
@@ -295,19 +295,17 @@ class HTTPProtocol(asyncio.Protocol):
             await request.handler_exit()
 
     async def _receive_data(self):
-        if 'request' in self.events:
-            await self.events['request']
-
-        if self.request is None:
+        if 'request' not in self.events:
             return
 
+        request = await self.events['request']
         excess = 0
 
-        if not self.request.upgraded:
-            self.request.body_size += len(self._recv_buf)
+        if not request.upgraded:
+            request.body_size += len(self._recv_buf)
 
-            if self.request.body_size > self.request.content_length > -1:
-                excess = self.request.body_size - self.request.content_length
+            if request.body_size > request.content_length > -1:
+                excess = request.body_size - request.content_length
 
         while len(self._recv_buf) > excess:
             data = self._recv_buf[:min(self.options['buffer_size'],
@@ -320,17 +318,17 @@ class HTTPProtocol(asyncio.Protocol):
                 return
 
         # maybe resume reading, or close
-        if self.request is not None:
+        if 'receive' in self.events:
             del self.events['receive']
 
-            if self.request.upgraded:
+            if request.upgraded:
                 if self in self.globals.connections:
                     self.transport.resume_reading()
-            elif self.request.body_size > self.options['client_max_body_size']:
+            elif request.body_size > self.options['client_max_body_size']:
                 self.close(BadRequest('payload too large'))
-            elif self.request.body_size >= self.request.content_length > -1:
+            elif request.body_size >= request.content_length > -1:
                 self.queue[0].put_nowait(None)
-            elif self.request.has_body and not self.request.eof():
+            elif request.has_body and not request.eof():
                 self.transport.resume_reading()
 
     def data_received(self, data):
@@ -388,7 +386,6 @@ class HTTPProtocol(asyncio.Protocol):
                     if self.request is not None:
                         if self.request.http_continue:
                             self.request.http_continue = False
-                            self.transport.resume_reading()
                             continue
 
                         if self.request.http_keepalive:
