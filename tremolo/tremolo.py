@@ -25,7 +25,7 @@ from .lib.contexts import WorkerContext
 from .lib.executors import MultiThreadExecutor
 from .lib.locks import ServerLock
 
-__version__ = '0.4.18'
+__version__ = '0.4.19'
 
 
 class Tremolo:
