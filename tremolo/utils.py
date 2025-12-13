@@ -177,14 +177,14 @@ def print_logo():
     RESET = '\033[0m'
 
     try:
-        print(f'\n                                {BLUE}▄▄██{RESET}')
+        print(f'\n                                {BLUE}▃▃▇▇{RESET}')
     except UnicodeEncodeError:
         return
 
-    print(f'  █                             {BLUE}▀▀  {RESET}')
-    print(f'  █▀▀  █▄▀▀ ▄▀▀▀▄ ▄▀▀█▀▀▄ ▄▀▀▀▄ {BLUE}▄▄██{RESET} ▄▀▀▀▄')
-    print(f'  █    █    █▄▄▄█ █  █  █ █   █ {BLUE}▀▀  {RESET} █   █')
-    print(f'  █    █    █     █  █  █ █   █ {BLUE}▄▄██{RESET} █   █')
+    print(f'  ▃                             {BLUE}▀▀  {RESET}')
+    print(f'  █▃▃  ▃ ▃▃  ▃▃▃  ▃▃▃ ▃▃   ▃▃▃  {BLUE}▃▃▇▇{RESET}  ▃▃▃ ')
+    print(f'  █    █▀   █▂▂▂█ █  █  █ █   █ {BLUE}▀▀  {RESET} █   █')
+    print(f'  █    █    █▔▔▔▔ █  █  █ █   █ {BLUE}▃▃▇▇{RESET} █   █')
     print(f'   ▀▀▀ ▀     ▀▀▀  ▀  ▀  ▀  ▀▀▀  {BLUE}▀▀  {RESET}  ▀▀▀ \n')
 
 
