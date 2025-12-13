@@ -63,7 +63,7 @@ class HTTPProtocol(asyncio.Protocol):
             exc = task.exception()
 
             if exc:
-                self.print_exception(exc, 'task_done')
+                self.close(exc)
 
     def connection_made(self, transport):
         self.context.update(transport=transport)
@@ -114,6 +114,7 @@ class HTTPProtocol(asyncio.Protocol):
 
     def keepalive_timeout(self, timeout):
         self.logger.debug('keepalive timeout after %gs', timeout)
+        self.close()
 
     def send_timeout(self, timeout):
         self.logger.debug('send timeout after %gs', timeout)
@@ -125,13 +126,10 @@ class HTTPProtocol(asyncio.Protocol):
             return await waiter
         except asyncio.CancelledError:
             if not self.is_closing():
-                try:
-                    if callable(timeout_cb):
-                        timeout_cb(timeout)
+                if callable(timeout_cb):
+                    timeout_cb(timeout)
 
-                    self.close()
-                except Exception as exc:
-                    self.close(exc)
+                raise
         finally:
             timer.cancel()
 
