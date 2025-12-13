@@ -19,6 +19,8 @@ class HTTPServer(HTTPProtocol):
             for _, func in reversed(self.app.hooks['close']):
                 if await func(**self.server):
                     break
+        except Exception as e:
+            self.print_exception(e, '_connection_lost')
         finally:
             super().connection_lost(exc)
 
