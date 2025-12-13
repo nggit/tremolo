@@ -89,8 +89,8 @@ class HTTPServer(HTTPProtocol):
 
             await response.end(data)
         else:
-            self.logger.info('middleware %s has exited with the connection '
-                             'possibly left open', func.__name__)
+            self.logger.debug('middleware %s has exited with the connection '
+                              'possibly left open', func.__name__)
 
         return True
 
@@ -138,8 +138,8 @@ class HTTPServer(HTTPProtocol):
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
-                self.logger.info('handler %s has exited with the connection '
-                                 'possibly left open', func.__name__)
+                self.logger.debug('handler %s has exited with the connection '
+                                  'possibly left open', func.__name__)
                 return
 
         status = response.get_status()
