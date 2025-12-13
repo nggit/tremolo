@@ -183,8 +183,8 @@ def print_logo():
 
     print(f'  ▃                             {BLUE}▀▀  {RESET}')
     print(f'  █▃▃  ▃ ▃▃  ▃▃▃  ▃▃▃ ▃▃   ▃▃▃  {BLUE}▃▃▇▇{RESET}  ▃▃▃ ')
-    print(f'  █    █▀   █▃▃▃█ █  █  █ █   █ {BLUE}▀▀  {RESET} █   █')
-    print(f'  █    █    █     █  █  █ █   █ {BLUE}▃▃▇▇{RESET} █   █')
+    print(f'  █    █▀   █▂▂▂█ █  █  █ █   █ {BLUE}▀▀  {RESET} █   █')
+    print(f'  █    █    █▔▔▔▔ █  █  █ █   █ {BLUE}▃▃▇▇{RESET} █   █')
     print(f'   ▀▀▀ ▀     ▀▀▀  ▀  ▀  ▀  ▀▀▀  {BLUE}▀▀  {RESET}  ▀▀▀ \n')
 
 
