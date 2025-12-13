@@ -83,29 +83,29 @@ class HTTPHeader:
         while max_lines > 1:
             try:
                 line = lines.__next__()
-
-                if line == b'':
-                    break
-
-                if len(line) > max_line_size or not is_safe(line):
-                    self.is_valid = False
-                    return self
-
-                colon_pos = line.find(b':', 1)
-
-                if colon_pos <= 0 or line[colon_pos - 1] == 32:
-                    self.is_valid = False
-                    break
-
-                name = line[:colon_pos].lower()
-                value = line[colon_pos + 1:].strip(b' \t')
-
-                if name in self.headers:
-                    self.headers[name].append(value)
-                else:
-                    self.headers[name] = [value]
             except StopIteration:
                 break
+
+            if line == b'':
+                break
+
+            if len(line) > max_line_size or not is_safe(line):
+                self.is_valid = False
+                return self
+
+            colon_pos = line.find(b':', 1)
+
+            if colon_pos <= 0 or line[colon_pos - 1] == 32:
+                self.is_valid = False
+                break
+
+            name = line[:colon_pos].lower()
+            value = line[colon_pos + 1:].strip(b' \t')
+
+            if name in self.headers:
+                self.headers[name].append(value)
+            else:
+                self.headers[name] = [value]
 
             max_lines -= 1
         else:
