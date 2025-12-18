@@ -126,13 +126,15 @@ class Tremolo:
         if callable(func) and not isinstance(func, type):
             self.routes.add(func, path, getoptions(func))
         else:  # a class-based view
-            for name in dir(func):
-                if name.startswith('_'):
+            name = getattr(func, '__module__', None) or func.__name__
+
+            for attr_name in dir(func):
+                method = getattr(func, attr_name)
+
+                if attr_name.startswith('_') or not callable(method):
                     continue
 
-                method = getattr(func, name)
-
-                if callable(method):
+                if method.__module__ == name and not isinstance(method, type):
                     self.routes.add(
                         method, path, dict(getoptions(method), self=func),
                         **options
