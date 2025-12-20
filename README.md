@@ -12,7 +12,7 @@ Being built with a stream in mind, Tremolo tends to use `yield` instead of `retu
 @app.route('/hello')
 async def hello_world(**server):
     yield b'Hello '
-    yield b'world!'
+    yield b'World!'
 ```
 
 But that's not the only pattern. You can go straight to the [Basics](https://nggit.github.io/tremolo-docs/basics/) to start building your web application with Tremolo.
@@ -51,7 +51,7 @@ app = Application()
 
 @app.route('/hello')
 async def hello_world(**server):
-    return 'Hello world!', 'latin-1'
+    return 'Hello World!', 'latin-1'
 
 
 if __name__ == '__main__':

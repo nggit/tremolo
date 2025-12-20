@@ -147,6 +147,20 @@ class HTTPResponse(Response):
         self.headers.pop(b'content-type', None)
         self.content_type = content_type
 
+    def set_connection(self, status):
+        if self.request.http_keepalive:
+            if status == 101:
+                self.request.upgraded = True
+            elif not (self.http_chunked or b'content-length' in self.headers):
+                # no chunk, no close, no size. Assume close to signal end
+                self.request.http_keepalive = False
+
+            self.set_header(
+                b'Connection', CONNECTIONS[(status in (101, 426)) + 1]
+            )
+        else:
+            self.set_header(b'Connection', b'close')
+
     def close(self, keepalive=False):
         if not keepalive:
             # this will force the TCP connection to be terminated
@@ -209,28 +223,13 @@ class HTTPResponse(Response):
                     self.http_chunked = chunked
 
                 self.set_status(*status)
+                self.set_connection(status[0])
 
                 if not no_content:
                     self.set_header(b'Content-Type', self.content_type)
 
                 if self.http_chunked:
                     self.set_header(b'Transfer-Encoding', b'chunked')
-
-                if self.request.http_keepalive:
-                    if status[0] == 101:
-                        self.request.upgraded = True
-                    elif not (self.http_chunked or
-                              b'content-length' in self.headers):
-                        # no chunk, no close, no size.
-                        # Assume close to signal end
-                        self.request.http_keepalive = False
-
-                    self.set_header(
-                        b'Connection',
-                        CONNECTIONS[(status[0] in (101, 426)) + 1]
-                    )
-                else:
-                    self.set_header(b'Connection', b'close')
 
                 if self.request.method == b'HEAD' or no_content:
                     if status[0] not in (101, 426):

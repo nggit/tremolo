@@ -128,7 +128,7 @@ class HTTPServer(HTTPProtocol):
         finally:
             self.server.pop('self', None)  # avoid double self in middleware
 
-        next_data = getattr(coro, '__anext__', False)
+        next_data = getattr(coro, '__anext__', None)
 
         if next_data:
             data = await next_data()
@@ -158,20 +158,7 @@ class HTTPServer(HTTPProtocol):
             response.set_header(b'Transfer-Encoding', b'chunked')
 
         if next_data:
-            if request.http_keepalive:
-                if status[0] == 101:
-                    request.upgraded = True
-                elif not (response.http_chunked or
-                          b'content-length' in response.headers):
-                    # no chunk, no close, no size.
-                    # Assume close to signal end
-                    request.http_keepalive = False
-
-                response.set_header(
-                    b'Connection', CONNECTIONS[(status[0] in (101, 426)) + 1]
-                )
-            else:
-                response.set_header(b'Connection', b'close')
+            response.set_connection(status[0])
 
             if await self.run_middlewares('response', reverse=True):
                 return
