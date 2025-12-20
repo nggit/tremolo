@@ -128,7 +128,7 @@ class HTTPServer(HTTPProtocol):
         finally:
             self.server.pop('self', None)  # avoid double self in middleware
 
-        next_data = getattr(coro, '__anext__', False)
+        next_data = getattr(coro, '__anext__', None)
 
         if next_data:
             data = await next_data()
