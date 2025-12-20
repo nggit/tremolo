@@ -314,7 +314,8 @@ class HTTPServer(HTTPProtocol):
                             if method not in methods:
                                 continue
 
-                            matches['self'] = kwargs['self'](**options)
+                            if callable(kwargs['self']):
+                                matches['self'] = kwargs['self'](**options)
 
                         for k in matches:
                             self.server.setdefault(k, matches[k])

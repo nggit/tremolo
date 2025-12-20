@@ -123,20 +123,22 @@ class Tremolo:
         return self.middleware('response', *args, **kwargs)
 
     def add_route(self, func, path='/', **options):
-        if isinstance(func, type):  # a class-based view
-            for name in dir(func):
-                if name.startswith('_'):
+        if callable(func) and not isinstance(func, type):
+            self.routes.add(func, path, getoptions(func))
+        else:  # a class-based view
+            name = getattr(func, '__module__', None) or func.__name__
+
+            for attr_name in dir(func):
+                method = getattr(func, attr_name)
+
+                if attr_name.startswith('_') or not callable(method):
                     continue
 
-                method = getattr(func, name)
-
-                if callable(method):
+                if method.__module__ == name and not isinstance(method, type):
                     self.routes.add(
                         method, path, dict(getoptions(method), self=func),
                         **options
                     )
-        else:
-            self.routes.add(func, path, getoptions(func))
 
     def add_hook(self, func, name='worker_start', priority=999):
         if name not in self.hooks:
