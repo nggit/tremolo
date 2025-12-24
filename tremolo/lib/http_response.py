@@ -25,11 +25,21 @@ CONNECTIONS = (b'close', b'keep-alive', b'upgrade')
 
 
 class HeaderKey(bytes):
-    def __new__(cls, name):
-        obj = super().__new__(cls, name.lower())
-        obj.name = name  # original casing
+    __slots__ = ()
+    names = {
+        b'allow': b'Allow',
+        b'location': b'Location'
+    }
 
-        return obj
+    def __new__(cls, name):
+        key = name.lower()
+        cls.names.setdefault(key, name)
+
+        return super().__new__(cls, key)
+
+    @property
+    def name(self):
+        return self.names[self]
 
 
 class HTTPResponse(Response):
