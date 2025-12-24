@@ -19,6 +19,8 @@ class HTTPServer(HTTPProtocol):
             for _, func in reversed(self.app.hooks['close']):
                 if await func(**self.server):
                     break
+        except Exception as e:
+            self.print_exception(e, '_connection_lost')
         finally:
             super().connection_lost(exc)
 
@@ -89,8 +91,8 @@ class HTTPServer(HTTPProtocol):
 
             await response.end(data)
         else:
-            self.logger.info('middleware %s has exited with the connection '
-                             'possibly left open', func.__name__)
+            self.logger.debug('middleware %s has exited with the connection '
+                              'possibly left open', func.__name__)
 
         return True
 
@@ -120,24 +122,26 @@ class HTTPServer(HTTPProtocol):
             response.set_content_type(options['content_type'])
 
         try:
-            agen = func(func=func, kwargs=kwargs, **self.server)
+            coro = func(func=func, kwargs=kwargs, **self.server)
         except TypeError:  # doesn't accept extra **kwargs
-            agen = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
+            coro = func(**{k: self.server.get(k, kwargs[k]) for k in kwargs})
+        finally:
+            self.server.pop('self', None)  # avoid double self in middleware
 
-        next_data = getattr(agen, '__anext__', False)
+        next_data = getattr(coro, '__anext__', None)
 
         if next_data:
             data = await next_data()
         else:
-            data = await agen
+            data = await coro
 
             if data is None:
                 response.close(keepalive=response.headers_sent())
                 return
 
             if not isinstance(data, (bytes, bytearray, str, tuple)):
-                self.logger.info('handler %s has exited with the connection '
-                                 'possibly left open', func.__name__)
+                self.logger.debug('handler %s has exited with the connection '
+                                  'possibly left open', func.__name__)
                 return
 
         status = response.get_status()
@@ -154,20 +158,7 @@ class HTTPServer(HTTPProtocol):
             response.set_header(b'Transfer-Encoding', b'chunked')
 
         if next_data:
-            if request.http_keepalive:
-                if status[0] == 101:
-                    request.upgraded = True
-                elif not (response.http_chunked or
-                          b'content-length' in response.headers):
-                    # no chunk, no close, no size.
-                    # Assume close to signal end
-                    request.http_keepalive = False
-
-                response.set_header(
-                    b'Connection', CONNECTIONS[(status[0] in (101, 426)) + 1]
-                )
-            else:
-                response.set_header(b'Connection', b'close')
+            response.set_connection(status[0])
 
             if await self.run_middlewares('response', reverse=True):
                 return
@@ -310,7 +301,8 @@ class HTTPServer(HTTPProtocol):
                             if method not in methods:
                                 continue
 
-                            matches['self'] = kwargs['self'](**options)
+                            if callable(kwargs['self']):
+                                matches['self'] = kwargs['self'](**options)
 
                         for k in matches:
                             self.server.setdefault(k, matches[k])

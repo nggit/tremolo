@@ -45,16 +45,13 @@ class ASGILifespan:
     async def send(self, data):
         if data['type'] in ('lifespan.startup.complete',
                             'lifespan.shutdown.complete'):
-            self._waiter.set_result(None)
+            self._waiter.set_result(self._loop.create_future())
             self._logger.info(data['type'])
         elif data['type'] in ('lifespan.startup.failed',
                               'lifespan.shutdown.failed'):
-            if 'message' in data:
-                message = ': %s' % data['message']
-            else:
-                message = ''
-
-            raise LifespanError('%s%s' % (data['type'], message))
+            raise LifespanError(
+                '%s: %s' % (data['type'], data.get('message', ''))
+            )
         else:
             raise LifespanProtocolUnsupported
 
@@ -63,26 +60,26 @@ class ASGILifespan:
                                    self._waiter.cancel)
 
         try:
-            await self._waiter
-
-            self._waiter = self._loop.create_future()
+            self._waiter = await self._waiter
         except asyncio.CancelledError:
-            try:
-                exc = self._task.exception()
+            if not self._task.done():
+                self._task.cancel()
+                self._logger.error('lifespan: timeout after %gs', timeout)
+                raise
 
-                if exc:
-                    if isinstance(exc, LifespanError):
-                        return exc
+            exc = self._task.exception()
 
-                    if isinstance(exc, LifespanProtocolUnsupported):
-                        self._logger.info(exc)
-                    else:
-                        self._logger.info(
-                            '%s: %s',
-                            LifespanProtocolUnsupported.message,
-                            str(exc) or repr(exc)
-                        )
-            except asyncio.InvalidStateError:
-                self._logger.warning('lifespan: timeout after %gs', timeout)
+            if exc:
+                if isinstance(exc, LifespanError):
+                    return exc
+
+                if isinstance(exc, LifespanProtocolUnsupported):
+                    self._logger.info(exc)
+                else:
+                    self._logger.info(
+                        '%s: %s',
+                        LifespanProtocolUnsupported.message,
+                        str(exc) or exc.__class__.__name__
+                    )
         finally:
             timer.cancel()

@@ -25,7 +25,7 @@ from .lib.contexts import WorkerContext
 from .lib.executors import MultiThreadExecutor
 from .lib.locks import ServerLock
 
-__version__ = '0.4.17'
+__version__ = '0.4.19'
 
 
 class Tremolo:
@@ -123,20 +123,22 @@ class Tremolo:
         return self.middleware('response', *args, **kwargs)
 
     def add_route(self, func, path='/', **options):
-        if isinstance(func, type):  # a class-based view
-            for name in dir(func):
-                if name.startswith('_'):
+        if callable(func) and not isinstance(func, type):
+            self.routes.add(func, path, getoptions(func))
+        else:  # a class-based view
+            name = getattr(func, '__module__', None) or func.__name__
+
+            for attr_name in dir(func):
+                method = getattr(func, attr_name)
+
+                if attr_name.startswith('_') or not callable(method):
                     continue
 
-                method = getattr(func, name)
-
-                if callable(method):
+                if method.__module__ == name and not isinstance(method, type):
                     self.routes.add(
                         method, path, dict(getoptions(method), self=func),
                         **options
                     )
-        else:
-            self.routes.add(func, path, getoptions(func))
 
     def add_hook(self, func, name='worker_start', priority=999):
         if name not in self.hooks:
@@ -219,6 +221,9 @@ class Tremolo:
         options = self.context.options
         options.update(kwargs)
 
+        options.setdefault('debug', False)
+        options.setdefault('log_level',
+                           'DEBUG' if options['debug'] else 'INFO')
         options.setdefault('app', None)
         options.setdefault('app_dir', os.getcwd())
         options.setdefault('shutdown_timeout', 30)
@@ -227,15 +232,14 @@ class Tremolo:
         if self.logger is None:
             self.logger = logging.getLogger(mp.current_process().name)
 
-        self.logger.setLevel(
-            getattr(logging,
-                    options.get('log_level', 'DEBUG').upper(), logging.DEBUG)
-        )
+        self.logger.setLevel(options['log_level'].upper())
+
+        handler = logging.StreamHandler()
         formatter = logging.Formatter(
             options.get('log_fmt',
                         '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
         )
-        handler = logging.StreamHandler()
+
         handler.setFormatter(formatter)
         self.logger.addHandler(handler)
 
@@ -342,7 +346,6 @@ class Tremolo:
         self.context.info['server_name'] = options[
                                            'server_name'].encode('latin-1')
 
-        options.setdefault('debug', False)
         options.setdefault('experimental', False)
         options.setdefault('ws', True)
         options.setdefault('ws_max_payload_size', 2 * 1048576)
