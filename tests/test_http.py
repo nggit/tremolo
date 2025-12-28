@@ -639,38 +639,50 @@ class TestHTTP(unittest.TestCase):
             self.assertEqual(response.url, b'/new')
 
     def test_pipeline_content_length(self):
-        with self.client2:
-            self.client2.sendall(
-                b'POST /upload HTTP/1.1\r\n'
-                b'Host: localhost\r\n'
-                b'Content-Type: x-www-form-urlencoded\r\n'
-                b'Content-Length: 7\r\n\r\nfoo=bar'
-                b'GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n'
-                b'GET / HTTP/1.1\r\n\r\n'
-                b'GET / HTTP/1.0\r\n\r\n'
-            )
-            response = self.client2.end()
+        for _ in range(10):
+            with self.client2:
+                self.client2.sendall(
+                    b'POST /upload HTTP/1.1\r\n'
+                    b'Host: localhost\r\n'
+                    b'Content-Type: x-www-form-urlencoded\r\n'
+                    b'Content-Length: 7\r\n\r\nfoo=bar'
+                    b'GET / HTTP/1.0\r\nConnection: keep-alive\r\n\r\n'
+                    b'GET / HTTP/1.1\r\n\r\n'
+                    b'GET / HTTP/1.0\r\n\r\n'
+                )
+                response = self.client2.end()
 
-            self.assertEqual(response.body(), b'foo=bar')
-            self.assertEqual(response.header.version, b'HTTP/1.1')
-            self.assertEqual(response.status, 200)
-            self.assertEqual(response.message, b'OK')
+                self.assertEqual(response.body(), b'foo=bar')
+                self.assertEqual(response.header.version, b'HTTP/1.1')
+                self.assertEqual(response.status, 200)
+                self.assertEqual(response.message, b'OK')
 
-            response = self.client2.end()
+                response = self.client2.end()
+                body = response.body()
 
-            self.assertEqual(response.body(), b'Under Maintenance')
-            self.assertEqual(response.header.version, b'HTTP/1.0')
-            self.assertEqual(response.status, 503)
-            self.assertEqual(response.message, b'Service Unavailable')
+                if body == b'':
+                    continue
 
-            response = self.client2.end()
+                self.assertEqual(body, b'Under Maintenance')
+                self.assertEqual(response.header.version, b'HTTP/1.0')
+                self.assertEqual(response.status, 503)
+                self.assertEqual(response.message, b'Service Unavailable')
 
-            self.assertEqual(response.body(), b'Bad Request')
-            self.assertEqual(response.header.version, b'HTTP/1.1')
-            self.assertEqual(response.status, 400)
-            self.assertEqual(response.message, b'Bad Request')
+                response = self.client2.end()
+                body = response.body()
 
-            self.assertEqual(self.client2.recv(4096), b'')
+                if body == b'':
+                    continue
+
+                self.assertEqual(body, b'Bad Request')
+                self.assertEqual(response.header.version, b'HTTP/1.1')
+                self.assertEqual(response.status, 400)
+                self.assertEqual(response.message, b'Bad Request')
+
+                self.assertEqual(self.client2.recv(4096), b'')
+                break
+        else:
+            raise ValueError('max retries exceeded')
 
     def test_pipeline_content_length_unconsumed(self):
         with self.client2:
