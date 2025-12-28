@@ -234,14 +234,19 @@ class Tremolo:
 
         self.logger.setLevel(options['log_level'].upper())
 
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            options.get('log_fmt',
-                        '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
-        )
+        for handler in self.logger.handlers:
+            if isinstance(handler, logging.StreamHandler):
+                break
+        else:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                options.get(
+                    'log_fmt',
+                    '[%(asctime)s] %(module)s: %(levelname)s: %(message)s')
+            )
 
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
 
         if sock is None:
             sock = self.create_sock(host, port)
@@ -496,7 +501,9 @@ class Tremolo:
                     break
 
     def _worker(self, host, port, **kwargs):
-        sys.stdout = TextIOWrapper(sys.stdout.buffer, line_buffering=True)
+        if not getattr(sys.stdout, 'line_buffering', False):
+            sys.stdout = TextIOWrapper(sys.stdout.buffer, line_buffering=True)
+
         loop_name = kwargs.get('loop', 'asyncio.')
 
         if '.' not in loop_name:
@@ -598,34 +605,37 @@ class Tremolo:
         except OSError:
             sock.close()
 
-    def _handle_reload(self, **info):
+    def _handle_reload(self, kwargs):
+        print('Reloading...')
+
+        if kwargs['app'] is None:
+            for module in list(sys.modules.values()):
+                module_file = getattr(module, '__file__', None)
+
+                if (module_file and
+                        module.__name__ not in ('__main__',
+                                                '__mp_main__',
+                                                'tremolo') and
+                        not module.__name__.startswith('tremolo.') and
+                        module_file.startswith(kwargs['app_dir']) and
+                        os.path.exists(module_file)):
+                    del sys.modules[module.__name__]
+
+            module = import_module(kwargs['module_name'])
+
+            # we need to update/rebind objects like
+            # routes, middlewares, etc.
+            for attr in module.__dict__.values():
+                if isinstance(attr, self.__class__) and attr.routes:
+                    self.__dict__.update(attr.__dict__)
+
+    def _process_exit(self, **info):
         args = info['args']
         kwargs = info['kwargs']
         process = info['process']
 
         if process.exitcode == 3:
-            print('Reloading...')
-
-            if kwargs['app'] is None:
-                for module in list(sys.modules.values()):
-                    module_file = getattr(module, '__file__', None)
-
-                    if (module_file and
-                            module.__name__ not in ('__main__',
-                                                    '__mp_main__',
-                                                    'tremolo') and
-                            not module.__name__.startswith('tremolo.') and
-                            module_file.startswith(kwargs['app_dir']) and
-                            os.path.exists(module_file)):
-                        del sys.modules[module.__name__]
-
-                module = import_module(kwargs['module_name'])
-
-                # we need to update/rebind objects like
-                # routes, middlewares, etc.
-                for attr in module.__dict__.values():
-                    if isinstance(attr, self.__class__) and attr.routes:
-                        self.__dict__.update(attr.__dict__)
+            self._handle_reload(kwargs)
         elif process.exitcode != 0:
             print(
                 'A worker process died (%d). Restarting...' % process.exitcode
@@ -637,7 +647,7 @@ class Tremolo:
             self.manager.spawn(
                 self._worker, args=args, kwargs=kwargs,
                 name=process.name,
-                exit_cb=self._handle_reload
+                exit_cb=self._process_exit
             )
 
     def run(self, host=None, port=0, *, worker_num=1, **kwargs):
@@ -713,7 +723,18 @@ class Tremolo:
         else:
             self.listen(port, host=host, **kwargs)
 
-        if worker_num < 1:
+        while worker_num == 0:  # single-process mode
+            try:
+                self._worker(host, port, **kwargs)
+                return
+            except SystemExit as exc:
+                if exc.code == 3:
+                    self._handle_reload(kwargs)
+                    continue
+
+                raise
+
+        if worker_num < 0:
             try:
                 worker_num = len(os.sched_getaffinity(0))
             except AttributeError:
@@ -752,7 +773,7 @@ class Tremolo:
                     self._worker,
                     args=args,
                     kwargs=dict(options, sock=sock, _locks=locks),
-                    exit_cb=self._handle_reload
+                    exit_cb=self._process_exit
                 )
 
         print('-' * terminal_width)
