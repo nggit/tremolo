@@ -131,8 +131,8 @@ async def on_request(**server):
 async def on_response(content_type=b'text/plain', **server):
     response = server['response']
 
-    assert response.headers[b'x-foo'] == [b'X-Foo: bar']
-    assert b'Set-Cookie: sess=www; ' in response.headers[b'set-cookie'][0]
+    assert response.headers[b'x-foo'] == [b'bar']
+    assert b'sess=www; ' in response.headers[b'set-cookie'][0]
 
     response.set_header(b'X-Foo', b'baz')
 
