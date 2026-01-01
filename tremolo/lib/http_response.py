@@ -24,6 +24,24 @@ from .websocket import WebSocket
 CONNECTIONS = (b'close', b'keep-alive', b'upgrade')
 
 
+class HeaderKey(bytes):
+    __slots__ = ()
+    names = {
+        b'allow': b'Allow',
+        b'location': b'Location'
+    }
+
+    def __new__(cls, name):
+        key = name.lower()
+        cls.names.setdefault(key, name)
+
+        return super().__new__(cls, key)
+
+    @property
+    def name(self):
+        return self.names[self]
+
+
 class HTTPResponse(Response):
     __slots__ = ('line', 'content_type', 'http_chunked', '_headers')
 
@@ -59,12 +77,12 @@ class HTTPResponse(Response):
         if b'\r' in name or b'\n' in name or b'\r' in value or b'\n' in value:
             raise InternalServerError
 
-        key = name.lower()
+        key = HeaderKey(name)
 
         if key in self.headers:
-            self.headers[key].append(name + b': ' + value)
+            self.headers[key].append(value)
         else:
-            self.headers[key] = [name + b': ' + value]
+            self.headers[key] = [value]
 
     def set_header(self, name, value=''):
         if isinstance(name, str):
@@ -76,7 +94,7 @@ class HTTPResponse(Response):
         if b'\r' in name or b'\n' in name or b'\r' in value or b'\n' in value:
             raise InternalServerError
 
-        self.headers[name.lower()] = [name + b': ' + value]
+        self.headers[HeaderKey(name)] = [value]
 
     def set_base_headers(self):
         self.set_header(
@@ -193,8 +211,9 @@ class HTTPResponse(Response):
                  self.content_type,
                  content_length,
                  CONNECTIONS[keepalive and self.request.http_keepalive],
-                 b'\r\n'.join(b'\r\n'.join(v) for k, v in self.headers.items()
-                              if k not in excludes),
+                 b'\r\n'.join(k.name + b': ' + value for k in self.headers
+                              if k not in excludes
+                              for value in self.headers[k]),
                  data), **kwargs
             )
             self.headers_sent(True)
@@ -244,7 +263,8 @@ class HTTPResponse(Response):
 
             await self.send(
                 b' '.join(self.line) + b'\r\n' +
-                b'\r\n'.join(b'\r\n'.join(v) for v in self.headers.values()) +
+                b'\r\n'.join(k.name + b': ' + value for k in self.headers
+                             for value in self.headers[k]) +
                 b'\r\n\r\n'
             )
             self.headers_sent(True)

@@ -117,7 +117,7 @@ def parse_args(**callbacks):
             options['ssl']['cert'] = sys.argv[i]
         elif sys.argv[i - 1] == '--ssl-key':
             options['ssl']['key'] = sys.argv[i]
-        elif sys.argv[i - 1].startswith('-'):
+        elif sys.argv[i - 1].startswith('--'):
             if name in callbacks:
                 code = callbacks[name](value=sys.argv[i], **context)
 
