@@ -17,7 +17,7 @@ jobs:
         run: |
           python -m venv --system-site-packages .local
           echo "$HOME/.local/bin" >> $GITHUB_PATH
-          python -m pip install --upgrade pip build setuptools
+          python -m pip install --upgrade pip build setuptools>=77.0.0
 
       - name: Build and verify its integrity
         run: |
