@@ -19,7 +19,7 @@ def add_package(path, app, base=()):
                 continue
 
             if entry.is_dir():
-                add_module(entry.path, app, base)
+                add_package(entry.path, app, base)
                 continue
 
             name, ext = os.path.splitext(entry.name)
