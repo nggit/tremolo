@@ -74,7 +74,7 @@ class Client:
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        self.sock.close()
+        self.close()
 
     async def __aenter__(self):
         if self.loop is None:
@@ -112,7 +112,7 @@ class Client:
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
-        self.sock.close()
+        self.close()
 
     def recv(self, n):
         if self.sock.gettimeout() == 0:
@@ -123,7 +123,7 @@ class Client:
         while len(buf) < n:
             data = self.sock.recv(n - len(buf))
 
-            if data == b'':
+            if not data:
                 break
 
             buf.extend(data)
@@ -135,6 +135,9 @@ class Client:
             return self.loop.sock_sendall(self.sock, data)
 
         return self.sock.sendall(data)
+
+    def close(self):
+        self.sock.close()
 
 
 class HTTPClient(Client):

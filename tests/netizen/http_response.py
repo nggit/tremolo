@@ -214,7 +214,7 @@ class HTTPResponse:
                 1 if self._buf.endswith((b'\r', b'\n')) else 4
             )
 
-            if data == b'':
+            if not data:
                 raise StopIteration
 
             self._handle_response(data)
@@ -237,7 +237,7 @@ class HTTPResponse:
 
                 data = self.client.sock.recv(16384)
 
-                if data == b'':
+                if not data:
                     raise StopIteration
 
                 self._buf.extend(data)
@@ -254,7 +254,7 @@ class HTTPResponse:
                 16384 if self.content_length <= -2 else self.content_length
             )
 
-        if data == b'':
+        if not data:
             raise StopIteration
 
         self.content_length -= len(data)
@@ -270,7 +270,7 @@ class HTTPResponse:
                 1 if self._buf.endswith((b'\r', b'\n')) else 4
             )
 
-            if data == b'':
+            if not data:
                 raise StopAsyncIteration
 
             self._handle_response(data)
@@ -294,7 +294,7 @@ class HTTPResponse:
                 data = await self.client.loop.sock_recv(self.client.sock,
                                                         16384)
 
-                if data == b'':
+                if not data:
                     raise StopAsyncIteration
 
                 self._buf.extend(data)
@@ -312,7 +312,7 @@ class HTTPResponse:
                 16384 if self.content_length <= -2 else self.content_length
             )
 
-        if data == b'':
+        if not data:
             raise StopAsyncIteration
 
         self.content_length -= len(data)
