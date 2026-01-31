@@ -26,9 +26,17 @@ class ThreadExecutor(Thread):
         self.context = context
         self.queue = getattr(queue, 'SimpleQueue', queue.Queue)()
         self.loop = loop or asyncio.get_event_loop()
+
+        self._startup = self.loop.create_future()
         self._shutdown = None
 
+    def start(self):
+        super().start()
+        return self._startup
+
     def run(self):
+        self._startup.set_result(None)
+
         while self.loop.is_running():
             try:
                 self.loop.call_soon_threadsafe(  # set the last active thread
@@ -104,15 +112,20 @@ class MultiThreadExecutor:
         self.thread = None  # points to the last active thread
         self.counter = 1
 
-    def start(self, prefix='MultiThreadExecutor', **kwargs):
+    def start(self, prefix='MultiThreadExecutor', loop=None, **kwargs):
+        aws = []
+
         while len(self.threads) < self.size:
             self.thread = ThreadExecutor(
-                self, name=f'{prefix}-{self.counter}', **kwargs
+                self, name=f'{prefix}-{self.counter}', loop=loop, **kwargs
             )
             self.thread.start()
             self.threads.append(self.thread)
+            aws.append(self.thread._startup)
 
             self.counter += 1
+
+        return asyncio.gather(*aws)
 
     def submit(self, func, args=(), kwargs={}, name=None):
         if self.size == 0 or len(self.threads) < self.size:
@@ -130,8 +143,11 @@ class MultiThreadExecutor:
             self.start()
             raise
 
-    async def shutdown(self):
+    def shutdown(self):
         self.size = 0
+        aws = []
 
         while self.threads:
-            await self.threads.pop().shutdown()
+            aws.append(self.threads.pop().shutdown())
+
+        return asyncio.gather(*aws)

@@ -264,7 +264,7 @@ class Tremolo:
             ssl_context = None
 
         executor = MultiThreadExecutor(size=options.get('thread_pool_size', 5))
-        executor.start()
+        await executor.start(loop=self.loop)
 
         if '_locks' in options:
             lock = ServerLock(options['_locks'], executor, loop=self.loop)
