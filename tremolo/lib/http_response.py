@@ -484,7 +484,9 @@ class HTTPResponse(Response):
         exc = HTTPException(cause=exc)
 
         if data is None:
-            self.headers.clear()
+            if exc.code >= 400:
+                self.headers.clear()
+
             self.set_status(exc.code, exc.message)
             self.set_content_type(exc.content_type)
 
