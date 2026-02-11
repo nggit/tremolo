@@ -281,7 +281,7 @@ class HTTPServer(HTTPProtocol):
                     m = p.search(request.url)
 
                     if m:
-                        if (key == -1 and path != '' and
+                        if (key == -1 and path != b'' and
                                 p.pattern.startswith(b'^/' + parts[0])):
                             if parts[0] in self.app.routes:
                                 self.app.routes[parts[0]].append(
@@ -310,7 +310,7 @@ class HTTPServer(HTTPProtocol):
                         await self._handle_response(func, kwargs)
                         return
 
-            if methods or key == -1:
+            if key == -1 or method in methods:
                 break
 
             key = -1
