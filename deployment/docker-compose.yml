@@ -1,0 +1,13 @@
+services:
+  example-app:
+    build:
+      context: .
+      target: dev # "prod" for production
+      dockerfile: example_app.Dockerfile
+    image: example.com/example-app
+    container_name: example_app
+    restart: unless-stopped
+    volumes:
+      - ./example_app:/app
+    ports:
+      - "80:8080"
