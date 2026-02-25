@@ -18,7 +18,7 @@ fi
 # so we can modify files in both direction without hassle
 HOST_GID=$(stat -c '%g' /app)
 
-# keep the permissions in check each container restart
+# keep the permissions in check each container (re)start
 chmod 775 /app
 find /app -type d ! -perm 775 -exec chmod 775 {} +
 find /app -type f ! -perm 664 -exec chmod 664 {} +
