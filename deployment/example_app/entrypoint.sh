@@ -20,8 +20,8 @@ HOST_GID=$(stat -c '%g' /app)
 
 # keep the permissions in check each container restart
 chmod 775 /app
-find . -type d ! -perm 775 -exec chmod 775 {} +
-find . -type f ! -perm 664 -exec chmod 664 {} +
+find /app -type d ! -perm 775 -exec chmod 775 {} +
+find /app -type f ! -perm 664 -exec chmod 664 {} +
 
 chown -R "$USER:$HOST_GID" /app
 su - "$USER" -- -c 'exec python3 /app/server.py'
