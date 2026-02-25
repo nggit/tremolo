@@ -20,12 +20,8 @@ HOST_GID=$(stat -c '%g' /app)
 
 # keep the permissions in check each container restart
 chmod 775 /app
-chmod 664 /app/*
-
-# this is my share group example for SQLite
-#chmod 775 /app/data
-#chmod 664 /app/data/*.db
-#chmod 664 /app/data/*.db-*
+find . -type d ! -perm 775 -exec chmod 775 {} +
+find . -type f ! -perm 664 -exec chmod 664 {} +
 
 chown -R "$USER:$HOST_GID" /app
 su - "$USER" -- -c 'exec python3 /app/server.py'
