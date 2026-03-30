@@ -565,7 +565,6 @@ class Tremolo:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         sock.setblocking(False)
-        sock.set_inheritable(True)
 
         if sock.family.name == 'AF_UNIX':
             if not host.endswith('.sock'):
