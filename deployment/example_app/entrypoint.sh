@@ -1,11 +1,10 @@
 
-UID="$(id -u app 2>/dev/null)"
+USER=app
+UID="$(id -u "$USER" 2>/dev/null)"
 
 if [ -z "$UID" ]; then
     UID=0
     USER=root
-else
-    USER=app
 fi
 
 if [ "$UID" -lt 10000 ]; then

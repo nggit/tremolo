@@ -7,7 +7,7 @@ app = Application()
 
 @app.route('/hello')
 async def hello_world(**server):
-    return 'Hello world!', 'latin-1'
+    return 'Hello World!', 'latin-1'
 
 
 if __name__ == '__main__':
