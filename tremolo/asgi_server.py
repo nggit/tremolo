@@ -46,11 +46,6 @@ class ASGIServer(HTTPProtocol):
             'state': self.options['state'].copy()
         }
 
-        # provide direct access to server objects
-        self.server['request'] = request
-        self.server['response'] = response
-        scope['state']['server'] = self.server
-
         if (self.options['ws'] and b'sec-websocket-key' in request.headers and
                 b'upgrade' in request.headers and
                 request.headers[b'upgrade'][0].lower() == b'websocket'):

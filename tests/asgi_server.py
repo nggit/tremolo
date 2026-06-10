@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 import os
 import sys
 
@@ -67,7 +68,7 @@ async def app(scope, receive, send):
         return
 
     assert scope['type'] == 'http'
-    loop = scope['state']['server']['loop']
+    loop = asyncio.get_event_loop()
 
     more_body = True
 
