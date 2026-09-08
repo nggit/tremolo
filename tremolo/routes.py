@@ -24,7 +24,6 @@ class Routes(dict):
         self[1] = [
             (b'^/+(?:\\?.*)?$', handlers.index, getoptions(handlers.index), {})
         ]
-        self[-1] = []
 
     def add(self, func, path='/', kwargs=None, **options):
         if not kwargs:
@@ -47,10 +46,10 @@ class Routes(dict):
                 key = bytes([len(parts)]) + parts[0]
                 pattern = b'^/+%s(?:/+)?(?:\\?.*)?$' % path
 
-        if key != 1 and key in self:
-            self[key].append((pattern, func, kwargs, options))
-        else:
+        if key not in self or self[key][0][1] is handlers.index:
             self[key] = [(pattern, func, kwargs, options)]
+        else:
+            self[key].append((pattern, func, kwargs, options))
 
     def compile(self, executor=None):
         for key in self:
