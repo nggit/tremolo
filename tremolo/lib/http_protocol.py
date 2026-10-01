@@ -230,7 +230,7 @@ class HTTPProtocol(asyncio.Protocol):
         self.queue[1].put_nowait(None)
 
     async def _handle_request(self, request):
-        response = request.create_response()
+        response = request.accept()
         timer = self.set_handler_timeout(self.options['app_handler_timeout'])
 
         try:
