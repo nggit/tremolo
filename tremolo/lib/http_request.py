@@ -115,7 +115,7 @@ class HTTPRequest(Request):
 
         return prefix + os.urandom(length - len(prefix))
 
-    def create_response(self):
+    def accept(self):
         return HTTPResponse(self)
 
     def clear(self):
